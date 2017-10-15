@@ -1,0 +1,31 @@
+{
+  "name": "processor",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node ./index.js",
+    "lint": "eslint . --ignore-pattern 'public/*' --ext .js || true"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://gitlab.com/luettich/processor.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://gitlab.com/luettich/processor/issues"
+  },
+  "homepage": "https://gitlab.com/luettich/processor#README",
+  "dependencies": {
+    "config": "^1.26.2",
+    "kafka-node": "^2.2.3",
+    "winston": "^2.3.1"
+  },
+  "devDependencies": {
+    "eslint-config-topcoder": "^2.0.0",
+    "eslint-plugin-babel": "^4.1.2",
+    "eslint-plugin-chai-expect": "^1.1.1",
+    "eslint-plugin-react": "^7.2.0"
+  }
+}
