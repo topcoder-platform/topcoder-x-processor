@@ -7,6 +7,9 @@
     "start": "node ./index.js",
     "lint": "eslint . --ignore-pattern 'public/*' --ext .js || true"
   },
+  "engines": {
+    "node": ">8.6.0"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://gitlab.com/luettich/processor.git"
