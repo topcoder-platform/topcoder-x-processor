@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node ./index.js",
-    "lint": "eslint . --ignore-pattern 'public/*' --ext .js || true"
+    "lint": "eslint . --ignore-pattern 'public/*' --ext .js --fix || true"
   },
   "engines": {
     "node": ">8.6.0"
@@ -21,8 +21,17 @@
   },
   "homepage": "https://gitlab.com/luettich/processor#README",
   "dependencies": {
+    "axios": "^0.16.2",
     "config": "^1.26.2",
+    "joi": "^13.0.0",
+    "jwt-decode": "^2.2.0",
     "kafka-node": "^2.2.3",
+    "lodash": "^4.17.4",
+    "markdown-it": "^8.4.0",
+    "moment": "^2.19.1",
+    "mongoose": "^4.12.3",
+    "topcoder-dev-api-challenges": "^1.0.5",
+    "topcoder-dev-api-projects": "^1.0.1",
     "winston": "^2.3.1"
   },
   "devDependencies": {
