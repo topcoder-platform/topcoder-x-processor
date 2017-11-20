@@ -4,8 +4,10 @@
 /**
  * This module is the wrapper of the kafka consumer.
  *
+ * Changes in 1.1:
+ * - changes related to https://www.topcoder.com/challenges/30060466
  * @author TCSCODER
- * @version 1.0
+ * @version 1.1
  */
 'use strict';
 
@@ -17,7 +19,7 @@ const logger = require('./logger');
 
 class Kafka {
   constructor() {
-    this.client = new kafka.Client(config.ZOO_KEEPER);
+    this.client = new kafka.KafkaClient(config.KAFKA_OPTIONS);
     this.consumer = new kafka.Consumer(this.client, [{topic: config.TOPIC, partition: 0}], {autoCommit: true});
   }
 
@@ -34,7 +36,7 @@ class Kafka {
         return;
       }
 
-      if (event && _.includes(['issue.created', 'issue.updated'], event.event)) {
+      if (event && _.includes(['issue.created', 'issue.updated', 'comment.created', 'comment.updated', 'issue.assigned'], event.event)) {
         IssueService
           .process(event)
           .catch(logger.error);
