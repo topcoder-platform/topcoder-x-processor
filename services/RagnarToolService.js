@@ -4,7 +4,7 @@
 'use strict';
 
 /**
- * This provides methods around Ranger Self service tool api.
+ * This provides methods around Ragnar Self service tool api.
  * @author TCSCODER
  * @version 1.0
  */
@@ -20,7 +20,7 @@ const logger = require('../utils/logger');
 let cachedAccessToken;
 
 /**
- * Authenticate with Ranger Self service tool API and get the access token.
+ * Authenticate with Ragnar Self service tool API and get the access token.
  * @returns {String} the access token issued by tool
  * @private
  */
@@ -35,11 +35,11 @@ async function getAccessToken() {
   }
 
   // Authenticate
-  const response = await axios.post(config.TC_RANGER_LOGIN_URL, config.TC_RANGER_ADMIN_LOGIN_BODY);
+  const response = await axios.post(config.TC_RAGNAR_LOGIN_URL, config.TC_RAGNAR_ADMIN_LOGIN_BODY);
   const token = _.get(response, 'data.token');
 
   if (!token) {
-    throw new Error(`cannot authenticate with Ranger self service tool: ${config.TC_RANGER_LOGIN_URL}`);
+    throw new Error(`cannot authenticate with Ragnar self service tool: ${config.TC_RAGNAR_LOGIN_URL}`);
   }
   cachedAccessToken = token;
   return cachedAccessToken;
@@ -54,7 +54,7 @@ async function getAccessToken() {
 async function getTCUserName(provider, username) {
   Joi.attempt({provider, username}, getTCUserName.schema);
   const accessToken = await getAccessToken();
-  let url = config.TC_RANGER_USER_MAPPING_URL;
+  let url = config.TC_RAGNAR_USER_MAPPING_URL;
   if (provider === 'github') {
     url += `?githubUsername=${username}`;
   } else if (provider === 'gitlab') {
@@ -68,7 +68,7 @@ async function getTCUserName(provider, username) {
     });
     return response.data;
   } catch (error) {
-    logger.error(`Error occurred while getting username from Ranger for user ${error}`);
+    logger.error(`Error occurred while getting username from Ragnar for user ${error}`);
     return null;
   }
 }

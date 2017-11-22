@@ -110,7 +110,7 @@ removeAssign.schema = assignUser.schema;
 async function createComment(owner, repo, number, body) {
   Joi.attempt({owner, repo, number, body}, createComment.schema);
   await github.issues.createComment({owner, repo, number, body});
-  logger.debug('Comment is added on issue notifying user to assign using Ranger tool');
+  logger.debug('Comment is added on issue notifying user to assign using Ragnar tool');
 }
 
 createComment.schema = {

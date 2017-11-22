@@ -40,9 +40,9 @@ The following config parameters are supported, they are defined in `config/defau
 | NODE_MAILER_OPTIONS| the node mailer smtp options, see [here](https://nodemailer.com/smtp/ for more detail)| see `default.js` |
 |EMAIL_SENDER_ADDRESS| the email sender email address||
 |ISSUE_BID_EMAIL_RECEIVER| the email receiver about bid email||
-|TC_RANGER_USER_MAPPING_URL| the api URL of Ranger self service tool to get user mapping | see `default.js`|
-|TC_RANGER_ADMIN_LOGIN_BODY| the login request body of Admin user for Ranger self service tool| see `default.js`|
-|TC_RANGER_LOGIN_URL| the api URL of Ranger self service tool to login| see `default.js`|
+|TC_RAGNAR_USER_MAPPING_URL| the api URL of Ragnar self service tool to get user mapping | see `default.js`|
+|TC_RAGNAR_ADMIN_LOGIN_BODY| the login request body of Admin user for Ragnar self service tool| see `default.js`|
+|TC_RAGNAR_LOGIN_URL| the api URL of Ragnar self service tool to login| see `default.js`|
 |TC_DEV_ENV| the flag whether to use topcoder development api or production| false|
 
 KAFKA_OPTIONS should be object as described in https://github.com/SOHU-Co/kafka-node#kafkaclient
@@ -76,13 +76,13 @@ Create a MongoDB database, and configure `MONGODB_URL`.
 npm start
 ```
 
-Run and configure the Ranger self-service tool
+Run and configure the Ragnar self-service tool
 
 ## Verification
 
 - properly config and run the `receiver` app.
 - properly config and run the `processor` app.
-- properly config and run the Ranger self service tool.
+- properly config and run the Ragnar self service tool.
 - create an issue in the repo, you can see the logs in `receiver` and `processor`, the `issue.created` event is generated.
 - update an issue in the repo, you can see the logs in `receiver` and `processor`, the `issue.updated` event is generated.
 - create a comment on an issue, you can see the logs in `receiver` and `processor`, the `comment.created` event is generated.
@@ -157,12 +157,12 @@ Run and configure the Ranger self-service tool
 
 ### Issue Assignment
 When an user is assigned to an issue then 'issue.assigned' event will be captured and processed as
-- processor will get the Topcoder handle for such user using Ranger self service tool api
+- processor will get the Topcoder handle for such user using Ragnar self service tool api
 - if user is found then the topcoder challenge associated with that issue will be updated as
   - topcoder user will be assigned
 - if user is not found in mapping
   - comment on github issue will added as :
   ```
-  @username, please sign-up with Ranger Self-service tool.
+  @username, please sign-up with Ragnar Self-service tool.
   ```
   - user will be unassigned from issue

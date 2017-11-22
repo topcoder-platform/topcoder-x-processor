@@ -74,10 +74,10 @@ module.exports = {
   },
   EMAIL_SENDER_ADDRESS: process.env.EMAIL_SENDER_ADDRESS || '',
   ISSUE_BID_EMAIL_RECEIVER: process.env.ISSUE_BID_EMAIL_RECEIVER || '',
-  TC_RANGER_USER_MAPPING_URL: process.env.TC_RANGER_LOGIN_URL || 'http://localhost:3001/api/v1/admin/tcuser',
-  TC_RANGER_ADMIN_LOGIN_BODY: {
+  TC_RAGNAR_USER_MAPPING_URL: process.env.TC_RAGNAR_LOGIN_URL || 'http://localhost:3001/api/v1/admin/tcuser',
+  TC_RAGNAR_ADMIN_LOGIN_BODY: {
     username: "admin",
     password: "password"
   },
-  TC_RANGER_LOGIN_URL: process.env.TC_RANGER_LOGIN_URL || 'http://localhost:3001/api/v1/admin/login'
+  TC_RAGNAR_LOGIN_URL: process.env.TC_RAGNAR_LOGIN_URL || 'http://localhost:3001/api/v1/admin/login'
 };

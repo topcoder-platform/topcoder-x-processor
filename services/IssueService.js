@@ -19,7 +19,7 @@ const logger = require('../utils/logger');
 const topcoderApiHelper = require('../utils/topcoder-api-helper');
 const gitHubService = require('./GithubService');
 const emailService = require('./EmailService');
-const rangerService = require('./RangerToolService');
+const ragnarService = require('./RagnarToolService');
 
 const Issue = models.Issue;
 const Project = models.Project;
@@ -89,7 +89,7 @@ async function handleIssueAssignment(event, issue) {
     throw new Error(`This provider ${event.provider} is not supported`);
   }
   const assigneeUsername = event.data.assignee.name;
-  const userMapping = await rangerService.getTCUserName(event.provider, assigneeUsername);
+  const userMapping = await ragnarService.getTCUserName(event.provider, assigneeUsername);
   if (userMapping && userMapping.topcoderUsername) {
     // take found git user's topcoder handle and update the challenge assignment
     const dbIssue = await Issue.findOne({
@@ -110,7 +110,7 @@ async function handleIssueAssignment(event, issue) {
     logger.debug(`Member ${userMapping.topcoderUsername} is assigned to challenge with id ${dbIssue.challengeId}`);
   } else {
     // comment on the git ticket for the user to self-sign up with the Ragnar Self-Service tool
-    const comment = `@${assigneeUsername}, please sign-up with Ranger Self-service tool`;
+    const comment = `@${assigneeUsername}, please sign-up with Ragnar Self-service tool`;
     await gitHubService.createComment(event.data.issue.owner.name, event.data.repository.name, issue.number, comment);
     // un-assign the user from the ticket
     await gitHubService.removeAssign(event.data.issue.owner.name, event.data.repository.name, issue.number, assigneeUsername);
