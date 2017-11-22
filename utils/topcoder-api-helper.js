@@ -5,8 +5,10 @@
 /**
  * This module contains the helper methods to work with Topcoder APIs.
  *
+ * Changes in 1.1:
+ * - added support for switching topcoder dev and prod API through configuration
  * @author TCSCODER
- * @version 1.0
+ * @version 1.1
  */
 'use strict';
 
@@ -15,8 +17,17 @@ const axios = require('axios');
 const config = require('config');
 const _ = require('lodash');
 const moment = require('moment');
-const topcoderApiProjects = require('topcoder-dev-api-projects');
-const topcoderApiChallenges = require('topcoder-dev-api-challenges');
+
+let topcoderApiProjects = require('topcoder-api-projects');
+let topcoderApiChallenges = require('topcoder-api-challenges');
+
+const topcoderDevApiProjects = require('topcoder-dev-api-projects');
+const topcoderDevApiChallenges = require('topcoder-dev-api-challenges');
+
+if (config.TC_DEV_ENV) {
+  topcoderApiProjects = topcoderDevApiProjects;
+  topcoderApiChallenges = topcoderDevApiChallenges;
+}
 
 // Cache the access token
 let cachedAccessToken;
@@ -88,7 +99,6 @@ async function createProject(projectName) {
   const projectBody = new topcoderApiProjects.ProjectRequestBody.constructFromObject({
     projectName
   });
-
   const projectResponse = await new Promise((resolve, reject) => {
     projectsApiInstance.directProjectsPost(projectBody, (err, res) => {
       if (err) {
@@ -159,7 +169,6 @@ async function updateChallenge(id, challenge) {
     });
   });
 }
-
 
 module.exports = {
   createProject,
