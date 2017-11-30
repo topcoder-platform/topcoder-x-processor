@@ -18,8 +18,8 @@ module.exports = {
   KAFKA_OPTIONS: {
     kafkaHost: process.env.KAFKA_HOST || 'localhost:9092'
   },
-  MONGODB_URL: process.env.MONGODB_URL || 'mongodb://127.0.0.1:27017/events',
-  TC_DEV_ENV: false,
+  MONGODB_URL: process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/events',
+  TC_DEV_ENV: process.env.NODE_ENV === 'production' ? false : true,
   TC_AUTHN_URL: process.env.TC_AUTHN_URL || 'https://topcoder-dev.auth0.com/oauth/ro',
   TC_AUTHN_REQUEST_BODY: {
     username: process.env.TC_USERNAME || 'mess',
