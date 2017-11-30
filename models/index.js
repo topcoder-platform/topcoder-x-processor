@@ -5,8 +5,10 @@
 
 /**
  * Initialize and export all model schemas.
+ * Changes in 1.1:
+ * - changes related to https://www.topcoder.com/challenges/30060466
  * @author TCSCODER
- * @version 1.0
+ * @version 1.1
  */
 const config = require('config');
 const mongoose = require('mongoose');
@@ -16,7 +18,8 @@ const connection = mongoose.createConnection(config.MONGODB_URL);
 
 /* eslint-disable global-require */
 const models = {
-  Issue: connection.model('Issue', require('./Issue'))
+  Issue: connection.model('Issue', require('./Issue')),
+  Project: connection.model('Project', require('./Project'))
 };
 /* eslint-enable global-require */
 
