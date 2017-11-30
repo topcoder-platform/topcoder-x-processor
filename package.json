@@ -8,7 +8,7 @@
     "lint": "eslint . --ignore-pattern 'public/*' --ext .js --fix || true"
   },
   "engines": {
-    "node": ">8.6.0"
+    "node": "~8.6.0"
   },
   "repository": {
     "type": "git",
