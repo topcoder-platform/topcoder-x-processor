@@ -3,6 +3,8 @@
  */
 'use strict';
 
+const fs = require('fs');
+
 /**
  * This module is the configuration of the app.
  * Changes in 1.1:
@@ -16,7 +18,11 @@ module.exports = {
   LOG_LEVEL: process.env.LOG_LEVEL || 'debug',
   TOPIC: process.env.TOPIC || 'events_topic',
   KAFKA_OPTIONS: {
-    kafkaHost: process.env.KAFKA_HOST || 'localhost:9092'
+    kafkaHost: process.env.KAFKA_HOST || 'localhost:9092',
+    sslOptions: {
+      cert: process.env.KAFKA_CLIENT_CERT || fs.readFileSync('./kafka_client.cer'),
+      key: process.env.KAFKA_CLIENT_CERT_KEY || fs.readFileSync('./kafka_client.key')
+   }
   },
   MONGODB_URL: process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/events',
   TC_DEV_ENV: process.env.NODE_ENV === 'production' ? false : true,
