@@ -18,6 +18,7 @@ module.exports = {
   LOG_LEVEL: process.env.LOG_LEVEL || 'debug',
   TOPIC: process.env.TOPIC || 'events_topic',
   KAFKA_OPTIONS: {
+    partition: process.env.KAFKA_PARTITION || 0,
     kafkaHost: process.env.KAFKA_HOST || 'localhost:9092',
     sslOptions: {
       cert: process.env.KAFKA_CLIENT_CERT || fs.readFileSync('./kafka_client.cer'),
