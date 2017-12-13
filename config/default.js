@@ -71,12 +71,12 @@ module.exports = {
   GITHUB_ADMIN_TOKEN: process.env.GITHUB_ADMIN_TOKEN || '',
   // node mailer option
   NODE_MAILER_OPTIONS: {
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: process.env.SMTP_PORT || 465,
+    host: process.env.SMTP_HOST || process.env.MAILGUN_SMTP_SERVER || 'smtp.gmail.com',
+    port: process.env.SMTP_PORT || process.env.MAILGUN_SMTP_POR || 465,
     secure: process.env.SMTP_IS_SECURE || true,
     auth: {
-      user: process.env.SMTP_USERNAME || '',
-      pass: process.env.SMTP_PASSWORD || ''
+      user: process.env.SMTP_USERNAME || process.env.MAILGUN_SMTP_LOGIN || '',
+      pass: process.env.SMTP_PASSWORD || process.env.MAILGUN_SMTP_PASSWORD || ''
     }
   },
   EMAIL_SENDER_ADDRESS: process.env.EMAIL_SENDER_ADDRESS || '',
