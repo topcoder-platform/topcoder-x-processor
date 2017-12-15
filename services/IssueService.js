@@ -73,6 +73,7 @@ function parseComment(comment) {
     parsedComment.assignedUser = command[0].match(/@([^\s]+)/g)[0].replace('@', '');
     // parse accepted bid amount
     const numberPart = command[0].match(/\$[0-9]+/g)[0].replace('$', '');
+    logger.debug(`parsed dollar amount out as ${numberPart}`);
     parsedComment.acceptedBidAmount = parseInt(numberPart, 10);
   }
   return parsedComment;
@@ -135,9 +136,10 @@ async function handleIssueComment(event, issue) {
   if (parsedComment.isAcceptBid) {
     logger.debug(`Bid by ${parsedComment.assignedUser} is accepted with amount ${parsedComment.bidAmount} `);
     const newTitle = `[$${parsedComment.acceptedBidAmount}] ${issue.title}`;
+    logger.debug(`updating issue: ${event.data.repository.name}/${issue.number}`);
     await gitHubService.updateIssue(event.data.issue.owner.name, event.data.repository.name, issue.number, newTitle);
     // assign user
-
+    logger.debug(`assigning user, ${event.data.issue.owner.name} to issue: ${event.data.repository.name}/${issue.number}`);
     await gitHubService.assignUser(event.data.issue.owner.name, event.data.repository.name, issue.number, parsedComment.assignedUser);
   }
 }
