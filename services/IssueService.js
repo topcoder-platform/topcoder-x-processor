@@ -233,7 +233,8 @@ async function handleIssueCreate(event, issue) {
     name: issue.title,
     projectId,
     detailedRequirements: issue.body,
-    prizes: issue.prizes
+    prizes: issue.prizes,
+    task: true
   });
 
   // Save
