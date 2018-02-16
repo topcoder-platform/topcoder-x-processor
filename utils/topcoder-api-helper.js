@@ -24,6 +24,9 @@ let topcoderApiChallenges = require('topcoder-api-challenges');
 const topcoderDevApiProjects = require('topcoder-dev-api-projects');
 const topcoderDevApiChallenges = require('topcoder-dev-api-challenges');
 
+const logger = require('./logger');
+
+
 if (config.TC_DEV_ENV) {
   topcoderApiProjects = topcoderDevApiProjects;
   topcoderApiChallenges = topcoderDevApiChallenges;
@@ -153,7 +156,7 @@ async function createChallenge(challenge) {
  */
 async function updateChallenge(id, challenge) {
   bearer.apiKey = await getAccessToken();
-
+  logger.debug(`Updating challenge ${id} with ${JSON.stringify(challenge)}`);
   // eslint-disable-next-line new-cap
   const challengeBody = new topcoderApiChallenges.UpdateChallengeBodyParam.constructFromObject({
     param: challenge
@@ -162,6 +165,8 @@ async function updateChallenge(id, challenge) {
   await new Promise((resolve, reject) => {
     challengesApiInstance.challengesIdPut(id, challengeBody, (err, res) => {
       if (err) {
+        logger.error(err);
+        logger.debug(JSON.stringify(err));
         reject(err);
       } else {
         resolve(res);

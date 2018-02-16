@@ -90,6 +90,7 @@ async function handleIssueAssignment(event, issue) {
     throw new Error(`This provider ${event.provider} is not supported`);
   }
   const assigneeUsername = event.data.assignee.name;
+  logger.debug(`Looking up TC handle of github user: ${assigneeUsername}`);
   const userMapping = await ragnarService.getTCUserName(event.provider, assigneeUsername);
   if (userMapping && userMapping.topcoderUsername) {
     // take found git user's topcoder handle and update the challenge assignment
@@ -104,8 +105,9 @@ async function handleIssueAssignment(event, issue) {
     }
 
     // Update the challenge
+    logger.debug(`Assinging user to challenge: ${userMapping.topcoderUsername}`);
     await topcoderApiHelper.updateChallenge(dbIssue.challengeId, {
-      task: true,
+      //task: true,
       assignees: [userMapping.topcoderUsername]
     });
     logger.debug(`Member ${userMapping.topcoderUsername} is assigned to challenge with id ${dbIssue.challengeId}`);
