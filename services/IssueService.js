@@ -13,6 +13,7 @@
 const _ = require('lodash');
 const Joi = require('joi');
 const MarkdownIt = require('markdown-it');
+const config = require('config');
 
 const models = require('../models');
 const logger = require('../utils/logger');
@@ -107,9 +108,14 @@ async function handleIssueAssignment(event, issue) {
     // Update the challenge
     logger.debug(`Assinging user to challenge: ${userMapping.topcoderUsername}`);
     await topcoderApiHelper.updateChallenge(dbIssue.challengeId, {
-      //task: true,
+      // task: true,
       assignees: [userMapping.topcoderUsername]
     });
+
+    const contestUrl = `${config.TC_URL}/challenges/${dbIssue.challengeId}`;
+    const comment = `Contest ${contestUrl} has been updated - it has been assigned to @${userMapping.topcoderUsername}.`;
+    await gitHubService.createComment(event.data.issue.owner.name, event.data.repository.name, issue.number, comment);
+
     logger.debug(`Member ${userMapping.topcoderUsername} is assigned to challenge with id ${dbIssue.challengeId}`);
   } else {
     // comment on the git ticket for the user to self-sign up with the Ragnar Self-Service tool
@@ -184,6 +190,10 @@ async function handleIssueUpdate(event, issue) {
     prizes: issue.prizes
   });
   await dbIssue.save();
+  // comment on the git ticket for the user to self-sign up with the Ragnar Self-Service tool
+  const contestUrl = `${config.TC_URL}/challenges/${dbIssue.challengeId}`;
+  const comment = `Contest ${contestUrl} has been updated - the new changes has been updated for this ticket.`;
+  await gitHubService.createComment(event.data.issue.owner.name, event.data.repository.name, issue.number, comment);
 
   logger.debug(`updated challenge ${dbIssue.challengeId} for for issue ${issue.number}`);
 }
@@ -241,6 +251,10 @@ async function handleIssueCreate(event, issue) {
 
   // Save
   await Issue.create(issue);
+
+  const contestUrl = `${config.TC_URL}/challenges/${issue.challengeId}`;
+  const comment = `Contest ${contestUrl} has been created for this ticket.`;
+  await gitHubService.createComment(event.data.issue.owner.name, event.data.repository.name, issue.number, comment);
 
   logger.debug(`new challenge created with id ${issue.challengeId} for issue ${issue.number}`);
 }
