@@ -27,6 +27,16 @@ const Project = models.Project;
 const md = new MarkdownIt();
 
 /**
+ * Generate the contest url, given the challenge id
+ * @param {String} challengeId The id of the challenge in topcoder
+ * @returns {String} The topcoder url to access the challenge
+ * @private
+ */
+function getUrlForChallengeId(challengeId) {
+  return `${config.TC_URL}/challenges/${challengeId}`;
+}
+
+/**
  * Parse the prize from issue title.
  * @param {Object} issue the issue
  * @private
@@ -112,7 +122,7 @@ async function handleIssueAssignment(event, issue) {
       assignees: [userMapping.topcoderUsername]
     });
 
-    const contestUrl = `${config.TC_URL}/challenges/${dbIssue.challengeId}`;
+    const contestUrl = getUrlForChallengeId(dbIssue.challengeId);
     const comment = `Contest ${contestUrl} has been updated - it has been assigned to @${userMapping.topcoderUsername}.`;
     await gitHubService.createComment(event.data.issue.owner.name, event.data.repository.name, issue.number, comment);
 
@@ -191,7 +201,7 @@ async function handleIssueUpdate(event, issue) {
   });
   await dbIssue.save();
   // comment on the git ticket for the user to self-sign up with the Ragnar Self-Service tool
-  const contestUrl = `${config.TC_URL}/challenges/${dbIssue.challengeId}`;
+  const contestUrl = getUrlForChallengeId(dbIssue.challengeId);
   const comment = `Contest ${contestUrl} has been updated - the new changes has been updated for this ticket.`;
   await gitHubService.createComment(event.data.issue.owner.name, event.data.repository.name, issue.number, comment);
 
@@ -252,7 +262,7 @@ async function handleIssueCreate(event, issue) {
   // Save
   await Issue.create(issue);
 
-  const contestUrl = `${config.TC_URL}/challenges/${issue.challengeId}`;
+  const contestUrl = getUrlForChallengeId(issue.challengeId);
   const comment = `Contest ${contestUrl} has been created for this ticket.`;
   await gitHubService.createComment(event.data.issue.owner.name, event.data.repository.name, issue.number, comment);
 
