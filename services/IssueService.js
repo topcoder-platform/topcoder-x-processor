@@ -123,7 +123,7 @@ async function handleIssueAssignment(event, issue) {
     });
 
     const contestUrl = getUrlForChallengeId(dbIssue.challengeId);
-    const comment = `Contest ${contestUrl} has been updated - it has been assigned to @${userMapping.topcoderUsername}.`;
+    const comment = `Contest ${contestUrl} has been updated - it has been assigned to ${userMapping.topcoderUsername}.`;
     await gitHubService.createComment(event.data.issue.owner.name, event.data.repository.name, issue.number, comment);
 
     logger.debug(`Member ${userMapping.topcoderUsername} is assigned to challenge with id ${dbIssue.challengeId}`);
