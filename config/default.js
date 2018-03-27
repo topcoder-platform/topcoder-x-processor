@@ -86,5 +86,7 @@ module.exports = {
     username: "admin",
     password: "password"
   },
-  TC_RAGNAR_LOGIN_URL: process.env.TC_RAGNAR_LOGIN_URL || 'http://localhost:3001/api/v1/admin/login'
+  TC_RAGNAR_LOGIN_URL: process.env.TC_RAGNAR_LOGIN_URL || 'http://localhost:3001/api/v1/admin/login',
+  GITLAB_API_BASE_URL: process.env.GITLAB_API_BASE_URL || 'https://gitlab.com',
+  GITLAB_ADMIN_TOKEN: process.env.GITLAB_ADMIN_TOKEN || '',
 };
