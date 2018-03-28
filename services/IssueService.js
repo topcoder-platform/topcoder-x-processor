@@ -21,6 +21,7 @@ const topcoderApiHelper = require('../utils/topcoder-api-helper');
 const gitHubService = require('./GithubService');
 const emailService = require('./EmailService');
 const ragnarService = require('./RagnarToolService');
+const gitlabService = require('./GitlabService');
 
 const Issue = models.Issue;
 const Project = models.Project;
@@ -97,10 +98,13 @@ function parseComment(comment) {
  * @private
  */
 async function handleIssueAssignment(event, issue) {
-  if (event.provider !== 'github') {
-    throw new Error(`This provider ${event.provider} is not supported`);
+  const assigneeUserId = event.data.assignee.id;
+  let assigneeUsername;
+  if (event.provider === 'github') {
+    assigneeUsername = await gitHubService.getUsernameById(assigneeUserId);
+  } else {
+    assigneeUsername = await gitlabService.getUsernameById(assigneeUserId);
   }
-  const assigneeUsername = event.data.assignee.name;
   logger.debug(`Looking up TC handle of github user: ${assigneeUsername}`);
   const userMapping = await ragnarService.getTCUserName(event.provider, assigneeUsername);
   if (userMapping && userMapping.topcoderUsername) {
@@ -130,9 +134,15 @@ async function handleIssueAssignment(event, issue) {
   } else {
     // comment on the git ticket for the user to self-sign up with the Ragnar Self-Service tool
     const comment = `@${assigneeUsername}, please sign-up with Ragnar Self-service tool`;
-    await gitHubService.createComment(event.data.issue.owner.name, event.data.repository.name, issue.number, comment);
-    // un-assign the user from the ticket
-    await gitHubService.removeAssign(event.data.issue.owner.name, event.data.repository.name, issue.number, assigneeUsername);
+    if (event.provider === 'github') {
+      await gitHubService.createComment(event.data.issue.owner.id, event.data.repository.name, issue.number, comment);
+      // un-assign the user from the ticket
+      await gitHubService.removeAssign(event.data.issue.owner.id, event.data.repository.name, issue.number, assigneeUsername);
+    } else {
+      await gitlabService.createComment(event.data.repository.id, issue.number, comment);
+      // un-assign the user from the ticket
+      await gitlabService.removeAssign(event.data.repository.id, issue.number, assigneeUserId);
+    }
   }
 }
 
@@ -143,9 +153,6 @@ async function handleIssueAssignment(event, issue) {
  * @private
  */
 async function handleIssueComment(event, issue) {
-  if (event.provider !== 'github') {
-    throw new Error(`This provider ${event.provider} is not supported`);
-  }
   const parsedComment = parseComment(event.data.comment);
   if (parsedComment.isBid) {
     logger.debug(`New bid is received with amount ${parsedComment.bidAmount}.`);
@@ -155,10 +162,21 @@ async function handleIssueComment(event, issue) {
     logger.debug(`Bid by ${parsedComment.assignedUser} is accepted with amount ${parsedComment.bidAmount} `);
     const newTitle = `[$${parsedComment.acceptedBidAmount}] ${issue.title}`;
     logger.debug(`updating issue: ${event.data.repository.name}/${issue.number}`);
-    await gitHubService.updateIssue(event.data.issue.owner.name, event.data.repository.name, issue.number, newTitle);
+
+    if (event.provider === 'github') {
+      await gitHubService.updateIssue(event.data.issue.owner.id, event.data.repository.name, issue.number, newTitle);
+    } else {
+      await gitlabService.updateIssue(event.data.repository.id, issue.number, newTitle);
+    }
+
     // assign user
-    logger.debug(`assigning user, ${event.data.issue.owner.name} to issue: ${event.data.repository.name}/${issue.number}`);
-    await gitHubService.assignUser(event.data.issue.owner.name, event.data.repository.name, issue.number, parsedComment.assignedUser);
+    logger.debug(`assigning user, ${parsedComment.assignedUser} to issue: ${event.data.repository.name}/${issue.number}`);
+    if (event.provider === 'github') {
+      await gitHubService.assignUser(event.data.issue.owner.id, event.data.repository.name, issue.number, parsedComment.assignedUser);
+    } else {
+      const userId = await gitlabService.getUserIdByLogin(parsedComment.assignedUser);
+      await gitlabService.assignUser(event.data.repository.id, issue.number, userId);
+    }
   }
 }
 
@@ -311,12 +329,10 @@ process.schema = Joi.object().keys({
       body: Joi.string().allow(''),
       labels: Joi.array().items(Joi.string()),
       assignees: Joi.array().items(Joi.object().keys({
-        id: Joi.number().required(),
-        name: Joi.string()
+        id: Joi.number().required()
       })),
       owner: Joi.object().keys({
-        id: Joi.number().required(),
-        name: Joi.string()
+        id: Joi.number().required()
       })
     }).required(),
     repository: Joi.object().keys({
@@ -328,13 +344,11 @@ process.schema = Joi.object().keys({
       id: Joi.number().required(),
       body: Joi.string().allow(''),
       user: Joi.object().keys({
-        id: Joi.number().required(),
-        name: Joi.string()
+        id: Joi.number().required()
       })
     }),
     assignee: Joi.object().keys({
-      id: Joi.number().required(),
-      name: Joi.string().required()
+      id: Joi.number().required()
     })
   }).required()
 });

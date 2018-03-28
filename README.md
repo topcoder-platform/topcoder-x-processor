@@ -44,7 +44,8 @@ The following config parameters are supported, they are defined in `config/defau
 |TC_RAGNAR_ADMIN_LOGIN_BODY| the login request body of Admin user for Ragnar self service tool| see `default.js`|
 |TC_RAGNAR_LOGIN_URL| the api URL of Ragnar self service tool to login| see `default.js`|
 |TC_DEV_ENV| the flag whether to use topcoder development api or production| false|
-|TC_URL| the URL of Topcoder to use for challenge detail URL| defaults to `https://topcoder-dev.com`|
+|GITLAB_API_BASE_URL| the URL for gitlab host| defaults to `https://gitlab.com`|
+|GITLAB_ADMIN_TOKEN|the gitlab repo admin/owner personal access token | see below section 'Gitlab Admin Token'|
 
 KAFKA_OPTIONS should be object as described in https://github.com/SOHU-Co/kafka-node#kafkaclient
 For using with SSL, the options should be as
@@ -68,6 +69,16 @@ For using with SSL, the options should be as
 - after creating the token, you can see personal access token,
   these should be set to GITHUB_ADMIN_TOKEN environment variables
 
+## Gitlab Admin Token
+
+- Log in to your GitLab account.
+- Go to your Profile settings.
+- Go to Access tokens.
+- Choose a name and optionally an expiry date for the token.
+- Choose the `api` scope at minimum.
+- Click on Create personal access token.
+- after creating the token, you can see personal access token,
+  these should be set to GITLAB_ADMIN_TOKEN environment variables.
 
 ## Local Setup
 
@@ -89,9 +100,8 @@ Run and configure the Ragnar self-service tool
 - create a comment on an issue, you can see the logs in `receiver` and `processor`, the `comment.created` event is generated.
 - update a comment on an issue, you can see the logs in `receiver` and `processor`, the `comment.updated` event is generated.
 - assigned a user to an issue, you can see the logs in `receiver` and `processor`, the `issue.assigned` event is generated.
-- assigned a user to an issue, you can see the logs in `receiver` and `processor`, the `issue.unassigned` event is generated.
-- add a label to an issue, you can see the logs in `receiver` and `processor`, the `issue.labeled` event is generated.
-- remove a label to an issue, you can see the logs in `receiver` and `processor`, the `issue.unlabeled` event is generated.
+- unassigned a user to an issue, you can see the logs in `receiver` and `processor`, the `issue.unassigned` event is generated.
+- add or remove a label to an issue, you can see the logs in `receiver` and `processor`, the `issue.labelUpdated` event is generated.
 - create a pull request, you can see the logs in `receiver` and `processor`, the `pull_request.created` event is generated.
 - close a pull request without merge, you can see the logs in `receiver` and `processor`, the `pull_request.closed` event is generated and the `merged` property is `false`.
 - merge a pull request, you can see the logs in `receiver` and `processor`, the `pull_request.closed` event is generated and the `merged` property is `true`.
@@ -162,7 +172,7 @@ When an user is assigned to an issue then 'issue.assigned' event will be capture
 - if user is found then the topcoder challenge associated with that issue will be updated as
   - topcoder user will be assigned
 - if user is not found in mapping
-  - comment on github issue will added as :
+  - comment on github/gitlab issue will added as :
   ```
   @username, please sign-up with Ragnar Self-service tool.
   ```

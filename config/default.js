@@ -87,5 +87,6 @@ module.exports = {
     password: "password"
   },
   TC_RAGNAR_LOGIN_URL: process.env.TC_RAGNAR_LOGIN_URL || 'http://localhost:3001/api/v1/admin/login',
-  TC_URL: process.env.TC_URL || 'https://topcoder-dev.com'
+  GITLAB_API_BASE_URL: process.env.GITLAB_API_BASE_URL || 'https://gitlab.com',
+  GITLAB_ADMIN_TOKEN: process.env.GITLAB_ADMIN_TOKEN || '',
 };

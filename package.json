@@ -31,6 +31,7 @@
     "markdown-it": "^8.4.0",
     "moment": "^2.19.1",
     "mongoose": "^4.12.3",
+    "node-gitlab-api": "^2.2.6",
     "nodemailer": "^4.4.0",
     "topcoder-api-challenges": "^1.0.5",
     "topcoder-api-projects": "^1.0.1",
