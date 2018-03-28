@@ -86,5 +86,6 @@ module.exports = {
     username: "admin",
     password: "password"
   },
-  TC_RAGNAR_LOGIN_URL: process.env.TC_RAGNAR_LOGIN_URL || 'http://localhost:3001/api/v1/admin/login'
+  TC_RAGNAR_LOGIN_URL: process.env.TC_RAGNAR_LOGIN_URL || 'http://localhost:3001/api/v1/admin/login',
+  TC_URL: process.env.TC_URL || 'https://topcoder-dev.com'
 };

@@ -44,6 +44,7 @@ The following config parameters are supported, they are defined in `config/defau
 |TC_RAGNAR_ADMIN_LOGIN_BODY| the login request body of Admin user for Ragnar self service tool| see `default.js`|
 |TC_RAGNAR_LOGIN_URL| the api URL of Ragnar self service tool to login| see `default.js`|
 |TC_DEV_ENV| the flag whether to use topcoder development api or production| false|
+|TC_URL| the URL of Topcoder to use for challenge detail URL| defaults to `https://topcoder-dev.com`|
 
 KAFKA_OPTIONS should be object as described in https://github.com/SOHU-Co/kafka-node#kafkaclient
 For using with SSL, the options should be as
