@@ -128,7 +128,7 @@ async function handleIssueAssignment(event, issue) {
 
     const contestUrl = getUrlForChallengeId(dbIssue.challengeId);
     const comment = `Contest ${contestUrl} has been updated - it has been assigned to ${userMapping.topcoderUsername}.`;
-    await gitHubService.createComment(event.data.issue.owner.name, event.data.repository.name, issue.number, comment);
+    await gitHubService.createComment(event.data.issue.owner.id, event.data.repository.name, issue.number, comment);
 
     logger.debug(`Member ${userMapping.topcoderUsername} is assigned to challenge with id ${dbIssue.challengeId}`);
   } else {
@@ -221,7 +221,7 @@ async function handleIssueUpdate(event, issue) {
   // comment on the git ticket for the user to self-sign up with the Ragnar Self-Service tool
   const contestUrl = getUrlForChallengeId(dbIssue.challengeId);
   const comment = `Contest ${contestUrl} has been updated - the new changes has been updated for this ticket.`;
-  await gitHubService.createComment(event.data.issue.owner.name, event.data.repository.name, issue.number, comment);
+  await gitHubService.createComment(event.data.issue.owner.id, event.data.repository.name, issue.number, comment);
 
   logger.debug(`updated challenge ${dbIssue.challengeId} for for issue ${issue.number}`);
 }
@@ -282,7 +282,7 @@ async function handleIssueCreate(event, issue) {
 
   const contestUrl = getUrlForChallengeId(issue.challengeId);
   const comment = `Contest ${contestUrl} has been created for this ticket.`;
-  await gitHubService.createComment(event.data.issue.owner.name, event.data.repository.name, issue.number, comment);
+  await gitHubService.createComment(event.data.issue.owner.id, event.data.repository.name, issue.number, comment);
 
   logger.debug(`new challenge created with id ${issue.challengeId} for issue ${issue.number}`);
 }
