@@ -42,7 +42,7 @@ async function _removeAssignees(projectId, issueId, assignees) {
 async function createComment(projectId, issueId, body) {
   Joi.attempt({projectId, issueId, body}, createComment.schema);
   await gitlab.projects.issues.notes.create(projectId, issueId, {body});
-  logger.debug(`Comment is added on issue with message "${body}"`);
+  logger.debug(`Gitlab comment is added on issue with message "${body}"`);
 }
 
 createComment.schema = {
@@ -60,7 +60,7 @@ createComment.schema = {
 async function updateIssue(projectId, issueId, title) {
   Joi.attempt({projectId, issueId, title}, updateIssue.schema);
   await gitlab.projects.issues.edit(projectId, issueId, {title});
-  logger.debug(`Issue title is updated for issue number ${issueId}`);
+  logger.debug(`Gitlab issue title is updated for issue number ${issueId}`);
 }
 
 updateIssue.schema = {
@@ -83,7 +83,7 @@ async function assignUser(projectId, issueId, userId) {
     await _removeAssignees(projectId, issueId, oldAssignees);
   }
   await gitlab.projects.issues.edit(projectId, issueId, {assignee_ids: [userId]});
-  logger.debug(`Issue with number ${issueId} is assigned to ${issueId}`);
+  logger.debug(`Gitlab issue with number ${issueId} is assigned to ${issueId}`);
 }
 
 assignUser.schema = {
@@ -101,7 +101,7 @@ assignUser.schema = {
 async function removeAssign(projectId, issueId, userId) {
   Joi.attempt({projectId, issueId, userId}, removeAssign.schema);
   await _removeAssignees(projectId, issueId, [userId]);
-  logger.debug(`User ${userId} is unassigned from issue number ${issueId}`);
+  logger.debug(`Gitlab user ${userId} is unassigned from issue number ${issueId}`);
 }
 
 removeAssign.schema = assignUser.schema;

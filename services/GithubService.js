@@ -61,7 +61,7 @@ async function updateIssue(ownerId, repo, number, title) {
   Joi.attempt({ownerId, repo, number, title}, updateIssue.schema);
   const owner = await _getUsernameById(ownerId);
   await github.issues.edit({owner, repo, number, title});
-  logger.debug(`Issue title is updated for issue number ${number}`);
+  logger.debug(`Github issue title is updated for issue number ${number}`);
 }
 
 updateIssue.schema = {
@@ -88,7 +88,7 @@ async function assignUser(ownerId, repo, number, user) {
     await _removeAssignees(owner, repo, number, oldAssignees);
   }
   await github.issues.addAssigneesToIssue({owner, repo, number, assignees: [user]});
-  logger.debug(`Issue with number ${number} is assigned to ${user}`);
+  logger.debug(`Github issue with number ${number} is assigned to ${user}`);
 }
 
 assignUser.schema = {
@@ -111,7 +111,7 @@ async function removeAssign(ownerId, repo, number, user) {
   const owner = await _getUsernameById(ownerId);
 
   await _removeAssignees(owner, repo, number, [user]);
-  logger.debug(`User ${user} is unassigned from issue number ${number}`);
+  logger.debug(`Github user ${user} is unassigned from issue number ${number}`);
 }
 
 removeAssign.schema = assignUser.schema;
@@ -129,7 +129,7 @@ async function createComment(ownerId, repo, number, body) {
   const owner = await _getUsernameById(ownerId);
 
   await github.issues.createComment({owner, repo, number, body});
-  logger.debug('Comment is added on issue notifying user to assign using Ragnar tool');
+  logger.debug('Github comment is added on issue notifying user to assign using Ragnar tool');
 }
 
 createComment.schema = {
