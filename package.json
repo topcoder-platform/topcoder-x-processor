@@ -33,9 +33,9 @@
     "mongoose": "^4.12.3",
     "node-gitlab-api": "^2.2.6",
     "nodemailer": "^4.4.0",
-    "topcoder-api-challenges": "^1.0.5",
+    "topcoder-api-challenges": "^1.0.6",
     "topcoder-api-projects": "^1.0.1",
-    "topcoder-dev-api-challenges": "^1.0.5",
+    "topcoder-dev-api-challenges": "^1.0.6",
     "topcoder-dev-api-projects": "^1.0.1",
     "winston": "^2.3.1"
   },
