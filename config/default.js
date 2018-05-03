@@ -18,6 +18,10 @@ module.exports = {
   PARTITION: process.env.PARTITION || 0,
   KAFKA_OPTIONS: {
     kafkaHost: process.env.KAFKA_HOST || 'localhost:9092',
+    sslOptions: {
+      cert: process.env.KAFKA_CLIENT_CERT || fs.readFileSync('./kafka_client.cer'),
+      key: process.env.KAFKA_CLIENT_CERT_KEY || fs.readFileSync('./kafka_client.key')
+   }
   },
   MONGODB_URL: process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/topcoder-x-events',
   TC_DEV_ENV: process.env.NODE_ENV === 'production' ? false : true,
@@ -62,8 +66,8 @@ module.exports = {
   // NOTE: if subTrack is FIRST_2_FINISH,
   // this config has no effect since the ***EndsAt will be set automatically by TC APIs
   NEW_CHALLENGE_DURATION_IN_DAYS: process.env.NEW_CHALLENGE_DURATION_IN_DAYS || 5,
-  GITHUB_ADMIN_TOKEN: '95a5bfd207dafbd44428fa5cc006d51890073d7c',
-  GITLAB_ADMIN_TOKEN:'gj8QFR8z8FubeHK8sMx1',
+  GITHUB_ADMIN_TOKEN: process.env.GITHUB_ADMIN_TOKEN || '',
+  GITLAB_ADMIN_TOKEN:process.env.GITHUB_ADMIN_TOKEN || '',
   // node mailer option
   NODE_MAILER_OPTIONS: {
     host: process.env.SMTP_HOST || process.env.MAILGUN_SMTP_SERVER || 'smtp.gmail.com',
