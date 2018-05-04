@@ -25,16 +25,16 @@ class Kafka {
     this.consumer = new kafka.Consumer(this.client, [{topic: config.TOPIC, partition: config.PARTITION}], {autoCommit: true});
     this.consumer.setOffset(config.TOPIC, 0, 0);
     this.offset = new Offset(this.client);
-    logger.info(`connecting on topic: ${config.TOPIC}`);
+    logger.info(`Connecting on topic: ${config.TOPIC}`);
   }
 
   run() {
     this.consumer.on('error', (err) => {
-      logger.error(err);
+      logger.error(`ERROR ${err}`);
     });
 
     this.consumer.on('offsetOutOfRange', (topic) => {
-      logger.debug(topic);
+      logger.debug(`TOPIC ${topic}`);
       logger.info('offset OutOfRange. resetting.');
       this.offset.fetch([topic], (errOffsetFetch, offsets) => {
         if (errOffsetFetch) {
