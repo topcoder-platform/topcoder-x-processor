@@ -2,7 +2,7 @@
  * Copyright (c) 2017 TopCoder, Inc. All rights reserved.
  */
 'use strict';
-
+const fs = require('fs');
 /**
  * This module is the configuration of the app.
  * Changes in 1.1:
@@ -23,7 +23,7 @@ module.exports = {
       key: process.env.KAFKA_CLIENT_CERT_KEY || fs.readFileSync('./kafka_client.key')
    }
   },
-  MONGODB_URL: process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/topcoder-x-events',
+  MONGODB_URL: process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/ragnar',
   TC_DEV_ENV: process.env.NODE_ENV === 'production' ? false : true,
   TC_AUTHN_URL: process.env.TC_AUTHN_URL || 'https://topcoder-dev.auth0.com/oauth/ro',
   TC_AUTHN_REQUEST_BODY: {
@@ -66,8 +66,6 @@ module.exports = {
   // NOTE: if subTrack is FIRST_2_FINISH,
   // this config has no effect since the ***EndsAt will be set automatically by TC APIs
   NEW_CHALLENGE_DURATION_IN_DAYS: process.env.NEW_CHALLENGE_DURATION_IN_DAYS || 5,
-  GITHUB_ADMIN_TOKEN: process.env.GITHUB_ADMIN_TOKEN || '',
-  GITLAB_ADMIN_TOKEN:process.env.GITHUB_ADMIN_TOKEN || '',
   // node mailer option
   NODE_MAILER_OPTIONS: {
     host: process.env.SMTP_HOST || process.env.MAILGUN_SMTP_SERVER || 'smtp.gmail.com',
@@ -80,11 +78,6 @@ module.exports = {
   },
   EMAIL_SENDER_ADDRESS: process.env.EMAIL_SENDER_ADDRESS || '',
   ISSUE_BID_EMAIL_RECEIVER: process.env.ISSUE_BID_EMAIL_RECEIVER || '',
-  TC_RAGNAR_USER_MAPPING_URL: process.env.TC_RAGNAR_USER_MAPPING_URL || 'http://ragnar.topcoder-dev.com/api/v1/admin/tcuser',
-  TC_RAGNAR_ADMIN_LOGIN_BODY: {
-    username: "admin",
-    password: "password"
-  },
-  TC_RAGNAR_LOGIN_URL: process.env.TC_RAGNAR_LOGIN_URL || 'http://ragnar.topcoder-dev.com/api/v1/admin/login',
-  TC_URL: 'https://www.topcoder-dev.com'
+  TC_URL: process.env.TC_URL || 'https://www.topcoder-dev.com',
+  GITLAB_API_BASE_URL: process.env.GITLAB_API_BASE_URL || 'https://gitlab.com',
 };

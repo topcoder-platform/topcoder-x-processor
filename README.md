@@ -18,8 +18,6 @@ eslint is used to lint the javascript source code:
 npm run lint
 ```
 
-
-
 ## Configuration
 
 The following config parameters are supported, they are defined in `config/default.js` and can be configured in system environment:
@@ -28,24 +26,21 @@ The following config parameters are supported, they are defined in `config/defau
 | Name                           | Description                                | Default                          |
 | :----------------------------- | :----------------------------------------: | :------------------------------: |
 | LOG_LEVEL                      | the log level                              |  debug                           |
-| TOPIC                          | the kafka subscribe topic name             |  events_topic                    |
+| TOPIC                          | the kafka subscribe topic name             |  tc-x-events                    |
+| PARTITION                  | the kafka partition            |  0|
 | KAFKA_OPTIONS                  | the connection option for kafka            |  see below about KAFKA options                  |
-| MONGODB_URL  | the MongoDB URL | mongodb://127.0.0.1:27017/events |
+| MONGODB_URL  | the MongoDB URL which must be same as Ragnar tool | mongodb://127.0.0.1:27017/ragnar |
+|TC_DEV_ENV| the flag whether to use topcoder development api or production| false|
 | TC_AUTHN_URL | the Topcoder authentication url | https://topcoder-dev.auth0.com/oauth/ro |
 | TC_AUTHN_REQUEST_BODY | the Topcoder authentication request body. This makes use of some environment variables: `TC_USERNAME`, `TC_PASSWORD`, `TC_CLIENT_ID`, `CLIENT_V2CONNECTION` | see `default.js` |
 | TC_AUTHZ_URL | the Topcoder authorization url | https://api.topcoder-dev.com/v3/authorizations |
 | NEW_CHALLENGE_TEMPLATE | the body template for new challenge request. You can change the subTrack, reviewTypes, technologies, .. here | see `default.js` |
 | NEW_CHALLENGE_DURATION_IN_DAYS | the duration of new challenge | 5 |
-| GITHUB_ADMIN_TOKEN| the github repo admin/owner personal access token | see below section 'GitHub OAuth Admin Token'|
 | NODE_MAILER_OPTIONS| the node mailer smtp options, see [here](https://nodemailer.com/smtp/ for more detail)| see `default.js` |
 |EMAIL_SENDER_ADDRESS| the email sender email address||
 |ISSUE_BID_EMAIL_RECEIVER| the email receiver about bid email||
-|TC_RAGNAR_USER_MAPPING_URL| the api URL of Ragnar self service tool to get user mapping | see `default.js`|
-|TC_RAGNAR_ADMIN_LOGIN_BODY| the login request body of Admin user for Ragnar self service tool| see `default.js`|
-|TC_RAGNAR_LOGIN_URL| the api URL of Ragnar self service tool to login| see `default.js`|
-|TC_DEV_ENV| the flag whether to use topcoder development api or production| false|
+|TC_URL| the base URL of topcoder to get the challenge URL| defaults to `https://www.topcoder-dev.com`|
 |GITLAB_API_BASE_URL| the URL for gitlab host| defaults to `https://gitlab.com`|
-|GITLAB_ADMIN_TOKEN|the gitlab repo admin/owner personal access token | see below section 'Gitlab Admin Token'|
 
 KAFKA_OPTIONS should be object as described in https://github.com/SOHU-Co/kafka-node#kafkaclient
 For using with SSL, the options should be as
@@ -59,42 +54,30 @@ For using with SSL, the options should be as
  }
 ```
 
-## GitHub OAuth Admin Token
-
-- login into github.com
-- click the upper right avatar, then click `Settings`
-- click the left pannel --> Developer settings --> Personal access tokens
-- click the `Generate new token`, fill in the fields,
-  select all scopes,
-- after creating the token, you can see personal access token,
-  these should be set to GITHUB_ADMIN_TOKEN environment variables
-
-## Gitlab Admin Token
-
-- Log in to your GitLab account.
-- Go to your Profile settings.
-- Go to Access tokens.
-- Choose a name and optionally an expiry date for the token.
-- Choose the `api` scope at minimum.
-- Click on Create personal access token.
-- after creating the token, you can see personal access token,
-  these should be set to GITLAB_ADMIN_TOKEN environment variables.
-
-## Local Setup
-
-Create a MongoDB database, and configure `MONGODB_URL`.
+## Local Deployment
 
 ```shell
 npm start
 ```
 
-Run and configure the Ragnar self-service tool
+## Setup for verification
+Before verifying the tool, 4 service needs be configured and run them
+- processor
+- receiver
+- Ragnar Tool
+- Topcoder X (both backend and UI)
+
+First login in Ragnar tool with admin and Add owner for which requires topcoder handle, git host's username and type of git host.
+
+Go to Topcoder X UI login with above used topcoder username and
+- go to settings and make sure git hosts are correctly setup, if not click setup and authorize to setup.
+
+- Go to Topcoder X UI and go to project management and add a project from git account and click save, and edit the same project and click 'Add Webhooks' button (you need to add personnel access token), verify that webhooks are set up correctly on git host's project.
+
+Now, receiver service can receive the webhooks from git host's project and processor can processes the requests. Now you can verify this service by following the verfication steps below
 
 ## Verification
 
-- properly config and run the `receiver` app.
-- properly config and run the `processor` app.
-- properly config and run the Ragnar self service tool.
 - create an issue in the repo, you can see the logs in `receiver` and `processor`, the `issue.created` event is generated.
 - update an issue in the repo, you can see the logs in `receiver` and `processor`, the `issue.updated` event is generated.
 - create a comment on an issue, you can see the logs in `receiver` and `processor`, the `comment.created` event is generated.
