@@ -4,73 +4,30 @@
 'use strict';
 
 /**
- * This provides methods around Ragnar Self service tool api.
+ * This provides methods around Ragnar Self service tool.
  * @author TCSCODER
  * @version 1.0
  */
 
-const jwtDecode = require('jwt-decode');
 const Joi = require('joi');
-const axios = require('axios');
 const config = require('config');
-const _ = require('lodash');
-const logger = require('../utils/logger');
-
-// Cache the access token
-let cachedAccessToken;
+const models = require('../models');
 
 /**
- * Authenticate with Ragnar Self service tool API and get the access token.
- * @returns {String} the access token issued by tool
- * @private
- */
-async function getAccessToken() {
-  // Check the cached access token
-  if (cachedAccessToken) {
-    const decoded = jwtDecode(cachedAccessToken);
-    if (decoded.iat > new Date().getTime()) {
-      // Still not expired, just use it
-      return cachedAccessToken;
-    }
-  }
-
-  // Authenticate
-  const response = await axios.post(config.TC_RAGNAR_LOGIN_URL, config.TC_RAGNAR_ADMIN_LOGIN_BODY);
-  const token = _.get(response, 'data.token');
-
-  if (!token) {
-    throw new Error(`cannot authenticate with Ragnar self service tool: ${config.TC_RAGNAR_LOGIN_URL}`);
-  }
-  cachedAccessToken = token;
-  return cachedAccessToken;
-}
-
-/**
- * gets the tc handle for given username from a provider
+ * gets the tc handle for given username from a provider captured by Ragnar tool
  * @param {String} provider the username provider
  * @param {String} username the username
  * @returns {Object} user mapping if found else null
  */
 async function getTCUserName(provider, username) {
   Joi.attempt({provider, username}, getTCUserName.schema);
-  const accessToken = await getAccessToken();
-  let url = config.TC_RAGNAR_USER_MAPPING_URL;
+  const criteria = {};
   if (provider === 'github') {
-    url += `?githubUsername=${username}`;
+    criteria.githubUsername = username;
   } else if (provider === 'gitlab') {
-    url += `?gitlabUsername=${username}`;
+    criteria.gitlabUsername = username;
   }
-  try {
-    const response = await axios.get(url, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`
-      }
-    });
-    return response.data;
-  } catch (error) {
-    logger.error(`Error occurred while getting username from Ragnar for user ${error}`);
-    return null;
-  }
+  return await models.UserMapping.findOne(criteria);
 }
 
 getTCUserName.schema = {
@@ -78,6 +35,51 @@ getTCUserName.schema = {
   username: Joi.string().required()
 };
 
+/**
+ * gets the access token of repository's copilot captured by Ragnar tool
+ * @param {String} provider the repo provider
+ * @param {String} repoFullName the full name of repository
+ * @returns {String} the copilot if exists
+ */
+async function getRepositoryCopilot(provider, repoFullName) {
+  Joi.attempt({provider, repoFullName}, getRepositoryCopilot.schema);
+  let fullRepoUrl;
+  if (provider === 'github') {
+    fullRepoUrl = `https://github.com/${repoFullName}`;
+  } else if (provider === 'gitlab') {
+    fullRepoUrl = `${config.GITLAB_API_BASE_URL}/${repoFullName}`;
+  }
+
+  const challenge = await models.Challenge.findOne({
+    repoUrl: fullRepoUrl
+  });
+
+  if (!challenge || !challenge.username) {
+    // throw this repo is not managed by Ragnar tool
+    throw new Error(`This repository '${provider}' is not managed by Ragnar tool.`);
+  }
+  const copilot = await models.User.findOne({
+    topcoderUsername: challenge.username.toLowerCase(),
+    type: provider
+  });
+
+  if (!copilot) {
+    // throw no copilot is configured
+    throw new Error(`No copilot is configured for the this repository: ${provider}`);
+  }
+
+  return {
+    accessToken: copilot.accessToken,
+    userProviderId: copilot.userProviderId
+  };
+}
+
+getRepositoryCopilot.schema = {
+  provider: Joi.string().valid('github', 'gitlab').required(),
+  repoFullName: Joi.string().required()
+};
+
 module.exports = {
-  getTCUserName
+  getTCUserName,
+  getRepositoryCopilot
 };

@@ -101,9 +101,9 @@ async function handleIssueAssignment(event, issue) {
   const assigneeUserId = event.data.assignee.id;
   let assigneeUsername;
   if (event.provider === 'github') {
-    assigneeUsername = await gitHubService.getUsernameById(assigneeUserId);
+    assigneeUsername = await gitHubService.getUsernameById(event.copilot, assigneeUserId);
   } else {
-    assigneeUsername = await gitlabService.getUsernameById(assigneeUserId);
+    assigneeUsername = await gitlabService.getUsernameById(event.copilot, assigneeUserId);
   }
   logger.debug(`Looking up TC handle of github user: ${assigneeUsername}`);
   const userMapping = await ragnarService.getTCUserName(event.provider, assigneeUsername);
@@ -128,20 +128,20 @@ async function handleIssueAssignment(event, issue) {
 
     const contestUrl = getUrlForChallengeId(dbIssue.challengeId);
     const comment = `Contest ${contestUrl} has been updated - it has been assigned to ${userMapping.topcoderUsername}.`;
-    await gitHubService.createComment(event.data.issue.owner.id, event.data.repository.name, issue.number, comment);
+    await gitHubService.createComment(event.copilot, event.data.repository.name, issue.number, comment);
 
     logger.debug(`Member ${userMapping.topcoderUsername} is assigned to challenge with id ${dbIssue.challengeId}`);
   } else {
     // comment on the git ticket for the user to self-sign up with the Ragnar Self-Service tool
     const comment = `@${assigneeUsername}, please sign-up with Ragnar Self-service tool`;
     if (event.provider === 'github') {
-      await gitHubService.createComment(event.data.issue.owner.id, event.data.repository.name, issue.number, comment);
+      await gitHubService.createComment(event.copilot, event.data.repository.name, issue.number, comment);
       // un-assign the user from the ticket
-      await gitHubService.removeAssign(event.data.issue.owner.id, event.data.repository.name, issue.number, assigneeUsername);
+      await gitHubService.removeAssign(event.copilot, event.data.repository.name, issue.number, assigneeUsername);
     } else {
-      await gitlabService.createComment(event.data.repository.id, issue.number, comment);
+      await gitlabService.createComment(event.copilot, event.data.repository.id, issue.number, comment);
       // un-assign the user from the ticket
-      await gitlabService.removeAssign(event.data.repository.id, issue.number, assigneeUserId);
+      await gitlabService.removeAssign(event.copilot, event.data.repository.id, issue.number, assigneeUserId);
     }
   }
 }
@@ -164,18 +164,18 @@ async function handleIssueComment(event, issue) {
     logger.debug(`updating issue: ${event.data.repository.name}/${issue.number}`);
 
     if (event.provider === 'github') {
-      await gitHubService.updateIssue(event.data.issue.owner.id, event.data.repository.name, issue.number, newTitle);
+      await gitHubService.updateIssue(event.copilot, event.data.repository.name, issue.number, newTitle);
     } else {
-      await gitlabService.updateIssue(event.data.repository.id, issue.number, newTitle);
+      await gitlabService.updateIssue(event.copilot, event.data.repository.id, issue.number, newTitle);
     }
 
     // assign user
     logger.debug(`assigning user, ${parsedComment.assignedUser} to issue: ${event.data.repository.name}/${issue.number}`);
     if (event.provider === 'github') {
-      await gitHubService.assignUser(event.data.issue.owner.id, event.data.repository.name, issue.number, parsedComment.assignedUser);
+      await gitHubService.assignUser(event.copilot, event.data.repository.name, issue.number, parsedComment.assignedUser);
     } else {
-      const userId = await gitlabService.getUserIdByLogin(parsedComment.assignedUser);
-      await gitlabService.assignUser(event.data.repository.id, issue.number, userId);
+      const userId = await gitlabService.getUserIdByLogin(event.copilot, parsedComment.assignedUser);
+      await gitlabService.assignUser(event.copilot, event.data.repository.id, issue.number, userId);
     }
   }
 }
@@ -222,9 +222,9 @@ async function handleIssueUpdate(event, issue) {
   const contestUrl = getUrlForChallengeId(dbIssue.challengeId);
   const comment = `Contest ${contestUrl} has been updated - the new changes has been updated for this ticket.`;
   if (event.provider === 'github') {
-    await gitHubService.createComment(event.data.issue.owner.id, event.data.repository.name, issue.number, comment);
+    await gitHubService.createComment(event.copilot, event.data.repository.name, issue.number, comment);
   } else {
-    await gitlabService.createComment(event.data.repository.id, issue.number, comment);
+    await gitlabService.createComment(event.copilot, event.data.repository.id, issue.number, comment);
   }
 
   logger.debug(`updated challenge ${dbIssue.challengeId} for for issue ${issue.number}`);
@@ -287,9 +287,9 @@ async function handleIssueCreate(event, issue) {
   const contestUrl = getUrlForChallengeId(issue.challengeId);
   const comment = `Contest ${contestUrl} has been created for this ticket.`;
   if (event.provider === 'github') {
-    await gitHubService.createComment(event.data.issue.owner.id, event.data.repository.name, issue.number, comment);
+    await gitHubService.createComment(event.copilot, event.data.repository.name, issue.number, comment);
   } else {
-    await gitlabService.createComment(event.data.repository.id, issue.number, comment);
+    await gitlabService.createComment(event.copilot, event.data.repository.id, issue.number, comment);
   }
 
   logger.debug(`new challenge created with id ${issue.challengeId} for issue ${issue.number}`);
@@ -312,6 +312,8 @@ async function process(event) {
 
   // Parse prize from title
   parsePrizes(issue);
+  const copilot = await ragnarService.getRepositoryCopilot(event.provider, event.data.repository.full_name);
+  event.copilot = copilot;
 
   // Markdown the body
   issue.body = md.render(_.get(issue, 'body', ''));
