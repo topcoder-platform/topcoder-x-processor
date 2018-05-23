@@ -14,16 +14,16 @@ const fs = require('fs');
 
 module.exports = {
   LOG_LEVEL: process.env.LOG_LEVEL || 'debug',
-  TOPIC: process.env.TOPIC || 'tc-x-events',
   PARTITION: process.env.PARTITION || 0,
+  TOPIC: process.env.TOPIC || 'tc-x-events',
   KAFKA_OPTIONS: {
     kafkaHost: process.env.KAFKA_HOST || 'localhost:9092',
     sslOptions: {
-      cert: process.env.KAFKA_CLIENT_CERT || fs.readFileSync('./kafka_client.cer'),
-      key: process.env.KAFKA_CLIENT_CERT_KEY || fs.readFileSync('./kafka_client.key')
-   }
+      cert: process.env.KAFKA_CLIENT_CERT || fs.readFileSync('./kafka_client.cer'), // eslint-disable-line no-sync
+      key: process.env.KAFKA_CLIENT_CERT_KEY || fs.readFileSync('./kafka_client.key'), // eslint-disable-line no-sync
+    }
   },
-  MONGODB_URL: process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/ragnar',
+  MONGODB_URL: process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/topcoderx',
   TC_DEV_ENV: process.env.NODE_ENV === 'production' ? false : true,
   TC_AUTHN_URL: process.env.TC_AUTHN_URL || 'https://topcoder-dev.auth0.com/oauth/ro',
   TC_AUTHN_REQUEST_BODY: {

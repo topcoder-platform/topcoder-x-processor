@@ -4,7 +4,7 @@
 'use strict';
 
 /**
- * This provides methods around Ragnar Self service tool.
+ * This provides methods around Self service tool.
  * @author TCSCODER
  * @version 1.0
  */
@@ -14,7 +14,7 @@ const config = require('config');
 const models = require('../models');
 
 /**
- * gets the tc handle for given username from a provider captured by Ragnar tool
+ * gets the tc handle for given username from a provider captured by Topcoder x tool
  * @param {String} provider the username provider
  * @param {String} username the username
  * @returns {Object} user mapping if found else null
@@ -36,7 +36,7 @@ getTCUserName.schema = {
 };
 
 /**
- * gets the access token of repository's copilot captured by Ragnar tool
+ * gets the access token of repository's copilot captured by Topcoder x tool
  * @param {String} provider the repo provider
  * @param {String} repoFullName the full name of repository
  * @returns {String} the copilot if exists
@@ -50,16 +50,25 @@ async function getRepositoryCopilot(provider, repoFullName) {
     fullRepoUrl = `${config.GITLAB_API_BASE_URL}/${repoFullName}`;
   }
 
-  const challenge = await models.Challenge.findOne({
+  const project = await models.Project.findOne({
     repoUrl: fullRepoUrl
   });
 
-  if (!challenge || !challenge.username) {
-    // throw this repo is not managed by Ragnar tool
-    throw new Error(`This repository '${provider}' is not managed by Ragnar tool.`);
+  if (!project || !project.username) {
+    // throw this repo is not managed by Topcoder x tool
+    throw new Error(`This repository '${repoFullName}' is not managed by Topcoder X tool.`);
   }
+
+  const userMapping = await models.UserMapping.findOne({
+    topcoderUsername: project.username.toLowerCase()
+  });
+
+  if (!userMapping || (provider === 'github' && !userMapping.githubUserId) || (provider === 'gitlab' && !userMapping.gitlabUserId)) {
+    throw new Error(`Couldn't find githost username for '${provider}' for this repository '${repoFullName}'.`);
+  }
+
   const copilot = await models.User.findOne({
-    topcoderUsername: challenge.username.toLowerCase(),
+    username: provider === 'github' ? userMapping.githubUsername : userMapping.gitlabUsername,
     type: provider
   });
 
