@@ -147,7 +147,7 @@ async function createComment(copilot, repo, number, body) {
   const github = await _authenticate(copilot.accessToken);
   const owner = await _getUsernameById(github, copilot.userProviderId);
   await github.issues.createComment({owner, repo, number, body});
-  logger.debug('Github comment is added on issue notifying user to assign using Ragnar tool');
+  logger.debug('Github comment is added on issue notifying user to assign using Topcoder x tool');
 }
 
 createComment.schema = {

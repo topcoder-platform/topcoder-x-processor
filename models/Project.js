@@ -11,13 +11,18 @@
 const mongoose = require('mongoose');
 
 const schema = new mongoose.Schema({
-  provider: {type: String, required: true}, // github or gitlab
-  repositoryId: {type: Number, required: true, unique: true},
-  projectId: {type: Number, required: true, unique: true}
+  title: {type: String, required: true},
+  tcDirectId: {type: Number, required: true},
+  repoUrl: {type: String, required: true},
+  rocketChatWebhook: {type: String, required: true},
+  rocketChatChannelName: {type: String, required: true},
+  archived: {type: String, required: true},
+  username: {type: String, required: true},
+  secretWebhookKey: {type: String, required: true}
 });
 
 // project id, provider, repositoryId must be unique
-schema.index({projectId: 1, provider: 1, repositoryId: 1}, {unique: true});
+schema.index({tcDirectId: 1}, {unique: true});
 
 
 module.exports = schema;

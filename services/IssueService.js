@@ -24,7 +24,6 @@ const ragnarService = require('./RagnarToolService');
 const gitlabService = require('./GitlabService');
 
 const Issue = models.Issue;
-const Project = models.Project;
 const md = new MarkdownIt();
 
 /**
@@ -120,7 +119,7 @@ async function handleIssueAssignment(event, issue) {
     }
 
     // Update the challenge
-    logger.debug(`Assinging user to challenge: ${userMapping.topcoderUsername}`);
+    logger.debug(`Assigning user to challenge: ${userMapping.topcoderUsername}`);
     await topcoderApiHelper.updateChallenge(dbIssue.challengeId, {
       // task: true,
       assignees: [userMapping.topcoderUsername]
@@ -132,8 +131,8 @@ async function handleIssueAssignment(event, issue) {
 
     logger.debug(`Member ${userMapping.topcoderUsername} is assigned to challenge with id ${dbIssue.challengeId}`);
   } else {
-    // comment on the git ticket for the user to self-sign up with the Ragnar Self-Service tool
-    const comment = `@${assigneeUsername}, please sign-up with Ragnar Self-service tool`;
+    // comment on the git ticket for the user to self-sign up with the Topcoder x Self-Service tool
+    const comment = `@${assigneeUsername}, please sign-up with Topcoder X tool`;
     if (event.provider === 'github') {
       await gitHubService.createComment(event.copilot, event.data.repository.name, issue.number, comment);
       // un-assign the user from the ticket
@@ -218,7 +217,7 @@ async function handleIssueUpdate(event, issue) {
     prizes: issue.prizes
   });
   await dbIssue.save();
-  // comment on the git ticket for the user to self-sign up with the Ragnar Self-Service tool
+  // comment on the git ticket for the user to self-sign up with the Topcoder x Self-Service tool
   const contestUrl = getUrlForChallengeId(dbIssue.challengeId);
   const comment = `Contest ${contestUrl} has been updated - the new changes has been updated for this ticket.`;
   if (event.provider === 'github') {
@@ -238,9 +237,15 @@ async function handleIssueUpdate(event, issue) {
  */
 async function handleIssueCreate(event, issue) {
   // check if project for such repository is already created
-  const project = await Project.findOne({
-    provider: issue.provider,
-    repositoryId: issue.repositoryId
+
+  let fullRepoUrl;
+  if (issue.provider === 'github') {
+    fullRepoUrl = `https://github.com/${event.data.repository.full_name}`;
+  } else if (issue.provider === 'gitlab') {
+    fullRepoUrl = `${config.GITLAB_API_BASE_URL}/${event.data.repository.full_name}`;
+  }
+  const project = await models.Project.findOne({
+    repoUrl: fullRepoUrl
   });
 
   // Check if duplicated
@@ -254,23 +259,13 @@ async function handleIssueCreate(event, issue) {
     throw new Error(
       `challenge ${dbIssue.challengeId} existed already for the issue ${issue.number}`);
   }
-  let projectId;
-  if (project) { // if existing found don't create a project
-    projectId = project.projectId;
-    logger.debug(`existing project was found with id ${projectId} for repository ${event.data.repository.full_name}`);
-  } else {
-    // Create a new project
-    projectId = await topcoderApiHelper.createProject(event.data.repository.full_name);
 
-    // save project and repository mapping in db
-    await Project.create({
-      projectId,
-      provider: issue.provider,
-      repositoryId: issue.repositoryId
-    });
-
-    logger.debug(`new project created with id ${projectId} for issue ${issue.number}`);
-  }
+  if (!project) {
+    throw new Error(
+      'There is no project associated with this repository');
+  }// if existing found don't create a project
+  const projectId = project.tcDirectId;
+  logger.debug(`existing project was found with id ${projectId} for repository ${event.data.repository.full_name}`);
 
   // Create a new challenge
   issue.challengeId = await topcoderApiHelper.createChallenge({
@@ -279,7 +274,7 @@ async function handleIssueCreate(event, issue) {
     detailedRequirements: issue.body,
     prizes: issue.prizes,
     task: true
-  });
+  }, issue.provider, event.data.repository.full_name);
 
   // Save
   await Issue.create(issue);

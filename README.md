@@ -29,7 +29,7 @@ The following config parameters are supported, they are defined in `config/defau
 | TOPIC                          | the kafka subscribe topic name             |  tc-x-events                    |
 | PARTITION                  | the kafka partition            |  0|
 | KAFKA_OPTIONS                  | the connection option for kafka            |  see below about KAFKA options                  |
-| MONGODB_URL  | the MongoDB URL which must be same as Ragnar tool | mongodb://127.0.0.1:27017/ragnar |
+| MONGODB_URL  | the MongoDB URL which must be same as Topcoder x tool | mongodb://127.0.0.1:27017/topcoderx |
 |TC_DEV_ENV| the flag whether to use topcoder development api or production| false|
 | TC_AUTHN_URL | the Topcoder authentication url | https://topcoder-dev.auth0.com/oauth/ro |
 | TC_AUTHN_REQUEST_BODY | the Topcoder authentication request body. This makes use of some environment variables: `TC_USERNAME`, `TC_PASSWORD`, `TC_CLIENT_ID`, `CLIENT_V2CONNECTION` | see `default.js` |
@@ -61,20 +61,17 @@ npm start
 ```
 
 ## Setup for verification
-Before verifying the tool, 4 service needs be configured and run them
+Before verifying the tool, 3 service needs be configured and run them
 - processor
 - receiver
-- Ragnar Tool
-- Topcoder X (both backend and UI)
-
-First login in Ragnar tool with admin and Add owner for which requires topcoder handle, git host's username and type of git host.
+- Topcoder X
 
 Go to Topcoder X UI login with above used topcoder username and
 - go to settings and make sure git hosts are correctly setup, if not click setup and authorize to setup.
 
-- Go to Topcoder X UI and go to project management and add a project from git account and click save, and edit the same project and click 'Add Webhooks' button (you need to add personnel access token), verify that webhooks are set up correctly on git host's project.
+- Go to Topcoder X UI and go to project management and add a project from git account and click save, and edit the same project and click 'Add Webhooks' button, verify that webhooks are set up correctly on git host's project.
 
-Now, receiver service can receive the webhooks from git host's project and processor can processes the requests. Now you can verify this service by following the verfication steps below
+Now, receiver service can receive the webhooks from git host's project and processor can processes the requests. Now you can verify this service by following the verification steps below
 
 ## Verification
 
@@ -106,7 +103,7 @@ Now, receiver service can receive the webhooks from git host's project and proce
   ```
   debug: new challenge created with id 30051089 for issue 3
   ```
-- Wait a minute or 2 for Topcoder internal systems to process the new challenge. You may get an error page `HTTP Status 404` if the internal processings haven't completed yet.
+- Wait a minute or 2 for Topcoder internal systems to process the new challenge. You may get an error page `HTTP Status 404` if the internal processing haven't completed yet.
 - Visit challenge url to verify the challenge:
   ```
   https://www.topcoder-dev.com/challenge-details/30051089/?type=develop&noncache=true
@@ -157,6 +154,6 @@ When an user is assigned to an issue then 'issue.assigned' event will be capture
 - if user is not found in mapping
   - comment on github/gitlab issue will added as :
   ```
-  @username, please sign-up with Ragnar Self-service tool.
+  @username, please sign-up with Topcoder x Self-service tool.
   ```
   - user will be unassigned from issue
