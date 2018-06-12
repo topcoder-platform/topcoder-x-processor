@@ -17,7 +17,8 @@ const logger = require('../utils/logger');
 
 const copilotUserSchema = Joi.object().keys({
   accessToken: Joi.string().required(),
-  userProviderId: Joi.number().required()
+  userProviderId: Joi.number().required(),
+  topcoderUsername: Joi.string()
 }).required();
 
 /**
@@ -59,7 +60,7 @@ async function createComment(copilot, projectId, issueId, body) {
   Joi.attempt({copilot, projectId, issueId, body}, createComment.schema);
   const gitlab = await _authenticate(copilot.accessToken);
   await gitlab.projects.issues.notes.create(projectId, issueId, {body});
-  logger.debug(`Gitlab comment is added on issue with message "${body}"`);
+  logger.debug(`Gitlab comment is added on issue with message: "${body}"`);
 }
 
 createComment.schema = {
@@ -168,11 +169,58 @@ getUserIdByLogin.schema = {
   login: Joi.string().required()
 };
 
+/**
+ * updates the gitlab issue as paid and fix accepted
+ * @param {Object} copilot the copilot
+ * @param {Number} projectId the project id
+ * @param {Number} issueId the issue number
+ * @param {Number} challengeId the challenge id
+ */
+async function markIssueAsPaid(copilot, projectId, issueId, challengeId) {
+  Joi.attempt({copilot, projectId, issueId, challengeId}, markIssueAsPaid.schema);
+  const gitlab = await _authenticate(copilot.accessToken);
+  await gitlab.projects.issues.edit(projectId, issueId, {labels: `${config.PAID_ISSUE_LABEL},${config.FIX_ACCEPTED_ISSUE_LABEL}`});
+  const body = `Payment task has been updated: ${config.TC_OR_DETAIL_LINK}${challengeId}`;
+  await gitlab.projects.issues.notes.create(projectId, issueId, {body});
+  logger.debug(`Gitlab issue is updated for as paid and fix accepted for ${issueId}`);
+}
+
+markIssueAsPaid.schema = {
+  copilot: copilotUserSchema,
+  projectId: Joi.number().positive().required(),
+  issueId: Joi.number().positive().required(),
+  challengeId: Joi.number().positive().required()
+};
+
+/**
+ * change the state of gitlab issue
+ * @param {Object} copilot the copilot
+ * @param {string} projectId the project id
+ * @param {Number} issueId the issue issue id
+ * @param {string} state new state
+ */
+async function changeState(copilot, projectId, issueId, state) {
+  Joi.attempt({copilot, projectId, issueId, state}, changeState.schema);
+  const gitlab = await _authenticate(copilot.accessToken);
+  await gitlab.projects.issues.edit(projectId, issueId, {state_event: state});
+  logger.debug(`Gitlab issue state is updated to '${state}' for issue number ${issueId}`);
+}
+
+changeState.schema = {
+  copilot: copilotUserSchema,
+  projectId: Joi.number().positive().required(),
+  issueId: Joi.number().positive().required(),
+  state: Joi.string().required()
+};
+
+
 module.exports = {
   createComment,
   updateIssue,
   assignUser,
   removeAssign,
   getUsernameById,
-  getUserIdByLogin
+  getUserIdByLogin,
+  markIssueAsPaid,
+  changeState
 };

@@ -23,6 +23,9 @@ The following config parameters are supported, they are defined in `config/defau
 |ISSUE_BID_EMAIL_RECEIVER| the email receiver about bid email||
 |TC_URL| the base URL of topcoder to get the challenge URL| defaults to `https://www.topcoder-dev.com`|
 |GITLAB_API_BASE_URL| the URL for gitlab host| defaults to `https://gitlab.com`|
+|PAID_ISSUE_LABEL|the label name for paid, should be one of the label configured in topcoder x ui|'Paid'|
+|FIX_ACCEPTED_ISSUE_LABEL|the label name for fix accepted, should be one of the label configured in topcoder x ui|'Fix Accepted'|
+|TC_OR_DETAIL_LINK|the link to online review detail of challenge| see `default.js`, OR link for dev environment|
 
 KAFKA_OPTIONS should be object as described in https://github.com/SOHU-Co/kafka-node#kafkaclient
 For using with SSL, the options should be as

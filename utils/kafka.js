@@ -60,7 +60,7 @@ class Kafka {
         return;
       }
 
-      if (event && _.includes(['issue.created', 'issue.updated', 'comment.created', 'comment.updated', 'issue.assigned'], event.event)) {
+      if (event && _.includes(['issue.created', 'issue.updated', 'issue.closed', 'comment.created', 'comment.updated', 'issue.assigned'], event.event)) {
         IssueService
           .process(event)
           .catch(logger.error);

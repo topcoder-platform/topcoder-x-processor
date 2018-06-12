@@ -175,8 +175,99 @@ async function updateChallenge(id, challenge) {
   });
 }
 
+/**
+ * activates the topcoder challenge
+ * @param {Number} id the challenge id
+ */
+async function activateChallenge(id) {
+  const apiKey = await getAccessToken();
+  logger.debug(`Activating challenge ${id}`);
+  await axios.post(`${projectsClient.basePath}/challenges/${id}/activate`, null, {
+    headers: {
+      authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    }
+  });
+  logger.debug(`Challenge ${id} is activated successfully.`);
+}
+
+/**
+ * closes the topcoder challenge
+ * @param {Number} id the challenge id
+ * @param {Number} winnerId the winner id
+ */
+async function closeChallenge(id, winnerId) {
+  const apiKey = await getAccessToken();
+  logger.debug(`Closing challenge ${id}`);
+  await axios.post(`${projectsClient.basePath}/challenges/${id}/close?winnerId=${winnerId}`, null, {
+    headers: {
+      authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    }
+  });
+  logger.debug(`Challenge ${id} is closed successfully.`);
+}
+
+/**
+ * gets the project billing account id
+ * @param {Number} id the project id
+ * @returns {Number} the billing account id
+ */
+async function getProjectBillingAccountId(id) {
+  const apiKey = await getAccessToken();
+  logger.debug(`Getting project billing detail ${id}`);
+  const response = await axios.get(`${projectsClient.basePath}/direct/projects/${id}`, {
+    headers: {
+      authorization: `Bearer ${apiKey}`
+    }
+  });
+  return _.get(response, 'data.result.content.billingAccountIds[0]');
+}
+
+/**
+ * gets the topcoder user id from handle
+ * @param {String} handle the topcoder handle
+ * @returns {Number} the user id
+ */
+async function getTopcoderMemberId(handle) {
+  bearer.apiKey = await getAccessToken();
+  const response = await axios.get(`${projectsClient.basePath}/members/${handle}`);
+  return _.get(response, 'data.result.content.userId');
+}
+
+/**
+ * adds the resource to the topcoder challenge
+ * @param {Number} id the challenge id
+ * @param {Object} resource the resource resource to add
+ */
+async function addResourceToChallenge(id, resource) {
+  bearer.apiKey = await getAccessToken();
+  logger.debug(`adding resource to challenge ${id}`);
+  await new Promise((resolve, reject) => {
+    challengesApiInstance.challengesIdResourcesPost(id, resource, (err, res) => {
+      if (err) {
+        if (_.get(JSON.parse(_.get(err, 'response.text')), 'result.content')
+          === `User ${resource.resourceUserId} with role ${resource.roleId} already exists`) {
+          resolve();
+        } else {
+          logger.error(JSON.stringify(err));
+          reject(err);
+        }
+      } else {
+        logger.debug(`resource is added to challenge ${id} successfully.`);
+        resolve(res);
+      }
+    });
+  });
+}
+
 module.exports = {
   createProject,
   createChallenge,
-  updateChallenge
+  updateChallenge,
+  activateChallenge,
+  closeChallenge,
+  getProjectBillingAccountId,
+  getTopcoderMemberId,
+  addResourceToChallenge
 };

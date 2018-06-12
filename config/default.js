@@ -80,4 +80,7 @@ module.exports = {
   ISSUE_BID_EMAIL_RECEIVER: process.env.ISSUE_BID_EMAIL_RECEIVER || '',
   TC_URL: process.env.TC_URL || 'https://www.topcoder-dev.com',
   GITLAB_API_BASE_URL: process.env.GITLAB_API_BASE_URL || 'https://gitlab.com',
+  PAID_ISSUE_LABEL: process.env.PAID_ISSUE_LABEL || 'Paid',
+  FIX_ACCEPTED_ISSUE_LABEL: process.env.FIX_ACCEPTED_ISSUE_LABEL || 'Fix accepted',
+  TC_OR_DETAIL_LINK: process.env.TC_OR_DETAIL_LINK || 'https://software.topcoder-dev.com/review/actions/ViewProjectDetails?pid='
 };
