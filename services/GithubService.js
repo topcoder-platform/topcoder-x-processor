@@ -14,6 +14,7 @@ const Joi = require('joi');
 const GitHubApi = require('github');
 const config = require('config');
 const logger = require('../utils/logger');
+const errors = require('../utils/errors');
 
 const copilotUserSchema = Joi.object().keys({
   accessToken: Joi.string().required(),
@@ -28,12 +29,16 @@ const copilotUserSchema = Joi.object().keys({
  * @private
  */
 async function _authenticate(accessToken) {
-  const github = new GitHubApi();
-  github.authenticate({
-    type: 'oauth',
-    token: accessToken
-  });
-  return github;
+  try {
+    const github = new GitHubApi();
+    github.authenticate({
+      type: 'oauth',
+      token: accessToken
+    });
+    return github;
+  } catch (err) {
+    throw errors.convertGitHubError(err, 'Failed to authenticate to Github using access token of copilot.');
+  }
 }
 
 /**
@@ -46,14 +51,18 @@ async function _authenticate(accessToken) {
  * @private
  */
 async function _removeAssignees(github, owner, repo, number, assignees) {
-  await github.issues.removeAssigneesFromIssue({
-    owner,
-    repo,
-    number,
-    body: {
-      assignees
-    }
-  });
+  try {
+    await github.issues.removeAssigneesFromIssue({
+      owner,
+      repo,
+      number,
+      body: {
+        assignees
+      }
+    });
+  } catch (err) {
+    throw errors.convertGitHubError(err, 'Error occurred during remove assignees from issue.');
+  }
 }
 
 /**
@@ -78,7 +87,11 @@ async function updateIssue(copilot, repo, number, title) {
   Joi.attempt({copilot, repo, number, title}, updateIssue.schema);
   const github = await _authenticate(copilot.accessToken);
   const owner = await _getUsernameById(github, copilot.userProviderId);
-  await github.issues.edit({owner, repo, number, title});
+  try {
+    await github.issues.edit({owner, repo, number, title});
+  } catch (err) {
+    throw errors.convertGitHubError(err, 'Error occurred during updating issue.');
+  }
   logger.debug(`Github issue title is updated for issue number ${number}`);
 }
 
@@ -100,13 +113,17 @@ async function assignUser(copilot, repo, number, user) {
   Joi.attempt({copilot, repo, number, user}, assignUser.schema);
   const github = await _authenticate(copilot.accessToken);
   const owner = await _getUsernameById(github, copilot.userProviderId);
+  try {
+    const issue = await github.issues.get({owner, repo, number});
 
-  const issue = await github.issues.get({owner, repo, number});
-  const oldAssignees = _(issue.data.assignees).map('login').without(user).value();
-  if (oldAssignees && oldAssignees.length > 0) {
-    await _removeAssignees(github, owner, repo, number, oldAssignees);
+    const oldAssignees = _(issue.data.assignees).map('login').without(user).value();
+    if (oldAssignees && oldAssignees.length > 0) {
+      await _removeAssignees(github, owner, repo, number, oldAssignees);
+    }
+    await github.issues.addAssigneesToIssue({owner, repo, number, assignees: [user]});
+  } catch (err) {
+    throw errors.convertGitHubError(err, 'Error occurred during assigning issue user.');
   }
-  await github.issues.addAssigneesToIssue({owner, repo, number, assignees: [user]});
   logger.debug(`Github issue with number ${number} is assigned to ${user}`);
 }
 
@@ -129,7 +146,6 @@ async function removeAssign(copilot, repo, number, user) {
 
   const github = await _authenticate(copilot.accessToken);
   const owner = await _getUsernameById(github, copilot.userProviderId);
-
   await _removeAssignees(github, owner, repo, number, [user]);
   logger.debug(`Github user ${user} is unassigned from issue number ${number}`);
 }
@@ -148,7 +164,11 @@ async function createComment(copilot, repo, number, body) {
 
   const github = await _authenticate(copilot.accessToken);
   const owner = await _getUsernameById(github, copilot.userProviderId);
-  await github.issues.createComment({owner, repo, number, body});
+  try {
+    await github.issues.createComment({owner, repo, number, body});
+  } catch (err) {
+    throw errors.convertGitHubError(err, 'Error occurred during creating comment on issue.');
+  }
   logger.debug(`Github comment is added on issue with message: "${body}"`);
 }
 
@@ -207,9 +227,13 @@ async function markIssueAsPaid(copilot, repo, number, challengeId) {
   const github = await _authenticate(copilot.accessToken);
   const owner = await _getUsernameById(github, copilot.userProviderId);
   const labels = [config.PAID_ISSUE_LABEL, config.FIX_ACCEPTED_ISSUE_LABEL];
-  await github.issues.edit({owner, repo, number, labels});
-  const body = `Payment task has been updated: ${config.TC_OR_DETAIL_LINK}${challengeId}`;
-  await github.issues.createComment({owner, repo, number, body});
+  try {
+    await github.issues.edit({owner, repo, number, labels});
+    const body = `Payment task has been updated: ${config.TC_OR_DETAIL_LINK}${challengeId}`;
+    await github.issues.createComment({owner, repo, number, body});
+  } catch (err) {
+    throw errors.convertGitHubError(err, 'Error occurred during updating issue as paid.');
+  }
   logger.debug(`Github issue title is updated for as paid and fix accepted for ${number}`);
 }
 
@@ -231,7 +255,11 @@ async function changeState(copilot, repo, number, state) {
   Joi.attempt({copilot, repo, number, state}, changeState.schema);
   const github = await _authenticate(copilot.accessToken);
   const owner = await _getUsernameById(github, copilot.userProviderId);
-  await github.issues.edit({owner, repo, number, state});
+  try {
+    await github.issues.edit({owner, repo, number, state});
+  } catch (err) {
+    throw errors.convertGitHubError(err, 'Error occurred during updating status of issue.');
+  }
   logger.debug(`Github issue state is updated to '${state}' for issue number ${number}`);
 }
 
@@ -242,6 +270,32 @@ changeState.schema = {
   state: Joi.string().required()
 };
 
+/**
+ * updates the github issue with new labels
+ * @param {Object} copilot the copilot
+ * @param {string} repo the repository
+ * @param {Number} number the issue number
+ * @param {Number} labels the challenge id
+ */
+async function addLabels(copilot, repo, number, labels) {
+  Joi.attempt({copilot, repo, number, labels}, addLabels.schema);
+  const github = await _authenticate(copilot.accessToken);
+  const owner = await _getUsernameById(github, copilot.userProviderId);
+  try {
+    await github.issues.edit({owner, repo, number, labels});
+  } catch (err) {
+    throw errors.convertGitHubError(err, 'Error occurred during adding label in issue.');
+  }
+  logger.debug(`Github issue is updated with new labels for ${number}`);
+}
+
+addLabels.schema = {
+  copilot: copilotUserSchema,
+  repo: Joi.string().required(),
+  number: Joi.number().required(),
+  labels: Joi.array().items(Joi.string()).required()
+};
+
 module.exports = {
   updateIssue,
   assignUser,
@@ -250,5 +304,8 @@ module.exports = {
   getUsernameById,
   getUserIdByLogin,
   markIssueAsPaid,
-  changeState
+  changeState,
+  addLabels
 };
+
+logger.buildService(module.exports);

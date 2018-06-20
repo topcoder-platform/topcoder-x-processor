@@ -62,3 +62,5 @@ sendNewBidEmail.schema = {
 module.exports = {
   sendNewBidEmail
 };
+
+logger.buildService(module.exports);

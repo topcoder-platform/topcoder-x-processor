@@ -82,5 +82,8 @@ module.exports = {
   GITLAB_API_BASE_URL: process.env.GITLAB_API_BASE_URL || 'https://gitlab.com',
   PAID_ISSUE_LABEL: process.env.PAID_ISSUE_LABEL || 'Paid',
   FIX_ACCEPTED_ISSUE_LABEL: process.env.FIX_ACCEPTED_ISSUE_LABEL || 'Fix accepted',
-  TC_OR_DETAIL_LINK: process.env.TC_OR_DETAIL_LINK || 'https://software.topcoder-dev.com/review/actions/ViewProjectDetails?pid='
+  READY_FOR_REVIEW_ISSUE_LABEL: process.env.READY_FOR_REVIEW_ISSUE_LABEL || 'Ready for review',
+  TC_OR_DETAIL_LINK: process.env.TC_OR_DETAIL_LINK || 'https://software.topcoder-dev.com/review/actions/ViewProjectDetails?pid=',
+  RETRY_COUNT: process.env.RETRY_COUNT || 3,
+  RETRY_INTERVAL: process.env.RETRY_INTERVAL || 120000, // 2 minutes
 };
