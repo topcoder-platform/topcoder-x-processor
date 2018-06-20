@@ -12,6 +12,7 @@
 const Joi = require('joi');
 const config = require('config');
 const models = require('../models');
+const logger = require('../utils/logger');
 
 /**
  * gets the tc handle for given git user id from a mapping captured by Topcoder x tool
@@ -93,3 +94,5 @@ module.exports = {
   getTCUserName,
   getRepositoryCopilot
 };
+
+logger.buildService(module.exports);

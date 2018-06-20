@@ -3,11 +3,17 @@
         "node": true
     },
     "parserOptions": {
-        "ecmaVersion": 8
+        "ecmaVersion": 8,
+        "ecmaFeatures": {
+            "experimentalObjectRestSpread": true
+        }
     },
     "extends": "eslint-config-topcoder/nodejs",
     "rules": {
-        "max-len": ["error", 160],
+        "max-len": [
+            "error",
+            160
+        ],
         "indent": [
             "error",
             2
@@ -25,12 +31,16 @@
             "always"
         ],
         "no-console": 0,
-        "comma-dangle": ["error", {
-            "arrays": "never",
-            "objects": "never",
-            "imports": "never",
-            "exports": "never",
-            "functions": "ignore"
-        }]
+        "comma-dangle": [
+            "error",
+            {
+                "arrays": "never",
+                "objects": "never",
+                "imports": "never",
+                "exports": "never",
+                "functions": "ignore"
+            }
+        ],
+        "max-lines": 0,
     }
 }

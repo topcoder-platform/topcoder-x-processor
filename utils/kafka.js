@@ -11,6 +11,7 @@
  */
 'use strict';
 
+const {promisify} = require('util');
 const kafka = require('kafka-node');
 const config = require('config');
 const _ = require('lodash');
@@ -25,7 +26,10 @@ class Kafka {
     this.consumer = new kafka.Consumer(this.client, [{topic: config.TOPIC, partition: config.PARTITION}], {autoCommit: true});
     this.consumer.setOffset(config.TOPIC, 0, 0);
     this.offset = new Offset(this.client);
+    this.producer = new kafka.Producer(this.client);
     logger.info(`Connecting on topic: ${config.TOPIC}`);
+
+    this.sendAsync = promisify(this.producer.send).bind(this.producer);
   }
 
   run() {
@@ -66,6 +70,26 @@ class Kafka {
           .catch(logger.error);
       }
     });
+    this.consumer.on('ready', () => {
+      logger.info('kafka consumer is ready.');
+    });
+    this.producer.on('ready', () => {
+      logger.info('kafka producer is ready.');
+
+      this.producer.createTopics([config.TOPIC], true, (err) => {
+        if (err) {
+          logger.error(`error in creating topic: ${config.TOPIC}, error: ${err.stack}`);
+        } else {
+          logger.info(`kafka topic: ${config.TOPIC} is ready`);
+        }
+      });
+    });
+    this.producer.on('error', (err) => {
+      logger.error(`kafka is not connected. ${err.stack}`);
+    });
+  }
+  send(message) {
+    return this.sendAsync([{topic: config.TOPIC, messages: message}]);
   }
 }
 

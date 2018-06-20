@@ -26,6 +26,9 @@ The following config parameters are supported, they are defined in `config/defau
 |PAID_ISSUE_LABEL|the label name for paid, should be one of the label configured in topcoder x ui|'Paid'|
 |FIX_ACCEPTED_ISSUE_LABEL|the label name for fix accepted, should be one of the label configured in topcoder x ui|'Fix Accepted'|
 |TC_OR_DETAIL_LINK|the link to online review detail of challenge| see `default.js`, OR link for dev environment|
+|RETRY_COUNT| the number of times an event should be retried to process| 3|
+|RETRY_INTERVAL| the interval at which the event should be retried to process in milliseconds | 120000|
+|READY_FOR_REVIEW_ISSUE_LABEL| the label name for ready for review, should be one of the label configured in topcoder x ui|'Ready for review'|
 
 KAFKA_OPTIONS should be object as described in https://github.com/SOHU-Co/kafka-node#kafkaclient
 For using with SSL, the options should be as
