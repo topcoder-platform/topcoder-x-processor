@@ -30,7 +30,7 @@ The following config parameters are supported, they are defined in `config/defau
 |RETRY_INTERVAL| the interval at which the event should be retried to process in milliseconds | 120000|
 |READY_FOR_REVIEW_ISSUE_LABEL| the label name for ready for review, should be one of the label configured in topcoder x ui|'Ready for review'|
 
-KAFKA_OPTIONS should be object as described in https://github.com/SOHU-Co/kafka-node#kafkaclient
+KAFKA_OPTIONS should be object as described in https://github.com/oleksiyk/kafka#ssl
 For using with SSL, the options should be as
 ```
  {

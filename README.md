@@ -45,12 +45,12 @@ The following config parameters are supported, they are defined in `config/defau
 |FIX_ACCEPTED_ISSUE_LABEL|the label name for fix accepted, should be one of the label configured in topcoder x ui|'Fix Accepted'|
 |TC_OR_DETAIL_LINK|the link to online review detail of challenge| see `default.js`, OR link for dev environment|
 
-KAFKA_OPTIONS should be object as described in https://github.com/SOHU-Co/kafka-node#kafkaclient
+KAFKA_OPTIONS should be object as described in https://github.com/oleksiyk/kafka#ssl
 For using with SSL, the options should be as
 ```
  {
-    kafkaHost: '<server>',
-    sslOptions: {
+    connectionString: '<server>',
+    ssl: {
       cert: '<certificate>', 
       key:  '<key>'
     }

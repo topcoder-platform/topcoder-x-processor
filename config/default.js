@@ -17,8 +17,8 @@ module.exports = {
   PARTITION: process.env.PARTITION || 0,
   TOPIC: process.env.TOPIC || 'tc-x-events',
   KAFKA_OPTIONS: {
-    kafkaHost: process.env.KAFKA_HOST || 'localhost:9092',
-    sslOptions: {
+    connectionString: process.env.KAFKA_HOST || 'localhost:9092',
+    ssl: {
       cert: process.env.KAFKA_CLIENT_CERT || fs.readFileSync('./kafka_client.cer'), // eslint-disable-line no-sync
       key: process.env.KAFKA_CLIENT_CERT_KEY || fs.readFileSync('./kafka_client.key'), // eslint-disable-line no-sync
     }
