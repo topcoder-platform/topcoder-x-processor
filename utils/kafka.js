@@ -11,54 +11,32 @@
  */
 'use strict';
 
-const {promisify} = require('util');
-const kafka = require('kafka-node');
 const config = require('config');
 const _ = require('lodash');
+const kafka = require('no-kafka');
 const IssueService = require('../services/IssueService');
 const logger = require('./logger');
 
-const Offset = kafka.Offset;
-
 class Kafka {
   constructor() {
-    this.client = new kafka.KafkaClient(config.KAFKA_OPTIONS);
-    this.consumer = new kafka.Consumer(this.client, [{topic: config.TOPIC, partition: config.PARTITION}], {autoCommit: true});
-    this.consumer.setOffset(config.TOPIC, 0, 0);
-    this.offset = new Offset(this.client);
-    this.producer = new kafka.Producer(this.client);
-    logger.info(`Connecting on topic: ${config.TOPIC}`);
+    this.consumer = new kafka.SimpleConsumer(config.KAFKA_OPTIONS);
 
-    this.sendAsync = promisify(this.producer.send).bind(this.producer);
+    this.producer = new kafka.Producer(config.KAFKA_OPTIONS);
+    this.producer.init().then(() => {
+      logger.info('kafka producer is ready.');
+    }).catch((err) => {
+      logger.error(`kafka producer is not connected. ${err.stack}`);
+    });
   }
 
-  run() {
-    this.consumer.on('error', (err) => {
-      logger.error(`ERROR ${err}`);
-    });
-
-    this.consumer.on('offsetOutOfRange', (topic) => {
-      logger.debug(`TOPIC ${topic}`);
-      logger.info('offset OutOfRange. resetting.');
-      this.offset.fetch([topic], (errOffsetFetch, offsets) => {
-        if (errOffsetFetch) {
-          logger.error(errOffsetFetch);
-          return console.error(errOffsetFetch);
-        }
-
-        const min = Math.min(offsets[topic.topic][topic.partition]);
-        logger.info(`Setting offset to ${min}`);
-        return this.consumer.setOffset(config.TOPIC, topic.partition, min);
-      });
-    });
-
-    this.consumer.on('message', (message) => {
-      logger.info(`received message from kafka: ${message.value}`);
+  messageHandler(messageSet) {
+    messageSet.forEach((item) => {
+      logger.info(`received message from kafka: ${item.message.value.toString('utf8')}`);
 
       // The event should be a JSON object
       let event;
       try {
-        event = JSON.parse(message.value);
+        event = JSON.parse(item.message.value.toString('utf8'));
       } catch (err) {
         logger.error(`"message" is not a valid JSON-formatted string: ${err.message}`);
         return;
@@ -70,26 +48,19 @@ class Kafka {
           .catch(logger.error);
       }
     });
-    this.consumer.on('ready', () => {
-      logger.info('kafka consumer is ready.');
-    });
-    this.producer.on('ready', () => {
-      logger.info('kafka producer is ready.');
+  }
 
-      this.producer.createTopics([config.TOPIC], true, (err) => {
-        if (err) {
-          logger.error(`error in creating topic: ${config.TOPIC}, error: ${err.stack}`);
-        } else {
-          logger.info(`kafka topic: ${config.TOPIC} is ready`);
-        }
-      });
-    });
-    this.producer.on('error', (err) => {
-      logger.error(`kafka is not connected. ${err.stack}`);
+  run() {
+    this.consumer.init().then(() => {
+      logger.info('kafka consumer is ready');
+      this.consumer.subscribe(config.TOPIC, {}, this.messageHandler);
+    }).catch((err) => {
+      logger.error(`kafka consumer is not connected. ${err.stack}`);
     });
   }
+
   send(message) {
-    return this.sendAsync([{topic: config.TOPIC, messages: message}]);
+    return this.producer.send({topic: config.TOPIC, message: {value: message}});
   }
 }
 
