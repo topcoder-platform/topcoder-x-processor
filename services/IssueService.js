@@ -65,7 +65,7 @@ async function handleEventGracefully(event, issue, err) {
     // reschedule event
     if (event.retryCount <= config.RETRY_COUNT) {
       logger.debug('Scheduling event for next retry');
-      const newEvent = {...event};
+      const newEvent = { ...event };
       newEvent.retryCount += 1;
       delete newEvent.copilot;
       setTimeout(async () => {
@@ -78,11 +78,13 @@ async function handleEventGracefully(event, issue, err) {
     if (event.event === 'issue.closed' && event.paymentSuccessful === false) {
       comment = `Payment failed: ${comment}`;
     }
-    // notify error in git host
-    if (event.provider === 'github') {
-      await gitHubService.createComment(event.copilot, event.data.repository.name, issue.number, comment);
-    } else {
-      await gitlabService.createComment(event.copilot, event.data.repository.id, issue.number, comment);
+    if (event.retryCount <= 1) {
+      // notify error in git host
+      if (event.provider === 'github') {
+        await gitHubService.createComment(event.copilot, event.data.repository.name, issue.number, comment);
+      } else {
+        await gitlabService.createComment(event.copilot, event.data.repository.id, issue.number, comment);
+      }
     }
     if (event.event === 'issue.closed') {
       // reopen

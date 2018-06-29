@@ -191,14 +191,19 @@ async function updateChallenge(id, challenge) {
  * @param {Number} id the challenge id
  */
 async function activateChallenge(id) {
-  const apiKey = await getAccessToken();
+  bearer.apiKey = await getAccessToken();
   logger.debug(`Activating challenge ${id}`);
   try {
-    await axios.post(`${projectsClient.basePath}/challenges/${id}/activate`, null, {
-      headers: {
-        authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      }
+    await new Promise((resolve, reject) => {
+      challengesApiInstance.activateChallenge(id, (err, data) => {
+        if (err) {
+          logger.error(err);
+          logger.debug(JSON.stringify(err));
+          reject(err);
+        } else {
+          resolve(data);
+        }
+      });
     });
     logger.debug(`Challenge ${id} is activated successfully.`);
   } catch (err) {
@@ -241,7 +246,12 @@ async function getProjectBillingAccountId(id) {
         authorization: `Bearer ${apiKey}`
       }
     });
-    return _.get(response, 'data.result.content.billingAccountIds[0]');
+    const billingAccountId = _.get(response, 'data.result.content.billingAccountIds[0]');
+    if (!billingAccountId) {
+      _.set(response, 'data.result.content', `There is no billing account id associated with project ${id}`)
+      throw new Error(response);
+    }
+    return billingAccountId;
   } catch (err) {
     throw errors.convertTopcoderApiError(err, 'Failed to get billing detail for the project.');
   }

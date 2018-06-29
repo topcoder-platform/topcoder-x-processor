@@ -14,6 +14,7 @@ const _ = require('lodash');
 const winston = require('winston');
 const config = require('config');
 const getParams = require('get-parameter-names');
+const globalLog = require('global-request-logger');
 
 const logger = new winston.Logger({
   transports: [
@@ -46,7 +47,7 @@ function sanitizeObject(obj) {
   try {
     return JSON.parse(JSON.stringify(obj, (name, value) => {
       // Array of field names that should not be logged
-      const removeFields = ['refreshToken', 'accessToken'];
+      const removeFields = ['refreshToken', 'accessToken', 'access_token', 'authorization'];
       if (_.includes(removeFields, name)) {
         return '<removed>';
       }
@@ -111,5 +112,19 @@ logger.decorateWithLogging = function decorateWithLogging(service) {
 logger.buildService = function buildService(service) {
   logger.decorateWithLogging(service);
 };
+
+globalLog.initialize();
+
+// global any http success request interceptor
+globalLog.on('success', (request, response) => {
+  logger.debug('Request', util.inspect(sanitizeObject(request)));
+  logger.debug('Response', util.inspect(sanitizeObject(response)));
+});
+
+// global any http error request interceptor
+globalLog.on('error', (request, response) => {
+  logger.error('Request', util.inspect(sanitizeObject(request)));
+  logger.error('Response', util.inspect(sanitizeObject(response)));
+});
 
 module.exports = logger;
