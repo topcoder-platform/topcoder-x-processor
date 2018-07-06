@@ -78,7 +78,7 @@ async function handleEventGracefully(event, issue, err) {
     if (event.event === 'issue.closed' && event.paymentSuccessful === false) {
       comment = `Payment failed: ${comment}`;
     }
-    if (event.retryCount <= 1) {
+    if (event.retryCount === config.RETRY_COUNT) {
       // notify error in git host
       if (event.provider === 'github') {
         await gitHubService.createComment(event.copilot, event.data.repository.name, issue.number, comment);
@@ -506,13 +506,14 @@ async function handleIssueCreate(event, issue) {
   } else {
     await gitlabService.createComment(event.copilot, event.data.repository.id, issue.number, comment);
   }
-
-  // if assignee is added during issue create then assign as well
-  if (event.data.issue.assignees && event.data.issue.assignees.length > 0 && event.data.issue.assignees[0].id) {
-    event.data.assignee = {
-      id: event.data.issue.assignees[0].id
-    };
-    await handleIssueAssignment(event, issue);
+  if (event.provider === 'gitlab') {
+    // if assignee is added during issue create then assign as well
+    if (event.data.issue.assignees && event.data.issue.assignees.length > 0 && event.data.issue.assignees[0].id) {
+      event.data.assignee = {
+        id: event.data.issue.assignees[0].id
+      };
+      await handleIssueAssignment(event, issue);
+    }
   }
 
   logger.debug(`new challenge created with id ${issue.challengeId} for issue ${issue.number}`);
