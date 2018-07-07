@@ -37,6 +37,7 @@ class Kafka {
       let event;
       try {
         event = JSON.parse(item.message.value.toString('utf8'));
+        event = JSON.parse(event.payload.value);
       } catch (err) {
         logger.error(`"message" is not a valid JSON-formatted string: ${err.message}`);
         return;
@@ -60,7 +61,21 @@ class Kafka {
   }
 
   send(message) {
-    return this.producer.send({topic: config.TOPIC, message: {value: message}});
+    const data = JSON.stringify({
+      topic: config.TOPIC,
+      originator: 'topcoder-x-processor',
+      timestamp: (new Date()).toISOString(),
+      'mime-type': 'application/json',
+      payload: {
+        value: message
+      }
+    });
+    return this.producer.send({
+      topic: config.TOPIC,
+      message: {
+        value: data
+      }
+    });
   }
 }
 
