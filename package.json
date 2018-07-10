@@ -22,27 +22,30 @@
   "homepage": "https://gitlab.com/luettich/processor#README",
   "dependencies": {
     "axios": "^0.16.2",
-    "config": "^1.26.2",
-    "github": "^12.0.2",
-    "joi": "^13.0.0",
+    "config": "^1.30.0",
+    "get-parameter-names": "^0.3.0",
+    "github": "^12.1.0",
+    "global-request-logger": "^0.1.1",
+    "joi": "^13.4.0",
     "jwt-decode": "^2.2.0",
-    "kafka-node": "^2.2.3",
-    "lodash": "^4.17.4",
-    "markdown-it": "^8.4.0",
-    "moment": "^2.19.1",
-    "mongoose": "^4.12.3",
-    "node-gitlab-api": "^2.2.6",
-    "nodemailer": "^4.4.0",
+    "lodash": "^4.17.10",
+    "markdown-it": "^8.4.1",
+    "moment": "^2.22.2",
+    "mongoose": "^4.13.14",
+    "no-kafka": "^3.2.10",
+    "node-gitlab-api": "^2.2.8",
+    "nodemailer": "^4.6.7",
     "topcoder-api-challenges": "^1.0.6",
     "topcoder-api-projects": "^1.0.1",
     "topcoder-dev-api-challenges": "^1.0.6",
     "topcoder-dev-api-projects": "^1.0.1",
-    "winston": "^2.3.1"
+    "util": "^0.11.0",
+    "winston": "^2.4.3"
   },
   "devDependencies": {
     "eslint-config-topcoder": "^2.0.0",
     "eslint-plugin-babel": "^4.1.2",
     "eslint-plugin-chai-expect": "^1.1.1",
-    "eslint-plugin-react": "^7.2.0"
+    "eslint-plugin-react": "^7.10.0"
   }
 }

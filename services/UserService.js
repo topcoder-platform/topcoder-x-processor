@@ -1,38 +1,39 @@
 /*
- * Copyright (c) 2017 TopCoder, Inc. All rights reserved.
+ * Copyright (c) 2018 TopCoder, Inc. All rights reserved.
  */
 'use strict';
 
 /**
  * This provides methods around Self service tool.
- * @author TCSCODER
+ * @author veshu
  * @version 1.0
  */
 
 const Joi = require('joi');
 const config = require('config');
 const models = require('../models');
+const logger = require('../utils/logger');
 
 /**
- * gets the tc handle for given username from a provider captured by Topcoder x tool
- * @param {String} provider the username provider
- * @param {String} username the username
+ * gets the tc handle for given git user id from a mapping captured by Topcoder x tool
+ * @param {String} provider the git provider
+ * @param {String} gitUserId the user id in git provider
  * @returns {Object} user mapping if found else null
  */
-async function getTCUserName(provider, username) {
-  Joi.attempt({provider, username}, getTCUserName.schema);
+async function getTCUserName(provider, gitUserId) {
+  Joi.attempt({provider, gitUserId}, getTCUserName.schema);
   const criteria = {};
   if (provider === 'github') {
-    criteria.githubUsername = username;
+    criteria.githubUserId = gitUserId;
   } else if (provider === 'gitlab') {
-    criteria.gitlabUsername = username;
+    criteria.gitlabUserId = gitUserId;
   }
   return await models.UserMapping.findOne(criteria);
 }
 
 getTCUserName.schema = {
   provider: Joi.string().valid('github', 'gitlab').required(),
-  username: Joi.string().required()
+  gitUserId: Joi.number().required()
 };
 
 /**
@@ -79,7 +80,8 @@ async function getRepositoryCopilot(provider, repoFullName) {
 
   return {
     accessToken: copilot.accessToken,
-    userProviderId: copilot.userProviderId
+    userProviderId: copilot.userProviderId,
+    topcoderUsername: userMapping.topcoderUsername
   };
 }
 
@@ -92,3 +94,5 @@ module.exports = {
   getTCUserName,
   getRepositoryCopilot
 };
+
+logger.buildService(module.exports);

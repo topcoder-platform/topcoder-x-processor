@@ -25,6 +25,7 @@ const topcoderDevApiProjects = require('topcoder-dev-api-projects');
 const topcoderDevApiChallenges = require('topcoder-dev-api-challenges');
 
 const logger = require('./logger');
+const errors = require('./errors');
 
 
 if (config.TC_DEV_ENV) {
@@ -102,17 +103,20 @@ async function createProject(projectName) {
   const projectBody = new topcoderApiProjects.ProjectRequestBody.constructFromObject({
     projectName
   });
-  const projectResponse = await new Promise((resolve, reject) => {
-    projectsApiInstance.directProjectsPost(projectBody, (err, res) => {
-      if (err) {
-        reject(err);
-      } else {
-        resolve(res);
-      }
+  try {
+    const projectResponse = await new Promise((resolve, reject) => {
+      projectsApiInstance.directProjectsPost(projectBody, (err, res) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(res);
+        }
+      });
     });
-  });
-
-  return _.get(projectResponse, 'result.content.projectId');
+    return _.get(projectResponse, 'result.content.projectId');
+  } catch (err) {
+    throw errors.convertTopcoderApiError(err, 'Failed to create project.');
+  }
 }
 
 /**
@@ -136,17 +140,21 @@ async function createChallenge(challenge) {
       submissionEndsAt: end
     }, challenge)
   });
-  const challengeResponse = await new Promise((resolve, reject) => {
-    challengesApiInstance.saveDraftContest(challengeBody, (err, res) => {
-      if (err) {
-        reject(err);
-      } else {
-        resolve(res);
-      }
+  try {
+    const challengeResponse = await new Promise((resolve, reject) => {
+      challengesApiInstance.saveDraftContest(challengeBody, (err, res) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(res);
+        }
+      });
     });
-  });
 
-  return _.get(challengeResponse, 'result.content.id');
+    return _.get(challengeResponse, 'result.content.id');
+  } catch (err) {
+    throw errors.convertTopcoderApiError(err, 'Failed to create challenge.');
+  }
 }
 
 /**
@@ -161,22 +169,146 @@ async function updateChallenge(id, challenge) {
   const challengeBody = new topcoderApiChallenges.UpdateChallengeBodyParam.constructFromObject({
     param: challenge
   });
+  try {
+    await new Promise((resolve, reject) => {
+      challengesApiInstance.challengesIdPut(id, challengeBody, (err, res) => {
+        if (err) {
+          logger.error(err);
+          logger.debug(JSON.stringify(err));
+          reject(err);
+        } else {
+          resolve(res);
+        }
+      });
+    });
+  } catch (err) {
+    throw errors.convertTopcoderApiError(err, 'Failed to update challenge.');
+  }
+}
 
-  await new Promise((resolve, reject) => {
-    challengesApiInstance.challengesIdPut(id, challengeBody, (err, res) => {
-      if (err) {
-        logger.error(err);
-        logger.debug(JSON.stringify(err));
-        reject(err);
-      } else {
-        resolve(res);
+/**
+ * activates the topcoder challenge
+ * @param {Number} id the challenge id
+ */
+async function activateChallenge(id) {
+  bearer.apiKey = await getAccessToken();
+  logger.debug(`Activating challenge ${id}`);
+  try {
+    await new Promise((resolve, reject) => {
+      challengesApiInstance.activateChallenge(id, (err, data) => {
+        if (err) {
+          logger.error(err);
+          logger.debug(JSON.stringify(err));
+          reject(err);
+        } else {
+          resolve(data);
+        }
+      });
+    });
+    logger.debug(`Challenge ${id} is activated successfully.`);
+  } catch (err) {
+    throw errors.convertTopcoderApiError(err, 'Failed to activate challenge.');
+  }
+}
+
+/**
+ * closes the topcoder challenge
+ * @param {Number} id the challenge id
+ * @param {Number} winnerId the winner id
+ */
+async function closeChallenge(id, winnerId) {
+  const apiKey = await getAccessToken();
+  logger.debug(`Closing challenge ${id}`);
+  try {
+    await axios.post(`${projectsClient.basePath}/challenges/${id}/close?winnerId=${winnerId}`, null, {
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
       }
     });
-  });
+    logger.debug(`Challenge ${id} is closed successfully.`);
+  } catch (err) {
+    throw errors.convertTopcoderApiError(err, 'Failed to close challenge.');
+  }
+}
+
+/**
+ * gets the project billing account id
+ * @param {Number} id the project id
+ * @returns {Number} the billing account id
+ */
+async function getProjectBillingAccountId(id) {
+  const apiKey = await getAccessToken();
+  logger.debug(`Getting project billing detail ${id}`);
+  try {
+    const response = await axios.get(`${projectsClient.basePath}/direct/projects/${id}`, {
+      headers: {
+        authorization: `Bearer ${apiKey}`
+      }
+    });
+    const billingAccountId = _.get(response, 'data.result.content.billingAccountIds[0]');
+    if (!billingAccountId) {
+      _.set(response, 'data.result.content', `There is no billing account id associated with project ${id}`)
+      throw new Error(response);
+    }
+    return billingAccountId;
+  } catch (err) {
+    throw errors.convertTopcoderApiError(err, 'Failed to get billing detail for the project.');
+  }
+}
+
+/**
+ * gets the topcoder user id from handle
+ * @param {String} handle the topcoder handle
+ * @returns {Number} the user id
+ */
+async function getTopcoderMemberId(handle) {
+  bearer.apiKey = await getAccessToken();
+  try {
+    const response = await axios.get(`${projectsClient.basePath}/members/${handle}`);
+    return _.get(response, 'data.result.content.userId');
+  } catch (err) {
+    throw errors.convertTopcoderApiError(err, 'Failed to get topcoder member id.');
+  }
+}
+
+/**
+ * adds the resource to the topcoder challenge
+ * @param {Number} id the challenge id
+ * @param {Object} resource the resource resource to add
+ */
+async function addResourceToChallenge(id, resource) {
+  bearer.apiKey = await getAccessToken();
+  logger.debug(`adding resource to challenge ${id}`);
+  try {
+    await new Promise((resolve, reject) => {
+      challengesApiInstance.challengesIdResourcesPost(id, resource, (err, res) => {
+        if (err) {
+          if (_.get(JSON.parse(_.get(err, 'response.text')), 'result.content')
+            === `User ${resource.resourceUserId} with role ${resource.roleId} already exists`) {
+            resolve();
+          } else {
+            logger.error(JSON.stringify(err));
+            reject(err);
+          }
+        } else {
+          logger.debug(`resource is added to challenge ${id} successfully.`);
+          resolve(res);
+        }
+      });
+    });
+  } catch (err) {
+    throw errors.convertTopcoderApiError(err, 'Failed to add resource to the challenge.');
+  }
 }
 
 module.exports = {
   createProject,
   createChallenge,
-  updateChallenge
+  updateChallenge,
+  activateChallenge,
+  closeChallenge,
+  getProjectBillingAccountId,
+  getTopcoderMemberId,
+  addResourceToChallenge
 };

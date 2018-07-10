@@ -22,7 +22,10 @@ const USER_ROLES = {
   OWNER: 'owner'
 };
 
+const SERVICE_ERROR_STATUS = 500;
+
 module.exports = {
   USER_ROLES,
-  USER_TYPES
+  USER_TYPES,
+  SERVICE_ERROR_STATUS
 };

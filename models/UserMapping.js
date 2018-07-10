@@ -15,6 +15,6 @@ const schema = new Schema({
   gitlabUserId: Number
 });
 
-schema.index({topcoderUsername: 1});
+schema.index({topcoderUsername: 1}, {unique: true});
 
 module.exports = schema;

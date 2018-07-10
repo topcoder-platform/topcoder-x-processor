@@ -41,13 +41,16 @@ The following config parameters are supported, they are defined in `config/defau
 |ISSUE_BID_EMAIL_RECEIVER| the email receiver about bid email||
 |TC_URL| the base URL of topcoder to get the challenge URL| defaults to `https://www.topcoder-dev.com`|
 |GITLAB_API_BASE_URL| the URL for gitlab host| defaults to `https://gitlab.com`|
+|PAID_ISSUE_LABEL|the label name for paid, should be one of the label configured in topcoder x ui|'Paid'|
+|FIX_ACCEPTED_ISSUE_LABEL|the label name for fix accepted, should be one of the label configured in topcoder x ui|'Fix Accepted'|
+|TC_OR_DETAIL_LINK|the link to online review detail of challenge| see `default.js`, OR link for dev environment|
 
-KAFKA_OPTIONS should be object as described in https://github.com/SOHU-Co/kafka-node#kafkaclient
+KAFKA_OPTIONS should be object as described in https://github.com/oleksiyk/kafka#ssl
 For using with SSL, the options should be as
 ```
  {
-    kafkaHost: '<server>',
-    sslOptions: {
+    connectionString: '<server>',
+    ssl: {
       cert: '<certificate>', 
       key:  '<key>'
     }
@@ -85,6 +88,7 @@ Now, receiver service can receive the webhooks from git host's project and proce
 - create a pull request, you can see the logs in `receiver` and `processor`, the `pull_request.created` event is generated.
 - close a pull request without merge, you can see the logs in `receiver` and `processor`, the `pull_request.closed` event is generated and the `merged` property is `false`.
 - merge a pull request, you can see the logs in `receiver` and `processor`, the `pull_request.closed` event is generated and the `merged` property is `true`.
+- close an issue in the repo, you can see the logs in `receiver` and `processor`, the `issue.closed` event is generated
 
 ### Create a new challenge for a new issue
 - Create a new issue in the repo. E.g.
@@ -132,7 +136,7 @@ Now, receiver service can receive the webhooks from git host's project and proce
   debug: nothing changed for issue 3
   ```
 
-- Update the tilte by removing `[$50 ]`, you'll get an error:
+- Update the title by removing `[$50 ]`, you'll get an error:
   ```
   error:  Error: Cannot parse prize from title: A new issue title - Updated the prize
   ```
@@ -157,3 +161,38 @@ When an user is assigned to an issue then 'issue.assigned' event will be capture
   @username, please sign-up with Topcoder x Self-service tool.
   ```
   - user will be unassigned from issue
+
+### Closing issue
+
+When an issue is closed it will first check if issue has any assignee or not,
+
+- if there is no assignee then simply ignores the issue closed event with message in logger
+- if there is an assignee then it will 
+  - first set the current assignee user as challenge assignee, 
+  - activate the challenge with project's billing
+  - closes the challenge with winner as assignee
+  - you can verify the challenge closed in OR (link will be commented in same issue in git host)
+  - issue label will be updated from configured paid and fix accepted label name
+
+You can see following logs
+```
+debug: Looking up TC handle of git user: 82332
+debug: Getting the billing account ID for project ID: 15180
+debug: Getting project billing detail 15180
+debug: assigning the billing account id 70016668 to challenge
+debug: Updating challenge 30052019 with {"billingAccountId":70016668,"prizes":[234]}
+debug: Getting the topcoder member ID for member name: tonyj
+debug: Getting the topcoder member ID for copilot name : tonyj
+debug: adding resource to challenge 30052019
+debug: resource is added to challenge 30052019 successfully.
+debug: adding resource to challenge 30052019
+debug: Activating challenge 30052019
+debug: Challenge 30052019 is activated successfully.
+debug: close challenge with winner tonyj(8547899)
+debug: Closing challenge 30052019
+debug: Challenge 30052019 is closed successfully.
+debug: update issue as paid
+debug: Gitlab/Github issue is updated for as paid and fix accepted for 59
+```
+
+- if issue have already paid label it won't process
