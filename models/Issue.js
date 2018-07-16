@@ -18,13 +18,24 @@ const schema = new mongoose.Schema({
   prizes: [{type: Number, required: true}], // extracted from title
   provider: {type: String, required: true}, // github or gitlab
   repositoryId: {type: Number, required: true},
-
+  labels: [{type: String, required: true}],
+  assignee: {type: String, required: false},
+  updatedAt: {
+    type: Date,
+    default: Date.now
+  },
   // From topcoder api
-  challengeId: {type: Number, required: true, unique: true}
+  challengeId: {type: Number, required: true, unique: true},
+  projectId: {type: mongoose.Schema.Types.ObjectId, ref: 'Project'}
 });
 
 // Issue number, provider, repositoryId must be unique
 schema.index({number: 1, provider: 1, repositoryId: 1}, {unique: true});
+schema.index({labels: 1});
+schema.index({projectId: 1});
 
-
+schema.pre('save', function preSave(next) {
+  this.updatedAt = Date.now(); // eslint-disable-line
+  return next();
+});
 module.exports = schema;

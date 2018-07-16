@@ -248,7 +248,7 @@ async function getProjectBillingAccountId(id) {
     });
     const billingAccountId = _.get(response, 'data.result.content.billingAccountIds[0]');
     if (!billingAccountId) {
-      _.set(response, 'data.result.content', `There is no billing account id associated with project ${id}`)
+      _.set(response, 'data.result.content', `There is no billing account id associated with project ${id}`);
       throw new Error(response);
     }
     return billingAccountId;

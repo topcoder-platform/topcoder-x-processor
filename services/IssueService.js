@@ -50,7 +50,7 @@ function parsePrizes(issue) {
   }
 
   issue.prizes = _.map(matches, (match) => parseInt(match.replace('$', ''), 10));
-  issue.title = issue.title.replace(/^(\[.*\])/, '');
+  issue.title = issue.title.replace(/^(\[.*\])/, '').trim();
 }
 
 /**
@@ -107,15 +107,25 @@ async function handleEventGracefully(event, issue, err) {
  * @returns {Object} the found db issue if exists
  * @private
  */
-async function ensureChallengeExists(issue) {
-  const dbIssue = await Issue.findOne({
+async function ensureChallengeExists(event, issue) {
+  let dbIssue = await Issue.findOne({
     number: issue.number,
     provider: issue.provider,
     repositoryId: issue.repositoryId
   });
-
   if (!dbIssue) {
-    throw errors.internalDependencyError(`there is no challenge for the updated issue ${issue.number}`);
+    // create if only in next retry of event
+    // else there can be conflict when issue being created
+    if (event.retryCount && _.toInteger(event.retryCount) > 1) {
+      await handleIssueCreate(event, issue);
+      dbIssue = await Issue.findOne({
+        number: issue.number,
+        provider: issue.provider,
+        repositoryId: issue.repositoryId
+      });
+    } else {
+      throw errors.internalDependencyError(`there is no challenge for the updated issue ${issue.number}`);
+    }
   }
   return dbIssue;
 }
@@ -255,13 +265,17 @@ async function handleIssueAssignment(event, issue) {
   if (userMapping && userMapping.topcoderUsername) {
     let dbIssue;
     try {
-      dbIssue = await ensureChallengeExists(issue);
+      dbIssue = await ensureChallengeExists(event, issue);
 
       logger.debug(`Getting the topcoder member ID for member name: ${userMapping.topcoderUsername}`);
       const topcoderUserId = await topcoderApiHelper.getTopcoderMemberId(userMapping.topcoderUsername);
       // Update the challenge
       logger.debug(`Assigning user to challenge: ${userMapping.topcoderUsername}`);
       assignUserAsRegistrant(topcoderUserId, dbIssue.challengeId);
+      dbIssue.set({
+        assignee: issue.assignee
+      });
+      await dbIssue.save();
     } catch (err) {
       handleEventGracefully(event, issue, err);
       return;
@@ -323,7 +337,7 @@ async function handleIssueComment(event, issue) {
 async function handleIssueUpdate(event, issue) {
   let dbIssue;
   try {
-    dbIssue = await ensureChallengeExists(issue);
+    dbIssue = await ensureChallengeExists(event, issue);
 
     if (_.isMatch(dbIssue, issue)) {
       // Title, body, prizes doesn't change, just ignore
@@ -337,17 +351,19 @@ async function handleIssueUpdate(event, issue) {
       detailedRequirements: issue.body,
       prizes: issue.prizes
     });
+    // Save
+    dbIssue.set({
+      title: issue.title,
+      body: issue.body,
+      prizes: issue.prizes,
+      labels: issue.labels,
+      assignee: issue.assignee
+    });
+    await dbIssue.save();
   } catch (e) {
     await handleEventGracefully(event, issue, e);
     return;
   }
-  // Save
-  dbIssue.set({
-    title: issue.title,
-    body: issue.body,
-    prizes: issue.prizes
-  });
-  await dbIssue.save();
   // comment on the git ticket for the user to self-sign up with the Topcoder x Self-Service tool
   const contestUrl = getUrlForChallengeId(dbIssue.challengeId);
   const comment = `Contest ${contestUrl} has been updated - the new changes has been updated for this ticket.`;
@@ -370,7 +386,7 @@ async function handleIssueUpdate(event, issue) {
 async function handleIssueClose(event, issue) {
   let dbIssue;
   try {
-    dbIssue = await ensureChallengeExists(issue);
+    dbIssue = await ensureChallengeExists(event, issue);
     if (!event.paymentSuccessful) {
       // if issue is closed without assignee then do nothing
       if (!event.data.assignee.id) {
@@ -519,6 +535,45 @@ async function handleIssueCreate(event, issue) {
   logger.debug(`new challenge created with id ${issue.challengeId} for issue ${issue.number}`);
 }
 
+/**
+ * handles the issue label updated event
+ * @param {Object} event the event
+ * @param {Object} issue the issue
+ * @private
+ */
+async function handleIssueLabelUpdated(event, issue) {
+  let dbIssue;
+  try {
+    dbIssue = await ensureChallengeExists(event, issue);
+  } catch (e) {
+    await handleEventGracefully(event, issue, e);
+    return;
+  }
+  dbIssue.set({
+    labels: issue.labels
+  });
+  await dbIssue.save();
+}
+
+/**
+ * handles the issue un assignment event
+ * @param {Object} event the event
+ * @param {Object} issue the issue
+ * @private
+ */
+async function handleIssueUnAssignment(event, issue) {
+  let dbIssue;
+  try {
+    dbIssue = await ensureChallengeExists(event, issue);
+  } catch (e) {
+    await handleEventGracefully(event, issue, e);
+    return;
+  }
+  dbIssue.set({
+    assignee: null
+  });
+  await dbIssue.save();
+}
 
 /**
  * Process issue event.
@@ -532,8 +587,21 @@ async function process(event) {
     title: event.data.issue.title,
     body: event.data.issue.body,
     provider: event.provider,
-    repositoryId: event.data.repository.id
+    repositoryId: event.data.repository.id,
+    labels: event.data.issue.labels
   };
+  let fullRepoUrl;
+  if (event.provider === 'github') {
+    fullRepoUrl = `https://github.com/${event.data.repository.full_name}`;
+  } else if (event.provider === 'gitlab') {
+    fullRepoUrl = `${config.GITLAB_API_BASE_URL}/${event.data.repository.full_name}`;
+  }
+
+  const project = await models.Project.findOne({
+    repoUrl: fullRepoUrl
+  });
+
+  issue.projectId = project.id;
 
   // Parse prize from title
   parsePrizes(issue);
@@ -543,6 +611,14 @@ async function process(event) {
   // Markdown the body
   issue.body = md.render(_.get(issue, 'body', ''));
 
+  if (event.data.issue.assignees && event.data.issue.assignees.length > 0 && event.data.issue.assignees[0].id) {
+    if (event.provider === 'github') {
+      issue.assignee = await gitHubService.getUsernameById(copilot, event.data.issue.assignees[0].id);
+    } else if (event.provider === 'gitlab') {
+      issue.assignee = await gitlabService.getUsernameById(copilot, event.data.issue.assignees[0].id);
+    }
+  }
+  console.warn(JSON.stringify(issue));
   if (event.event === 'issue.created') {
     await handleIssueCreate(event, issue);
   } else if (event.event === 'issue.updated') {
@@ -553,11 +629,16 @@ async function process(event) {
     await handleIssueComment(event, issue);
   } else if (event.event === 'issue.assigned') {
     await handleIssueAssignment(event, issue);
+  } else if (event.event === 'issue.labelUpdated') {
+    await handleIssueLabelUpdated(event, issue);
+  } else if (event.event === 'issue.unassigned') {
+    await handleIssueUnAssignment(event, issue);
   }
 }
 
 process.schema = Joi.object().keys({
-  event: Joi.string().valid('issue.created', 'issue.updated', 'issue.closed', 'comment.created', 'comment.updated', 'issue.assigned').required(),
+  event: Joi.string().valid('issue.created', 'issue.updated', 'issue.closed', 'comment.created', 'comment.updated', 'issue.assigned',
+    'issue.labelUpdated', 'issue.unassigned').required(),
   provider: Joi.string().valid('github', 'gitlab').required(),
   data: Joi.object().keys({
     issue: Joi.object().keys({
@@ -586,7 +667,8 @@ process.schema = Joi.object().keys({
     }),
     assignee: Joi.object().keys({
       id: Joi.number().required().allow(null)
-    })
+    }),
+    labels: Joi.array().items(Joi.string())
   }).required(),
   retryCount: Joi.number().integer().default(0).optional(),
   paymentSuccessful: Joi.boolean().default(false).optional()
