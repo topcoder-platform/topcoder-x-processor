@@ -74,27 +74,29 @@ async function handleEventGracefully(event, issue, err) {
         logger.debug('The event is scheduled for retry');
       }, config.RETRY_INTERVAL);
     }
-    let comment = `[${err.statusCode}]: ${err.message}`;
-    if (event.event === 'issue.closed' && event.paymentSuccessful === false) {
-      comment = `Payment failed: ${comment}`;
-    }
+
     if (event.retryCount === config.RETRY_COUNT) {
+      let comment = `[${err.statusCode}]: ${err.message}`;
+      if (event.event === 'issue.closed' && event.paymentSuccessful === false) {
+        comment = `Payment failed: ${comment}`;
+      }
       // notify error in git host
       if (event.provider === 'github') {
         await gitHubService.createComment(event.copilot, event.data.repository.name, issue.number, comment);
       } else {
         await gitlabService.createComment(event.copilot, event.data.repository.id, issue.number, comment);
       }
-    }
-    if (event.event === 'issue.closed') {
-      // reopen
-      await reOpenIssue(event, issue);
-      // ensure label is ready for review
-      const readyForReviewLabels = [config.READY_FOR_REVIEW_ISSUE_LABEL];
-      if (event.provider === 'github') {
-        await gitHubService.addLabels(event.copilot, event.data.repository.name, issue.number, readyForReviewLabels);
-      } else {
-        await gitlabService.addLabels(event.copilot, event.data.repository.id, issue.number, readyForReviewLabels);
+
+      if (event.event === 'issue.closed') {
+        // reopen
+        await reOpenIssue(event, issue);
+        // ensure label is ready for review
+        const readyForReviewLabels = [config.READY_FOR_REVIEW_ISSUE_LABEL];
+        if (event.provider === 'github') {
+          await gitHubService.addLabels(event.copilot, event.data.repository.name, issue.number, readyForReviewLabels);
+        } else {
+          await gitlabService.addLabels(event.copilot, event.data.repository.id, issue.number, readyForReviewLabels);
+        }
       }
     }
   }
@@ -618,7 +620,6 @@ async function process(event) {
       issue.assignee = await gitlabService.getUsernameById(copilot, event.data.issue.assignees[0].id);
     }
   }
-  console.warn(JSON.stringify(issue));
   if (event.event === 'issue.created') {
     await handleIssueCreate(event, issue);
   } else if (event.event === 'issue.updated') {
