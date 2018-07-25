@@ -23,6 +23,19 @@ const copilotUserSchema = Joi.object().keys({
 }).required();
 
 /**
+ * parse the repository name and repoFullName owner
+ * @param {String} fullName the full repository name
+ * @returns {Object} the parsed data
+ * @private
+ */
+function _parseRepoUrl(fullName) {
+  const results = fullName.split('/');
+  const repo = results[results.length - 1];
+  const owner = _(results).slice(0, results.length - 1).join('/');
+  return {owner, repo};
+}
+
+/**
  * authenticate the github using access token
  * @param {String} accessToken the access token of copilot
  * @returns {Object} the github instance
@@ -79,14 +92,14 @@ async function _getUsernameById(github, id) {
 /**
  * updates the title of github issue
  * @param {Object} copilot the copilot
- * @param {string} repo the repository
+ * @param {string} repoFullName the repository
  * @param {Number} number the issue number
  * @param {string} title new title
  */
-async function updateIssue(copilot, repo, number, title) {
-  Joi.attempt({copilot, repo, number, title}, updateIssue.schema);
+async function updateIssue(copilot, repoFullName, number, title) {
+  Joi.attempt({copilot, repoFullName, number, title}, updateIssue.schema);
   const github = await _authenticate(copilot.accessToken);
-  const owner = await _getUsernameById(github, copilot.userProviderId);
+  const {owner, repo} = _parseRepoUrl(repoFullName);
   try {
     await github.issues.edit({owner, repo, number, title});
   } catch (err) {
@@ -97,7 +110,7 @@ async function updateIssue(copilot, repo, number, title) {
 
 updateIssue.schema = {
   copilot: copilotUserSchema,
-  repo: Joi.string().required(),
+  repoFullName: Joi.string().required(),
   number: Joi.number().required(),
   title: Joi.string().required()
 };
@@ -105,14 +118,14 @@ updateIssue.schema = {
 /**
  * Assigns the issue to user
  * @param {Object} copilot the copilot
- * @param {string} repo the repository
+ * @param {string} repoFullName the repository
  * @param {Number} number the issue number
  * @param {string} user the user login of assignee
  */
-async function assignUser(copilot, repo, number, user) {
-  Joi.attempt({copilot, repo, number, user}, assignUser.schema);
+async function assignUser(copilot, repoFullName, number, user) {
+  Joi.attempt({copilot, repoFullName, number, user}, assignUser.schema);
   const github = await _authenticate(copilot.accessToken);
-  const owner = await _getUsernameById(github, copilot.userProviderId);
+  const {owner, repo} = _parseRepoUrl(repoFullName);
   try {
     const issue = await github.issues.get({owner, repo, number});
 
@@ -129,7 +142,7 @@ async function assignUser(copilot, repo, number, user) {
 
 assignUser.schema = {
   copilot: copilotUserSchema,
-  repo: Joi.string().required(),
+  repoFullName: Joi.string().required(),
   number: Joi.number().required(),
   user: Joi.string().required()
 };
@@ -137,15 +150,15 @@ assignUser.schema = {
 /**
  * Removes an assignee from the issue
  * @param {Object} copilot the copilot
- * @param {string} repo the repository
+ * @param {string} repoFullName the repository
  * @param {Number} number the issue number
  * @param {string} user the user login of assignee
  */
-async function removeAssign(copilot, repo, number, user) {
-  Joi.attempt({copilot, repo, number, user}, removeAssign.schema);
+async function removeAssign(copilot, repoFullName, number, user) {
+  Joi.attempt({copilot, repoFullName, number, user}, removeAssign.schema);
 
   const github = await _authenticate(copilot.accessToken);
-  const owner = await _getUsernameById(github, copilot.userProviderId);
+  const {owner, repo} = _parseRepoUrl(repoFullName);
   await _removeAssignees(github, owner, repo, number, [user]);
   logger.debug(`Github user ${user} is unassigned from issue number ${number}`);
 }
@@ -155,15 +168,15 @@ removeAssign.schema = assignUser.schema;
 /**
  * creates the comments on github issue
  * @param {Object} copilot the copilot
- * @param {string} repo the repository
+ * @param {string} repoFullName the repository
  * @param {Number} number the issue number
  * @param {string} body the comment body text
  */
-async function createComment(copilot, repo, number, body) {
-  Joi.attempt({copilot, repo, number, body}, createComment.schema);
+async function createComment(copilot, repoFullName, number, body) {
+  Joi.attempt({copilot, repoFullName, number, body}, createComment.schema);
 
   const github = await _authenticate(copilot.accessToken);
-  const owner = await _getUsernameById(github, copilot.userProviderId);
+  const {owner, repo} = _parseRepoUrl(repoFullName);
   try {
     await github.issues.createComment({owner, repo, number, body});
   } catch (err) {
@@ -174,7 +187,7 @@ async function createComment(copilot, repo, number, body) {
 
 createComment.schema = {
   copilot: copilotUserSchema,
-  repo: Joi.string().required(),
+  repoFullName: Joi.string().required(),
   number: Joi.number().required(),
   body: Joi.string().required()
 };
@@ -218,14 +231,14 @@ getUserIdByLogin.schema = {
 /**
  * updates the github issue as paid and fix accepted
  * @param {Object} copilot the copilot
- * @param {string} repo the repository
+ * @param {string} repoFullName the repository
  * @param {Number} number the issue number
  * @param {Number} challengeId the challenge id
  */
-async function markIssueAsPaid(copilot, repo, number, challengeId) {
-  Joi.attempt({copilot, repo, number, challengeId}, markIssueAsPaid.schema);
+async function markIssueAsPaid(copilot, repoFullName, number, challengeId) {
+  Joi.attempt({copilot, repoFullName, number, challengeId}, markIssueAsPaid.schema);
   const github = await _authenticate(copilot.accessToken);
-  const owner = await _getUsernameById(github, copilot.userProviderId);
+  const {owner, repo} = _parseRepoUrl(repoFullName);
   const labels = [config.PAID_ISSUE_LABEL, config.FIX_ACCEPTED_ISSUE_LABEL];
   try {
     await github.issues.edit({owner, repo, number, labels});
@@ -239,7 +252,7 @@ async function markIssueAsPaid(copilot, repo, number, challengeId) {
 
 markIssueAsPaid.schema = {
   copilot: copilotUserSchema,
-  repo: Joi.string().required(),
+  repoFullName: Joi.string().required(),
   number: Joi.number().required(),
   challengeId: Joi.number().positive().required()
 };
@@ -247,14 +260,14 @@ markIssueAsPaid.schema = {
 /**
  * change the state of github issue
  * @param {Object} copilot the copilot
- * @param {string} repo the repository
+ * @param {string} repoFullName the repository
  * @param {Number} number the issue number
  * @param {string} state new state
  */
-async function changeState(copilot, repo, number, state) {
-  Joi.attempt({copilot, repo, number, state}, changeState.schema);
+async function changeState(copilot, repoFullName, number, state) {
+  Joi.attempt({copilot, repoFullName, number, state}, changeState.schema);
   const github = await _authenticate(copilot.accessToken);
-  const owner = await _getUsernameById(github, copilot.userProviderId);
+  const {owner, repo} = _parseRepoUrl(repoFullName);
   try {
     await github.issues.edit({owner, repo, number, state});
   } catch (err) {
@@ -265,7 +278,7 @@ async function changeState(copilot, repo, number, state) {
 
 changeState.schema = {
   copilot: copilotUserSchema,
-  repo: Joi.string().required(),
+  repoFullName: Joi.string().required(),
   number: Joi.number().required(),
   state: Joi.string().required()
 };
@@ -273,14 +286,14 @@ changeState.schema = {
 /**
  * updates the github issue with new labels
  * @param {Object} copilot the copilot
- * @param {string} repo the repository
+ * @param {string} repoFullName the repository
  * @param {Number} number the issue number
  * @param {Number} labels the challenge id
  */
-async function addLabels(copilot, repo, number, labels) {
-  Joi.attempt({copilot, repo, number, labels}, addLabels.schema);
+async function addLabels(copilot, repoFullName, number, labels) {
+  Joi.attempt({copilot, repoFullName, number, labels}, addLabels.schema);
   const github = await _authenticate(copilot.accessToken);
-  const owner = await _getUsernameById(github, copilot.userProviderId);
+  const {owner, repo} = _parseRepoUrl(repoFullName);
   try {
     await github.issues.edit({owner, repo, number, labels});
   } catch (err) {
@@ -291,7 +304,7 @@ async function addLabels(copilot, repo, number, labels) {
 
 addLabels.schema = {
   copilot: copilotUserSchema,
-  repo: Joi.string().required(),
+  repoFullName: Joi.string().required(),
   number: Joi.number().required(),
   labels: Joi.array().items(Joi.string()).required()
 };
