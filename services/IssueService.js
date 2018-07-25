@@ -65,7 +65,7 @@ async function handleEventGracefully(event, issue, err) {
     // reschedule event
     if (event.retryCount <= config.RETRY_COUNT) {
       logger.debug('Scheduling event for next retry');
-      const newEvent = { ...event };
+      const newEvent = {...event};
       newEvent.retryCount += 1;
       delete newEvent.copilot;
       setTimeout(async () => {
@@ -82,7 +82,7 @@ async function handleEventGracefully(event, issue, err) {
       }
       // notify error in git host
       if (event.provider === 'github') {
-        await gitHubService.createComment(event.copilot, event.data.repository.name, issue.number, comment);
+        await gitHubService.createComment(event.copilot, event.data.repository.full_name, issue.number, comment);
       } else {
         await gitlabService.createComment(event.copilot, event.data.repository.id, issue.number, comment);
       }
@@ -93,7 +93,7 @@ async function handleEventGracefully(event, issue, err) {
         // ensure label is ready for review
         const readyForReviewLabels = [config.READY_FOR_REVIEW_ISSUE_LABEL];
         if (event.provider === 'github') {
-          await gitHubService.addLabels(event.copilot, event.data.repository.name, issue.number, readyForReviewLabels);
+          await gitHubService.addLabels(event.copilot, event.data.repository.full_name, issue.number, readyForReviewLabels);
         } else {
           await gitlabService.addLabels(event.copilot, event.data.repository.id, issue.number, readyForReviewLabels);
         }
@@ -105,6 +105,7 @@ async function handleEventGracefully(event, issue, err) {
 
 /**
  * check if challenge is exists for given issue in db/topcoder
+ * @param {Object} event the event
  * @param {Object} issue the issue
  * @returns {Object} the found db issue if exists
  * @private
@@ -177,7 +178,7 @@ async function assignUserAsRegistrant(topcoderUserId, challengeId) {
  */
 async function reOpenIssue(event, issue) {
   if (event.provider === 'github') {
-    await gitHubService.changeState(event.copilot, event.data.repository.name, issue.number, 'open');
+    await gitHubService.changeState(event.copilot, event.data.repository.full_name, issue.number, 'open');
   } else {
     await gitlabService.changeState(event.copilot, event.data.repository.id, issue.number, 'reopen');
   }
@@ -202,9 +203,9 @@ async function rollbackAssignee(event, assigneeUserId, issue, reOpen = false) {
   // comment on the git ticket for the user to self-sign up with the Topcoder x Self-Service tool
   const comment = `@${assigneeUsername}, please sign-up with Topcoder X tool`;
   if (event.provider === 'github') {
-    await gitHubService.createComment(event.copilot, event.data.repository.name, issue.number, comment);
+    await gitHubService.createComment(event.copilot, event.data.repository.full_name, issue.number, comment);
     // un-assign the user from the ticket
-    await gitHubService.removeAssign(event.copilot, event.data.repository.name, issue.number, assigneeUsername);
+    await gitHubService.removeAssign(event.copilot, event.data.repository.full_name, issue.number, assigneeUsername);
   } else {
     await gitlabService.createComment(event.copilot, event.data.repository.id, issue.number, comment);
     // un-assign the user from the ticket
@@ -285,7 +286,7 @@ async function handleIssueAssignment(event, issue) {
     const contestUrl = getUrlForChallengeId(dbIssue.challengeId);
     const comment = `Contest ${contestUrl} has been updated - it has been assigned to ${userMapping.topcoderUsername}.`;
     if (event.provider === 'github') {
-      await gitHubService.createComment(event.copilot, event.data.repository.name, issue.number, comment);
+      await gitHubService.createComment(event.copilot, event.data.repository.full_name, issue.number, comment);
     } else {
       await gitlabService.createComment(event.copilot, event.data.repository.id, issue.number, comment);
     }
@@ -314,7 +315,7 @@ async function handleIssueComment(event, issue) {
     logger.debug(`updating issue: ${event.data.repository.name}/${issue.number}`);
 
     if (event.provider === 'github') {
-      await gitHubService.updateIssue(event.copilot, event.data.repository.name, issue.number, newTitle);
+      await gitHubService.updateIssue(event.copilot, event.data.repository.full_name, issue.number, newTitle);
     } else {
       await gitlabService.updateIssue(event.copilot, event.data.repository.id, issue.number, newTitle);
     }
@@ -322,7 +323,7 @@ async function handleIssueComment(event, issue) {
     // assign user
     logger.debug(`assigning user, ${parsedComment.assignedUser} to issue: ${event.data.repository.name}/${issue.number}`);
     if (event.provider === 'github') {
-      await gitHubService.assignUser(event.copilot, event.data.repository.name, issue.number, parsedComment.assignedUser);
+      await gitHubService.assignUser(event.copilot, event.data.repository.full_name, issue.number, parsedComment.assignedUser);
     } else {
       const userId = await gitlabService.getUserIdByLogin(event.copilot, parsedComment.assignedUser);
       await gitlabService.assignUser(event.copilot, event.data.repository.id, issue.number, userId);
@@ -370,7 +371,7 @@ async function handleIssueUpdate(event, issue) {
   const contestUrl = getUrlForChallengeId(dbIssue.challengeId);
   const comment = `Contest ${contestUrl} has been updated - the new changes has been updated for this ticket.`;
   if (event.provider === 'github') {
-    await gitHubService.createComment(event.copilot, event.data.repository.name, issue.number, comment);
+    await gitHubService.createComment(event.copilot, event.data.repository.full_name, issue.number, comment);
   } else {
     await gitlabService.createComment(event.copilot, event.data.repository.id, issue.number, comment);
   }
@@ -461,7 +462,7 @@ async function handleIssueClose(event, issue) {
   try {
     logger.debug('update issue as paid');
     if (event.provider === 'github') {
-      await gitHubService.markIssueAsPaid(event.copilot, event.data.repository.name, issue.number, dbIssue.challengeId);
+      await gitHubService.markIssueAsPaid(event.copilot, event.data.repository.full_name, issue.number, dbIssue.challengeId);
     } else {
       await gitlabService.markIssueAsPaid(event.copilot, event.data.repository.id, issue.number, dbIssue.challengeId);
     }
@@ -520,7 +521,7 @@ async function handleIssueCreate(event, issue) {
   const contestUrl = getUrlForChallengeId(issue.challengeId);
   const comment = `Contest ${contestUrl} has been created for this ticket.`;
   if (event.provider === 'github') {
-    await gitHubService.createComment(event.copilot, event.data.repository.name, issue.number, comment);
+    await gitHubService.createComment(event.copilot, event.data.repository.full_name, issue.number, comment);
   } else {
     await gitlabService.createComment(event.copilot, event.data.repository.id, issue.number, comment);
   }
