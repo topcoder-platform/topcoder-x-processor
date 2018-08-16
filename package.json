@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "start": "node ./index.js",
-    "lint": "eslint . --ignore-pattern 'public/*' --ext .js --fix || true"
+    "lint": "eslint . --ignore-pattern 'public/*' --ext .js --fix || true",
+    "test": "mocha --exit"
   },
   "engines": {
     "node": "~8.6.0"
@@ -43,9 +44,12 @@
     "winston": "^2.4.3"
   },
   "devDependencies": {
+    "chai": "^4.1.2",
     "eslint-config-topcoder": "^2.0.0",
     "eslint-plugin-babel": "^4.1.2",
     "eslint-plugin-chai-expect": "^1.1.1",
-    "eslint-plugin-react": "^7.10.0"
+    "eslint-plugin-react": "^7.10.0",
+    "gitlab": "^3.7.0",
+    "mocha": "^5.2.0"
   }
 }

@@ -57,6 +57,16 @@ For using with SSL, the options should be as
  }
 ```
 
+The following config paramaters are supported in the test environment defined in `config/test.js` and can be configured in the system environment. Note that the test config inherits all config options present in the default config and adds/overrides some config options.
+
+| Name                           | Description                                | Default                          |
+| :----------------------------- | :----------------------------------------: | :------------------------------: |
+| GITLAB_REPO_URL                      | the url of the gitlab repo to run tests in                              |                             |
+| TC_URL                          | the topcoder development url             |  https://www.topcoder-dev.com                    |
+| TC_DEV_API_URL                  | the topcoder development api url            |  https://api.topcoder-dev.com/v3|
+| WAIT_TIME                  | the amount of time in milliseconds to wait for updates on gitlab to propagate to topcoder challenges. Some tests use multipliers of this value            |  60000                  |
+
+
 ## Local Deployment
 
 ```shell
@@ -76,6 +86,10 @@ Go to Topcoder X UI login with above used topcoder username and
 
 Now, receiver service can receive the webhooks from git host's project and processor can processes the requests. Now you can verify this service by following the verification steps below
 
+## Run tests
+```
+npm test
+```
 ## Verification
 
 - create an issue in the repo, you can see the logs in `receiver` and `processor`, the `issue.created` event is generated.
