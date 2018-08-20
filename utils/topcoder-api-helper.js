@@ -212,6 +212,47 @@ async function activateChallenge(id) {
 }
 
 /**
+ * Get challenge details by id
+ * @param {Number} id challenge ID
+ * @returns {Object} topcoder challenge
+ */
+async function getChallengeById(id) {
+  const apiKey = await getAccessToken();
+  logger.debug('Getting topcoder challenge details');
+  try {
+    const response = await axios.get(`${projectsClient.basePath}/challenges/${id}`, {
+      authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    });
+    const challenge = _.get(response, 'data.result.content');
+    return challenge;
+  } catch (er) {
+    throw errors.convertTopcoderApiError(er, 'Failed to get challenge details by Id');
+  }
+}
+
+/**
+ * getting list of topcoder challenges
+ * @returns {Array} topcoder challenges
+ */
+async function getChallenges() {
+  const apiKey = await getAccessToken();
+  logger.debug('Getting topcoder challenges');
+  try {
+    const response = await axios.get(`${projectsClient.basePath}/direct/challenges`, {
+      authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    });
+
+    const challenges = _.get(response, 'data.result.content');
+    logger.debug('Successfully retrieved challenges.');
+    return challenges;
+  } catch (err) {
+    throw errors.convertTopcoderApiError(err, 'Failed to retrieve topcoder challenge.');
+  }
+}
+
+/**
  * closes the topcoder challenge
  * @param {Number} id the challenge id
  * @param {Number} winnerId the winner id
@@ -302,13 +343,49 @@ async function addResourceToChallenge(id, resource) {
   }
 }
 
+/**
+ * unregister user from topcoder challenge
+ * @param {Number} id the challenge id
+ * @param {Object} resource the resource  resource to remove
+ */
+async function unregisterUserFromChallenge(id) {
+  bearer.apiKey = await getAccessToken();
+  logger.debug(`removing resource from challenge ${id}`);
+  try {
+    await new Promise((resolve, reject) => {
+      challengesApiInstance.unregisterChallenge(id, (err, res) => {
+        if (err) {
+          // TODO:* Handle when a user tries to unregister a user twice.
+          // if (_.get(JSON.parse(_.get(err, 'response.text')), 'result.content')
+          //   === `User ${resource.resourceUserId} with role ${resource.roleId} already exist`) {
+          //   resolve(res);
+          // } else {
+          //   logger.error(JSON.stringify(err));
+          //   reject(err);
+          // }
+          logger.debug(`Error - ${err}`);
+          reject(err);
+        } else {
+          logger.debug(`user is removed from the challenge ${id} successfuly.`);
+          resolve(res);
+        }
+      });
+    });
+  } catch (err) {
+    throw errors.convertTopcoderApiError(err, 'Failed to remove resource from the challenge');
+  }
+}
+
 module.exports = {
   createProject,
+  getChallenges,
+  getChallengeById,
   createChallenge,
   updateChallenge,
   activateChallenge,
   closeChallenge,
   getProjectBillingAccountId,
   getTopcoderMemberId,
-  addResourceToChallenge
+  addResourceToChallenge,
+  unregisterUserFromChallenge
 };

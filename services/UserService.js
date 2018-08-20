@@ -10,6 +10,7 @@
  */
 
 const Joi = require('joi');
+const _ = require('lodash');
 const config = require('config');
 const models = require('../models');
 const logger = require('../utils/logger');
@@ -17,24 +18,35 @@ const logger = require('../utils/logger');
 /**
  * gets the tc handle for given git user id from a mapping captured by Topcoder x tool
  * @param {String} provider the git provider
- * @param {String} gitUserId the user id in git provider
+ * @param {String} gitUser the user id in git provider
  * @returns {Object} user mapping if found else null
  */
-async function getTCUserName(provider, gitUserId) {
-  Joi.attempt({provider, gitUserId}, getTCUserName.schema);
+async function getTCUserName(provider, gitUser) {
+  Joi.attempt({provider, gitUser}, getTCUserName.schema);
   const criteria = {};
-  if (provider === 'github') {
-    criteria.githubUserId = gitUserId;
-  } else if (provider === 'gitlab') {
-    criteria.gitlabUserId = gitUserId;
+  if (_.isNumber(gitUser)) {
+    if (provider === 'github') {
+      criteria.githubUserId = gitUser;
+    } else if (provider === 'gitlab') {
+      criteria.gitlabUserId = gitUser;
+    }
   }
+  if (_.isString(gitUser)) {
+    if (provider === 'github') {
+      criteria.githubUsername = gitUser;
+    } else if (provider === 'gitlab') {
+      criteria.gitlabUsername = gitUser;
+    }
+  }
+
   return await models.UserMapping.findOne(criteria);
 }
 
 getTCUserName.schema = {
   provider: Joi.string().valid('github', 'gitlab').required(),
-  gitUserId: Joi.number().required()
+  gitUser: Joi.any().required()
 };
+
 
 /**
  * gets the access token of repository's copilot captured by Topcoder x tool

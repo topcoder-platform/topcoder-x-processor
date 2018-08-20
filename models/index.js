@@ -21,7 +21,8 @@ const models = {
   Issue: connection.model('Issue', require('./Issue')),
   Project: connection.model('Project', require('./Project')),
   User: connection.model('User', require('./User')),
-  UserMapping: connection.model('UserMapping', require('./UserMapping'))
+  UserMapping: connection.model('UserMapping', require('./UserMapping')),
+  Payment: connection.model('Payment', require('./Payment'))
 };
 /* eslint-enable global-require */
 

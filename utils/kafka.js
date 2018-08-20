@@ -15,6 +15,7 @@ const config = require('config');
 const _ = require('lodash');
 const kafka = require('no-kafka');
 const IssueService = require('../services/IssueService');
+const PaymentService = require('../services/PaymentService');
 const logger = require('./logger');
 
 class Kafka {
@@ -30,8 +31,9 @@ class Kafka {
   }
 
   messageHandler(messageSet) {
+    logger.debug(` topics ======= ${JSON.stringify(messageSet)}`);
     messageSet.forEach((item) => {
-      logger.info(`received message from kafka: ${item.message.value.toString('utf8')}`);
+      logger.debug(`received message from kafka: ${item.message.value.toString('utf8')}`);
 
       // The event should be a JSON object
       let event;
@@ -47,6 +49,12 @@ class Kafka {
         'comment.created', 'comment.updated', 'issue.assigned', 'issue.labelUpdated', 'issue.unassigned']
         , event.event)) {
         IssueService
+          .process(event)
+          .catch(logger.error);
+      }
+      if (event && _.includes(['payment.add', 'payment.update', 'payment.delete', 'payment.checkUpdates']
+          , event.event)) {
+        PaymentService
           .process(event)
           .catch(logger.error);
       }
