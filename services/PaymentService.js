@@ -292,7 +292,6 @@ async function handlePaymentDelete(event, payment) {
       });
 
       if (dbPayments) {
-
         const {requirements, prizes} = updateChallengeDetails(dbPayments); /* eslint-disable-line prefer-const */
         const changedPayment = {
           detailedRequirements: requirements,

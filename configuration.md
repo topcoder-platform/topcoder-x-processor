@@ -45,11 +45,19 @@ For using with SSL, the options should be as
 The following config paramaters are supported in the test environment defined in `config/test.js` and can be configured in the system environment. Note that the test config inherits all config options present in the default config and adds/overrides some config options.
 
 | Name                           | Description                                | Default                          |
-| :----------------------------- | :----------------------------------------: | :------------------------------: |
-| GITLAB_REPO_URL                      | the url of the gitlab repo to run tests in                              |                             |
+| :----------------------------- | :----------------------------------------: | :------------------------------: |                             |
 | TC_URL                          | the topcoder development url             |  https://www.topcoder-dev.com                    |
 | TC_DEV_API_URL                  | the topcoder development api url            |  https://api.topcoder-dev.com/v3|
-| WAIT_TIME                  | the amount of time in milliseconds to wait for updates on gitlab to propagate to topcoder challenges. Some tests use multipliers of this value            |  60000                  |
+| MAX_RETRY_COUNT                  | the maximum number of times to re-test before concluding that test failed            |  https://api.topcoder-dev.com/v3|
+| WAIT_TIME                  | the amount of time in milliseconds to wait before running a re-test            |  30000                  |
+| TC_DIRECT_ID                  | the topcoder direct id of the repository which is set up with a valid billing account            |  7377                  |
+| TOPCODER_USER_NAME                  | a valid username for topcoder dev platform            |  mess                  |
+| HOOK_BASE_URL                  | the webhook url of topcoder-x-receiver            |                    |
+| GITHUB_ACCESS_TOKEN                  | github personal access token            |                    |
+| GITHUB_REPOSITORY_NAME                  | the name of the repository to create for testing (should not already exist)            |                    |
+| GITLAB_USERNAME                  | gitlab username            |                    |
+| GITLAB_PASSWORD                  | gitlab password            |                    |
+| GITLAB_REPOSITORY_NAME                  | the name of the repository to create for testing (should not already exist)            |                    |
 
 ## Github Verification
 
