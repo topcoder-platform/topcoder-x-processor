@@ -15,6 +15,7 @@ const config = require('config');
 const GitlabAPI = require('node-gitlab-api');
 const logger = require('../utils/logger');
 const errors = require('../utils/errors');
+const helper = require('../utils/helper');
 
 const copilotUserSchema = Joi.object().keys({
   accessToken: Joi.string().required(),
@@ -69,6 +70,7 @@ async function createComment(copilot, projectId, issueId, body) {
   Joi.attempt({copilot, projectId, issueId, body}, createComment.schema);
   const gitlab = await _authenticate(copilot.accessToken);
   try {
+    body = helper.prepareAutomatedComment(body, copilot);
     await gitlab.projects.issues.notes.create(projectId, issueId, {body});
   } catch (err) {
     throw errors.convertGitLabError(err, 'Error occurred during creating comment on issue.');
@@ -202,7 +204,7 @@ async function markIssueAsPaid(copilot, projectId, issueId, challengeId) {
   const gitlab = await _authenticate(copilot.accessToken);
   try {
     await gitlab.projects.issues.edit(projectId, issueId, {labels: `${config.PAID_ISSUE_LABEL},${config.FIX_ACCEPTED_ISSUE_LABEL}`});
-    const body = `Payment task has been updated: ${config.TC_OR_DETAIL_LINK}${challengeId}`;
+    const body = helper.prepareAutomatedComment(`Payment task has been updated: ${config.TC_OR_DETAIL_LINK}${challengeId}`, copilot);
     await gitlab.projects.issues.notes.create(projectId, issueId, {body});
   } catch (err) {
     throw errors.convertGitLabError(err, 'Error occurred during updating issue as paid.');

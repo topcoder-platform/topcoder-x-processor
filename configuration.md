@@ -23,12 +23,12 @@ The following config parameters are supported, they are defined in `config/defau
 |ISSUE_BID_EMAIL_RECEIVER| the email receiver about bid email||
 |TC_URL| the base URL of topcoder to get the challenge URL| defaults to `https://www.topcoder-dev.com`|
 |GITLAB_API_BASE_URL| the URL for gitlab host| defaults to `https://gitlab.com`|
-|PAID_ISSUE_LABEL|the label name for paid, should be one of the label configured in topcoder x ui|'Paid'|
-|FIX_ACCEPTED_ISSUE_LABEL|the label name for fix accepted, should be one of the label configured in topcoder x ui|'Fix Accepted'|
+|PAID_ISSUE_LABEL|the label name for paid, should be one of the label configured in topcoder x ui|'tcx_Paid'|
+|FIX_ACCEPTED_ISSUE_LABEL|the label name for fix accepted, should be one of the label configured in topcoder x ui|'tcx_FixAccepted'|
 |TC_OR_DETAIL_LINK|the link to online review detail of challenge| see `default.js`, OR link for dev environment|
 |RETRY_COUNT| the number of times an event should be retried to process| 3|
 |RETRY_INTERVAL| the interval at which the event should be retried to process in milliseconds | 120000|
-|READY_FOR_REVIEW_ISSUE_LABEL| the label name for ready for review, should be one of the label configured in topcoder x ui|'Ready for review'|
+|READY_FOR_REVIEW_ISSUE_LABEL| the label name for ready for review, should be one of the label configured in topcoder x ui|'tcx_ReadyForReview'|
 
 KAFKA_OPTIONS should be object as described in https://github.com/oleksiyk/kafka#ssl
 For using with SSL, the options should be as

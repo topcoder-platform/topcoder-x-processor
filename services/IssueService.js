@@ -154,24 +154,6 @@ async function getProjectDetail(issue, event) {
 }
 
 /**
- * adds assignee as challenge registrant
- * @param {Number} topcoderUserId the topcoder user id
- * @param {Object} challengeId the challenge id
- * @private
- */
-async function assignUserAsRegistrant(topcoderUserId, challengeId) {
-  // role 1 from registrant
-  const registrantBody = {
-    roleId: 1,
-    resourceUserId: topcoderUserId,
-    phaseId: 0,
-    addNotification: true,
-    addForumWatch: true
-  };
-  await topcoderApiHelper.addResourceToChallenge(challengeId, registrantBody);
-}
-
-/**
  * re opens the issue
  * @param {Object} event the event
  * @param {Object} issue the issue
@@ -274,7 +256,7 @@ async function handleIssueAssignment(event, issue) {
       const topcoderUserId = await topcoderApiHelper.getTopcoderMemberId(userMapping.topcoderUsername);
       // Update the challenge
       logger.debug(`Assigning user to challenge: ${userMapping.topcoderUsername}`);
-      assignUserAsRegistrant(topcoderUserId, dbIssue.challengeId);
+      topcoderApiHelper.assignUserAsRegistrant(topcoderUserId, dbIssue.challengeId);
       dbIssue.set({
         assignee: issue.assignee
       });
@@ -445,7 +427,7 @@ async function handleIssueClose(event, issue) {
       await topcoderApiHelper.addResourceToChallenge(dbIssue.challengeId, copilotResourceBody);
 
       // adding reg
-      await assignUserAsRegistrant(winnerId, dbIssue.challengeId);
+      await topcoderApiHelper.assignUserAsRegistrant(winnerId, dbIssue.challengeId);
 
       // activate challenge
       await topcoderApiHelper.activateChallenge(dbIssue.challengeId);

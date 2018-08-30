@@ -15,7 +15,7 @@ const config = require('config');
 const _ = require('lodash');
 const kafka = require('no-kafka');
 const IssueService = require('../services/IssueService');
-const PaymentService = require('../services/PaymentService');
+const CopilotPaymentService = require('../services/CopilotPaymentService');
 const logger = require('./logger');
 
 class Kafka {
@@ -52,9 +52,9 @@ class Kafka {
           .process(event)
           .catch(logger.error);
       }
-      if (event && _.includes(['payment.add', 'payment.update', 'payment.delete', 'payment.checkUpdates']
+      if (event && _.includes(['copilotPayment.add', 'copilotPayment.update', 'copilotPayment.delete', 'copilotPayment.checkUpdates']
           , event.event)) {
-        PaymentService
+        CopilotPaymentService
           .process(event)
           .catch(logger.error);
       }

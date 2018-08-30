@@ -217,6 +217,9 @@ async function activateChallenge(id) {
  * @returns {Object} topcoder challenge
  */
 async function getChallengeById(id) {
+  if (!_.isNumber(id)) {
+    throw new Error('The challenge id must valid number');
+  }
   const apiKey = await getAccessToken();
   logger.debug('Getting topcoder challenge details');
   try {
@@ -228,27 +231,6 @@ async function getChallengeById(id) {
     return challenge;
   } catch (er) {
     throw errors.convertTopcoderApiError(er, 'Failed to get challenge details by Id');
-  }
-}
-
-/**
- * getting list of topcoder challenges
- * @returns {Array} topcoder challenges
- */
-async function getChallenges() {
-  const apiKey = await getAccessToken();
-  logger.debug('Getting topcoder challenges');
-  try {
-    const response = await axios.get(`${projectsClient.basePath}/direct/challenges`, {
-      authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json'
-    });
-
-    const challenges = _.get(response, 'data.result.content');
-    logger.debug('Successfully retrieved challenges.');
-    return challenges;
-  } catch (err) {
-    throw errors.convertTopcoderApiError(err, 'Failed to retrieve topcoder challenge.');
   }
 }
 
@@ -376,9 +358,51 @@ async function unregisterUserFromChallenge(id) {
   }
 }
 
+/**
+ * cancels the private contents
+ * @param {Number} id the challenge id
+ */
+async function cancelPrivateContent(id) {
+  bearer.apiKey = await getAccessToken();
+  logger.debug(`Cancelling challenge ${id}`);
+  try {
+    await new Promise((resolve, reject) => {
+      challengesApiInstance.cancelPrivateContest(id, (err, data) => {
+        if (err) {
+          logger.error(err);
+          logger.debug(JSON.stringify(err));
+          reject(err);
+        } else {
+          resolve(data);
+        }
+      });
+    });
+    logger.debug(`Challenge ${id} is cancelled successfully.`);
+  } catch (err) {
+    throw errors.convertTopcoderApiError(err, 'Failed to cancel challenge.');
+  }
+}
+
+/**
+ * adds assignee as challenge registrant
+ * @param {Number} topcoderUserId the topcoder user id
+ * @param {Object} challengeId the challenge id
+ * @private
+ */
+async function assignUserAsRegistrant(topcoderUserId, challengeId) {
+  // role 1 from registrant
+  const registrantBody = {
+    roleId: 1,
+    resourceUserId: topcoderUserId,
+    phaseId: 0,
+    addNotification: true,
+    addForumWatch: true
+  };
+  await addResourceToChallenge(challengeId, registrantBody);
+}
+
 module.exports = {
   createProject,
-  getChallenges,
   getChallengeById,
   createChallenge,
   updateChallenge,
@@ -387,5 +411,7 @@ module.exports = {
   getProjectBillingAccountId,
   getTopcoderMemberId,
   addResourceToChallenge,
-  unregisterUserFromChallenge
+  unregisterUserFromChallenge,
+  cancelPrivateContent,
+  assignUserAsRegistrant
 };

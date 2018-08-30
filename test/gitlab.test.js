@@ -1,24 +1,57 @@
 /*
- * Copyright (c) 2018 TopCoder, Inc. All rights reserved.
+ * Copyright (c) 2017 TopCoder, Inc. All rights reserved.
  */
 'use strict';
 
 /**
- * This provides gitlab tests for topcoder-x.
+ * This provides tests for topcoder-x.
  * @author TCSCODER
  * @version 1.0
  */
 /* eslint-env node, mocha */
 
+process.env.NODE_ENV = 'test';
+
 const {assert} = require('chai');
-const config = require('config');
-const uuidv4 = require('uuid/v4');
 const axios = require('axios');
-const Gitlab = require('gitlab/dist/es5').default;
-const utils = require('./utils');
-const data = require('./data');
+const config = require('config');
+const {ProjectsBundle} = require('gitlab');
+const models = require('../models');
 
 const PROVIDER = 'gitlab';
+const WAIT_TIME_MULTIPLIER = 10;
+
+/**
+ * get challenge with challengeId
+ * @param {String} challengeId the challenge id of the challenge
+ * @returns {Object} the challenge in TC platform
+ * @private
+ */
+async function _getChallenge(challengeId) {
+  try {
+    const response = await axios.get(`${config.TC_DEV_API_URL}/challenges/${challengeId}`, {
+      headers: {
+        'Cache-Control': 'no-cache'
+      }
+    });
+    if (response.status !== 200 || response.data.result.status !== 200) { // eslint-disable-line
+      throw new Error(`error getting challenge from topcoder, status code ${response.status}`);
+    }
+    return response.data.result.content;
+  } catch (err) {
+    throw err;
+  }
+}
+
+/**
+ * Generate the contest url, given the challenge id
+ * @param {String} challengeId The id of the challenge in topcoder
+ * @returns {String} The topcoder url to access the challenge
+ * @private
+ */
+function getUrlForChallengeId(challengeId) {
+  return `${config.TC_URL}/challenges/${challengeId}`;
+}
 
 /**
  * authenticate the gitlab using access token
@@ -28,312 +61,467 @@ const PROVIDER = 'gitlab';
  */
 async function _authenticate(accessToken) {
   try {
-    const gitlab = new Gitlab({
+    const gitlabServices = new ProjectsBundle({
       url: config.GITLAB_API_BASE_URL,
       oauthToken: accessToken
     });
-    return gitlab;
+    return gitlabServices;
   } catch (err) {
     throw new Error(`Failed to authenticate to Gitlab using access token of copilot. ${err.message}`);
   }
 }
 
 /**
- * creates an oauth token for Gitlab
- * @param {String} username the gitlab username
- * @param {String} password the gitlab password
- * @returns {Object} the oauth response with tokens
+ * get issue with projectId and issueIid
+ * @param {String} projectId the project id of the issue
+ * @param {String} issueIid the iid of the issue
+ * @returns {Object} the issue in the database
  * @private
  */
-async function _getOauthToken(username, password) {
-  try {
-    const response = await axios.post(`${config.GITLAB_API_BASE_URL}/oauth/token`, {
-      grant_type: 'password',
-      username,
-      password
-    });
-    return response.data;
-  } catch (err) {
-    throw err;
+async function _getIssue(projectId, issueIid) {
+  if (!issueIid) {
+    throw new Error('issue is null');
   }
+
+  const dbIssue = await models.Issue.findOne({
+    number: issueIid,
+    provider: PROVIDER,
+    repositoryId: projectId
+  });
+
+  if (!dbIssue) {
+    throw new Error(`there is no issue in the database ${issueIid}`);
+  }
+
+  return dbIssue;
 }
 
-describe('Topcoder-X-Processor tests', function test() {
-  this.timeout(config.WAIT_TIME * config.MAX_RETRY_COUNT * 2); // eslint-disable-line no-magic-numbers, no-invalid-this
 
-  let gitlab;
-  let user;
-  let issue;
+describe('Topcoder-X-Processor tests', function tcXTests() {
+  this.timeout(config.WAIT_TIME); // eslint-disable-line
+
   let project;
+  let tcDirectId;
+  let userMapping;
+  let copilot;
+  let issueIid;
+  let challengeId;
+  let gitlabServices;
 
-  before('create user, usermapping, repository, webhook', async () => {
-    const oauth = await _getOauthToken(config.GITLAB_USERNAME, config.GITLAB_PASSWORD);
-    gitlab = await _authenticate(oauth.access_token);
+  const data = {
+    issueTitle: '[$1] This is a test issue',
+    challengeTitle: 'This is a test issue',
+    issueDescription: 'This is a description',
+    challengeDescription: '<p>This is a description</p>\n',
+    prize: [1],
+    updatedIssuePrizeTitle: '[$2] This is a test issue',
+    updatedPrizeNote: 'changed title from **[${-1-}] This is a test issue** to **[${+2+}] This is a test issue**', // eslint-disable-line
+    updatedPrize: [2], // eslint-disable-line
+    updatedIssueTitle: '[$2] This is an updated test issue',
+    updatedChallengeTitle: 'This is an updated test issue',
+    updatedTitleNote: 'changed title from **[$2] This is a test issue** to **[$2] This is a{+n updated+} test issue**', // eslint-disable-line
+    updatedIssueDescription: 'This is an updated description',
+    updatedChallengeDescription: '<p>This is an updated description</p>\n'
+  };
 
-    user = await gitlab.Users.current();
+  before('gather project and user details', async () => {
+    this.timeout(config.WAIT_TIME * 2); // eslint-disable-line
 
-    project = await gitlab.Projects.create({
-      name: config.GITLAB_REPOSITORY_NAME,
-      issues_enabled: true
+    const dbProject = await models.Project.findOne({
+      repoUrl: config.GITLAB_REPO_URL
     });
 
-    const secretWebhookKey = uuidv4();
-    await gitlab.ProjectHooks.add(`${user.username}/${config.GITLAB_REPOSITORY_NAME}`,
-    `${config.HOOK_BASE_URL}/webhooks/gitlab`, {
-      push_events: true,
-      issues_events: true,
-      confidential_issues_events: true,
-      merge_requests_events: true,
-      tag_push_events: true,
-      note_events: true,
-      job_events: true,
-      pipeline_events: true,
-      wiki_page_events: true,
-      token: secretWebhookKey
+    if (!dbProject || !dbProject.username) {
+      // throw this repo is not managed by Topcoder x tool
+      throw new Error(`This repository '${config.GITLAB_REPO_URL}' is not managed by Topcoder X tool.`);
+    }
+
+    tcDirectId = dbProject.tcDirectId;
+
+    userMapping = await models.UserMapping.findOne({
+      topcoderUsername: dbProject.username.toLowerCase()
     });
 
-    await utils.createUser({
-      role: 'owner',
-      type: PROVIDER,
-      userProviderId: user.id,
-      username: user.username,
-      accessToken: oauth.access_token,
-      refreshToken: oauth.refresh_token
+    if (!userMapping || (PROVIDER === 'github' && !userMapping.githubUserId) || (PROVIDER === 'gitlab' && !userMapping.gitlabUserId)) {
+      throw new Error(`Couldn't find githost username for '${PROVIDER}' for this repository '${config.GITLAB_REPO_URL}'.`);
+    }
+
+    copilot = await models.User.findOne({
+      username: PROVIDER === 'github' ? userMapping.githubUsername : userMapping.gitlabUsername,
+      type: PROVIDER
     });
-    await utils.createUserMapping(user.id, user.username, PROVIDER);
-    await utils.createProject({
-      title: project.name,
-      tcDirectId: config.TC_DIRECT_ID,
-      repoUrl: project.web_url,
-      username: config.TOPCODER_USER_NAME,
-      secretWebhookKey
+
+    if (!copilot) {
+      // throw no copilot is configured
+      throw new Error(`No copilot is configured for the this repository: ${PROVIDER}`);
+    }
+
+    gitlabServices = await _authenticate(copilot.accessToken);
+    const projects = await gitlabServices.Projects.all({
+      search: dbProject.title,
+      owned: true
     });
+    console.log(projects);
+    project = projects[0];
   });
 
-  after('delete user, usermapping, repository, issue', async () => {
-    await gitlab.Projects.remove(project.id);
-    await utils.cleanup(user.id, {
-      repoUrl: project.web_url,
-      repositoryId: project.id
-    }, issue.number, PROVIDER);
+  after('cleanup', async () => {
+    await gitlabServices.Issues.remove(project.id, issueIid);
   });
 
-  describe('Tests for creating a Gitlab ticket', () => {
-    before('create an issue', async () => {
-      const gitlabIssue = await gitlab.Issues.create(project.id, {
+  describe('tests for creating a new Gitlab ticket', () => {
+    before('create an issue in gitlab', async () => {
+      const response = await gitlabServices.Issues.create(project.id, {
         title: data.issueTitle,
         description: data.issueDescription
       });
-      await utils.test(async () => {
-        issue = await utils.getIssue(project.id, gitlabIssue.iid, PROVIDER);
-      });
+      issueIid = response.iid;
     });
 
-    it('ensures that the challenge is created properly in the Topcoder platform', async () => {
-      await utils.ensureChallengeIsCreated(issue.challengeId);
+    it('ensures that the challenge is created properly in the Topcoder platform', function (done) { // eslint-disable-line
+      this.timeout(config.WAIT_TIME + 60000); // eslint-disable-line
 
-      const notes = await gitlab.IssueNotes.all(project.id, issue.number);
-      assert.exists(notes);
-      assert.isArray(notes);
-      const contestUrl = data.getUrlForChallengeId(issue.challengeId);
-      const note = data.contestCreatedComment(contestUrl);
-      assert.strictEqual(notes[0].body, note);
-    });
-  });
+      setTimeout(async () => {
+        try {
+          const issue = await _getIssue(project.id, issueIid);
+          const challenge = await _getChallenge(issue.challengeId);
+          const notes = await gitlabServices.IssueNotes.all(project.id, issueIid);
+          challengeId = challenge.challengeId;
 
-  describe('Tests for updating a Gitlab ticket - prize', () => {
-    before('update prize of an issue', async() => {
-      await gitlab.Issues.edit(project.id, issue.number, {
-        title: data.updatedPrizeTitle
-      });
-    });
+          assert.exists(challenge);
+          assert.strictEqual(challenge.projectId, tcDirectId);
+          assert.strictEqual(challenge.challengeName, data.challengeTitle);
+          assert.strictEqual(challenge.detailedRequirements, data.challengeDescription);
+          assert.deepEqual(challenge.prize, data.prize);
 
-    it('ensures that the prize is updated properly in the Topcoder challenge', async () => {
-      await utils.ensureChallengePrizeIsUpdated(issue.challengeId);
+          assert.exists(notes);
+          assert.isArray(notes);
+          const contestUrl = getUrlForChallengeId(challengeId);
+          let note = `Contest ${contestUrl} has been created for this ticket.`;
+          note += `<br/><br/>\`\`\`This is an automated message for ${userMapping.topcoderUsername} via Topcoder X\`\`\``;
+          assert.strictEqual(notes[0].body, note);
 
-      const notes = await gitlab.IssueNotes.all(project.id, issue.number);
-      assert.exists(notes);
-      assert.isArray(notes);
-      const contestUrl = data.getUrlForChallengeId(issue.challengeId);
-      const note = data.contestUpdatedComment(contestUrl);
-      assert.deepEqual(notes[0].body, note);
-      assert.deepEqual(notes[1].body, data.updatedPrizeNote);
+          done();
+        } catch (err) {
+          done(err);
+        }
+      }, config.WAIT_TIME);
     });
   });
 
-  describe('Tests for updating a Gitlab ticket - title', () => {
-    before('update title of an issue', async() => {
-      await gitlab.Issues.edit(project.id, issue.number, {
-        title: data.updatedPrizeTitle
+  describe('tests for updating a Gitlab ticket - prize', () => {
+    before('update prize of an issue in gitlab', async () => {
+      await gitlabServices.Issues.edit(project.id, issueIid, {
+        title: data.updatedIssuePrizeTitle
       });
     });
 
-    it('ensures that the title is updated properly in the Topcoder challenge', async () => {
-      await utils.ensureChallengeTitleIsUpdated(issue.challengeId);
+    it('ensures that the prize is updated properly on the TC challenge', function (done) { // eslint-disable-line
+      this.timeout(config.WAIT_TIME * WAIT_TIME_MULTIPLIER + 60000); // eslint-disable-line
 
-      const notes = await gitlab.IssueNotes.all(project.id, issue.number);
-      assert.exists(notes);
-      assert.isArray(notes);
-      const contestUrl = data.getUrlForChallengeId(issue.challengeId);
-      const note = data.contestUpdatedComment(contestUrl);
-      assert.deepEqual(notes[0].body, note);
-      assert.deepEqual(notes[1].body, data.updatedTitleNote);
+      setTimeout(async () => {
+        try {
+          const challenge = await _getChallenge(challengeId);
+          const notes = await gitlabServices.IssueNotes.all(project.id, issueIid);
+
+          assert.exists(challenge);
+          assert.deepEqual(challenge.prize, data.updatedPrize);
+
+          assert.exists(notes);
+          assert.isArray(notes);
+          const contestUrl = getUrlForChallengeId(challengeId);
+          let note = `Contest ${contestUrl} has been updated - the new changes has been updated for this ticket.`;
+          note += `<br/><br/>\`\`\`This is an automated message for ${userMapping.topcoderUsername} via Topcoder X\`\`\``;
+          assert.deepEqual(notes[0].body, note);
+          assert.deepEqual(notes[1].body, data.updatedPrizeNote);
+
+          done();
+        } catch (err) {
+          done(err);
+        }
+      }, config.WAIT_TIME * WAIT_TIME_MULTIPLIER); // eslint-disable-line
     });
   });
 
-  describe('Tests for updating a Gitlab ticket - description', () => {
-    before('update description of an issue', async() => {
-      await gitlab.Issues.edit(project.id, issue.number, {
+  describe('tests for updating a Gitlab ticket - title', () => {
+    before('update title of an issue in gitlab', async () => {
+      await gitlabServices.Issues.edit(project.id, issueIid, {
+        title: data.updatedIssueTitle
+      });
+    });
+
+    it('ensures that the title is updated properly on the TC challenge', function (done) { // eslint-disable-line
+      this.timeout(config.WAIT_TIME * WAIT_TIME_MULTIPLIER + 60000); // eslint-disable-line
+
+      setTimeout(async () => {
+        try {
+          const challenge = await _getChallenge(challengeId);
+          const notes = await gitlabServices.IssueNotes.all(project.id, issueIid);
+
+          assert.exists(challenge);
+          assert.deepEqual(challenge.challengeName, data.updatedChallengeTitle);
+
+          assert.exists(notes);
+          assert.isArray(notes);
+          const contestUrl = getUrlForChallengeId(challengeId);
+          let note = `Contest ${contestUrl} has been updated - the new changes has been updated for this ticket.`;
+          note += `<br/><br/>\`\`\`This is an automated message for ${userMapping.topcoderUsername} via Topcoder X\`\`\``;
+          assert.deepEqual(notes[0].body, note);
+          assert.deepEqual(notes[1].body, data.updatedTitleNote);
+
+          done();
+        } catch (err) {
+          done(err);
+        }
+      }, config.WAIT_TIME * WAIT_TIME_MULTIPLIER);
+    });
+  });
+
+  describe('tests for updating a Gitlab ticket - description', () => {
+    before('update description of an issue in gitlab', async () => {
+      await gitlabServices.Issues.edit(project.id, issueIid, {
         description: data.updatedIssueDescription
       });
     });
 
-    it('ensures that the description is updated properly in the Topcoder challenge', async () => {
-      await utils.ensureChallengeDescriptionIsUpdated(issue.challengeId);
+    it('ensure that the description is updated properly on the TC challenge', function (done) { // eslint-disable-line
+      this.timeout(config.WAIT_TIME * WAIT_TIME_MULTIPLIER + 60000); // eslint-disable-line
 
-      const notes = await gitlab.IssueNotes.all(project.id, issue.number);
-      assert.exists(notes);
-      assert.isArray(notes);
-      const contestUrl = data.getUrlForChallengeId(issue.challengeId);
-      const note = data.contestUpdatedComment(contestUrl);
-      assert.deepEqual(notes[0].body, note);
-      assert.deepEqual(notes[1].body, data.updatedDescriptionNote);
+      setTimeout(async () => {
+        try {
+          const challenge = await _getChallenge(challengeId);
+          const notes = await gitlabServices.IssueNotes.all(project.id, issueIid);
+
+          assert.exists(challenge);
+          assert.deepEqual(challenge.detailedRequirements, data.updatedChallengeDescription);
+
+          assert.exists(notes);
+          assert.isArray(notes);
+          const contestUrl = getUrlForChallengeId(challengeId);
+          let note = `Contest ${contestUrl} has been updated - the new changes has been updated for this ticket.`;
+          note += `<br/><br/>\`\`\`This is an automated message for ${userMapping.topcoderUsername} via Topcoder X\`\`\``;
+          assert.deepEqual(notes[0].body, note);
+          assert.deepEqual(notes[1].body, 'changed the description');
+
+          done();
+        } catch (err) {
+          done(err);
+        }
+      }, config.WAIT_TIME * WAIT_TIME_MULTIPLIER);
     });
   });
 
-  describe('Tests for assigning a gitlab ticket', () => {
-    before('assign issue to member', async() => {
-      await gitlab.Issues.edit(project.id, issue.number, {
-        assignee_ids: [user.id]
+  describe('tests for assigning a gitlab ticket', () => {
+    before('assign issue to member on gitlab', async () => {
+      await gitlabServices.Issues.edit(project.id, issueIid, {
+        assignee_ids: [userMapping.gitlabUserId]
       });
     });
 
-    it('ensures that the TC member is added to the TC challenge as expected', async () => {
-      await utils.ensureChallengeIsAssigned(issue.challengeId, config.TOPCODER_USER_NAME);
+    it('ensures that the TC member is added to the TC challenge as expected', function (done) { // eslint-disable-line
+      this.timeout(config.WAIT_TIME * WAIT_TIME_MULTIPLIER + 60000); // eslint-disable-line
 
-      const notes = await gitlab.IssueNotes.all(project.id, issue.number);
-      const contestUrl = data.getUrlForChallengeId(issue.challengeId);
-      const note = data.contestAssignedComment(contestUrl, config.TOPCODER_USER_NAME);
-      assert.deepEqual(notes[0].body, note);
-      assert.deepEqual(notes[1].body, data.assignedComment(user.username));
+      setTimeout(async () => {
+        try {
+          const challenge = await _getChallenge(challengeId);
+          const notes = await gitlabServices.IssueNotes.all(project.id, issueIid);
+
+          assert.exists(challenge);
+          assert.isArray(challenge.registrants);
+          assert.lengthOf(challenge.registrants, 1);
+          assert.equal(challenge.registrants[0].handle, userMapping.topcoderUsername);
+          assert.equal(challenge.numberOfRegistrants, 1);
+
+          assert.exists(notes);
+          assert.isArray(notes);
+          const contestUrl = getUrlForChallengeId(challengeId);
+          let note = `Contest ${contestUrl} has been updated - it has been assigned to ${userMapping.topcoderUsername}.`;
+          note += `<br/><br/>\`\`\`This is an automated message for ${userMapping.topcoderUsername} via Topcoder X\`\`\``;
+          assert.deepEqual(notes[0].body, note);
+          assert.deepEqual(notes[1].body, `assigned to @${userMapping.gitlabUsername}`);
+
+          done();
+        } catch (err) {
+          done(err);
+        }
+      }, config.WAIT_TIME * WAIT_TIME_MULTIPLIER);
     });
   });
 
-  describe('Tests for assigning a Github ticket - no mapping exists', () => {
-    before('remove all assignees, remove user mapping, assign issue to member', async() => {
-      await gitlab.Issues.edit(project.id, issue.number, {
+  describe('tests for assigning a gitlab ticket - unregistered user', () => {
+    before('remove mapping from userMapping, unassign and then assign issue to member on gitlab', async () => {
+      // Temporarily remove mapping in DB
+      await models.UserMapping.update({
+        gitlabUserId: userMapping.gitlabUserId
+      }, {
+        gitlabUserId: 123
+      });
+      await gitlabServices.Issues.edit(project.id, issueIid, {
         assignee_ids: []
       });
-      await utils.removeUserMapping(user.id, PROVIDER);
-      await gitlab.Issues.edit(project.id, issue.number, {
-        assignee_ids: [user.id]
+      await gitlabServices.Issues.edit(project.id, issueIid, {
+        assignee_ids: [userMapping.gitlabUserId]
       });
     });
 
-    after('add back correct mapping to userMapping, reassign', async() => {
-      await utils.addBackUserMapping(user.id, PROVIDER);
-      await gitlab.Issues.edit(project.id, issue.number, {
-        assignee_ids: [user.id]
+    after('add back correct mapping to userMapping, reassign', async () => {
+      // Add back mapping in DB
+      await models.UserMapping.update({
+        gitlabUserId: 123
+      }, {
+        gitlabUserId: userMapping.gitlabUserId
+      });
+      await gitlabServices.Issues.edit(project.id, issueIid, {
+        assignee_ids: [userMapping.gitlabUserId]
       });
     });
 
-    it('ensures that the TC member assignment is rolled back', async () => {
-      await utils.test(async () => {
-        const notes = await gitlab.IssueNotes.all(project.id, issue.number);
-        assert.exists(notes);
-        assert.isArray(notes);
-        assert.deepEqual(notes[0].body, data.unassignedComment(user.username));
-        assert.deepEqual(notes[1].body, data.signUpComment(user.username));
-      });
+    it('ensures that the TC member assignment is rolled back', function (done) { // eslint-disable-line
+      this.timeout(config.WAIT_TIME + 60000); // eslint-disable-line
+      setTimeout(async () => {
+        try {
+          const notes = await gitlabServices.IssueNotes.all(project.id, issueIid);
+
+          assert.exists(notes);
+          assert.isArray(notes);
+          let note = `unassigned @${userMapping.gitlabUsername}`;
+          note += `<br/><br/>\`\`\`This is an automated message for ${userMapping.topcoderUsername} via Topcoder X\`\`\``;
+          assert.deepEqual(notes[0].body, note);
+          note = `@${userMapping.gitlabUsername}, please sign-up with Topcoder X tool`;
+          note += `<br/><br/>\`\`\`This is an automated message for ${userMapping.topcoderUsername} via Topcoder X\`\`\``;
+          assert.deepEqual(notes[1].body, `@${userMapping.gitlabUsername}, please sign-up with Topcoder X tool`);
+
+          done();
+        } catch (err) {
+          done(err);
+        }
+      }, config.WAIT_TIME);
     });
   });
 
   // THIS TEST WILL FAIL as the member is not removed as a registrant on TC challenge
-  describe('Tests for unassigning a gitlab ticket', () => {
-    before('unassign issue', async() => {
-      await gitlab.Issues.edit(project.id, issue.number, {
+  describe('tests for unassigning a gitlab ticket', () => {
+    before('unassign issue to member on gitlab', async () => {
+      await gitlabServices.Issues.edit(project.id, issueIid, {
         assignee_ids: []
       });
     });
 
-    after('reassign issue', async() => {
-      await gitlab.Issues.edit(project.id, issue.number, {
-        assignee_ids: [user.id]
+    after('reassign issue to member', async () => {
+      // for subsequent tests
+      await gitlabServices.Issues.edit(project.id, issueIid, {
+        assignee_ids: [userMapping.gitlabUserId]
       });
     });
 
-    it('ensures that the TC challenge goes back to unassigned and the existing assignee is removed', async () => {
-      await utils.ensureChallengeIsUnassigned(issue.challengeId);
+    it('ensures that the TC challenge goes back to unassigned and the existing assignee is removed', function (done) { // eslint-disable-line
+      this.timeout(config.WAIT_TIME * WAIT_TIME_MULTIPLIER + 60000); // eslint-disable-line
 
-      const notes = await gitlab.IssueNotes.all(project.id, issue.number);
-      assert.exists(notes);
-      assert.isArray(notes);
-      assert.deepEqual(notes[0].body, data.unassignedComment(user.username));
+      setTimeout(async () => {
+        try {
+          const challenge = await _getChallenge(challengeId);
+          const notes = await gitlabServices.IssueNotes.all(project.id, issueIid);
+
+          assert.exists(challenge);
+          assert.isArray(challenge.registrants);
+          assert.lengthOf(challenge.registrants, 0);
+          assert.equal(challenge.numberOfRegistrants, 0);
+
+          assert.exists(notes);
+          assert.isArray(notes);
+          let note = `unassigned @${userMapping.gitlabUsername}`;
+          note += `<br/><br/>\`\`\`This is an automated message for ${userMapping.topcoderUsername} via Topcoder X\`\`\``;
+          assert.deepEqual(notes[0].body, note);
+
+          done();
+        } catch (err) {
+          done(err);
+        }
+      }, config.WAIT_TIME * WAIT_TIME_MULTIPLIER);
     });
   });
 
   // THIS TEST WILL FAIL as the issue is not reopened if no assignee exists. It is ignored with a log message
-  describe('Tests for closing a gitlab ticket - no assigne exists', () => {
-    before('remove assignees, close an issue', async() => {
-      await gitlab.Issues.edit(project.id, issue.number, {
+  describe('tests for closing a gitlab ticket - no assigne exists', () => {
+    before('close an issue on gitlab', async () => {
+      await gitlabServices.Issues.edit(project.id, issueIid, {
         assignee_ids: []
       });
-      await gitlab.Issues.edit(project.id, issue.number, {
+      await gitlabServices.Issues.edit(project.id, issueIid, {
         state_event: 'close'
       });
     });
 
-    after('reassign issue, reopen issue', async() => {
-      await gitlab.Issues.edit(project.id, issue.number, {
-        assignee_ids: [user.id]
+    after('reassign issue to member, reopen issue', async () => {
+      // for subsequent tests
+      await gitlabServices.Issues.edit(project.id, issueIid, {
+        assignee_ids: [userMapping.gitlabUserId]
       });
-      await gitlab.Issues.edit(project.id, issue.number, {
+      await gitlabServices.Issues.edit(project.id, issueIid, {
         state_event: 'reopen'
       });
     });
 
-    it('ensures a comment is added to the Gitlab ticket and the ticket is reopened', async () => {
-      await utils.test(async () => {
-        const gitlabIssues = await gitlab.Issues.all(project.id, issue.number);
-        const gitlabIssue = gitlabIssues.find((i) => i.iid === issue.number);
-        const notes = await gitlab.IssueNotes.all(project.id, issue.number);
+    it('ensures a comment is added to the Gitlab ticket and the ticket is reopened', function (done) { // eslint-disable-line
+      this.timeout(config.WAIT_TIME + 60000); // eslint-disable-line
 
-        assert.deepEqual(gitlabIssue.state, 'opened');
+      setTimeout(async () => {
+        try {
+          const gitlabIssues = await gitlabServices.Issues.all(project.id, issueIid);
+          const gitlabIssue = gitlabIssues.find((i) => i.iid === issueIid);
+          const notes = await gitlabServices.IssueNotes.all(project.id, issueIid);
 
-        assert.exists(notes);
-        assert.isArray(notes);
-        assert.deepEqual(notes[0].body, data.issueClosedWithNoAssigneeComment);
-      });
+          assert.deepEqual(gitlabIssue.state, 'opened');
+
+          assert.exists(notes);
+          assert.isArray(notes);
+          const contestUrl = getUrlForChallengeId(challengeId);
+          let note = `Contest ${contestUrl} has been updated - it has been assigned to ${userMapping.topcoderUsername}.`;
+          note += `<br/><br/>\`\`\`This is an automated message for ${userMapping.topcoderUsername} via Topcoder X\`\`\``;
+          assert.deepEqual(notes[0].body, note);
+          assert.deepEqual(notes[1].body, 'closed');
+
+          done();
+        } catch (err) {
+          done(err);
+        }
+      }, config.WAIT_TIME);
     });
   });
 
-  describe('Tests for closing a gitlab ticket', () => {
-    before('add assignee, close an issue', async() => {
-      await gitlab.Issues.edit(project.id, issue.number, {
-        assignee_ids: [user.id]
+  describe('tests for closing a gitlab ticket', () => {
+    before('close an issue on gitlab', async () => {
+      await gitlabServices.Issues.edit(project.id, issueIid, {
+        assignee_ids: [userMapping.gitlabUserId]
       });
-      await gitlab.Issues.edit(project.id, issue.number, {
+      await gitlabServices.Issues.edit(project.id, issueIid, {
         state_event: 'close'
       });
     });
 
-    it('ensures that the copilot is assigned and the challenge is closed', async () => {
-      await utils.test(async () => {
-        const notes = await gitlab.IssueNotes.all(project.id, issue.number);
-        const gitlabIssues = await gitlab.Issues.all(project.id, issue.number);
-        const gitlabIssue = gitlabIssues.find((i) => i.iid === issue.number);
+    it('ensures that the copilot is assigned and the challenge is closed', function (done) { // eslint-disable-line
+      this.timeout(config.WAIT_TIME * WAIT_TIME_MULTIPLIER + 60000); // eslint-disable-line
 
-        assert.deepEqual(gitlabIssue.state, 'closed');
-        assert.exists(gitlabIssue.labels);
-        assert.isArray(gitlabIssue.labels);
-        assert.lengthOf(gitlabIssue.labels, 2); // eslint-disable-line no-magic-numbers
-        assert.deepEqual(gitlabIssue.labels[0], data.fixAcceptedLabel);
-        assert.deepEqual(gitlabIssue.labels[1], data.paidLabel);
+      setTimeout(async () => {
+        try {
+          const notes = await gitlabServices.IssueNotes.all(project.id, issueIid);
+          const gitlabIssues = await gitlabServices.Issues.all(project.id, issueIid);
+          const gitlabIssue = gitlabIssues.find((i) => i.iid === issueIid);
 
-        assert.exists(notes);
-        assert.isArray(notes);
-        assert.deepEqual(notes[0].body, data.paymentTaskComment(issue.challengeId));
-      });
+          assert.exists(notes);
+          assert.isArray(notes);
+          let note = `Payment task has been updated: https://software.topcoder-dev.com/review/actions/ViewProjectDetails?pid=${challengeId}`;
+          note += `<br/><br/>\`\`\`This is an automated message for ${userMapping.topcoderUsername} via Topcoder X\`\`\``;
+          assert.deepEqual(notes[0].body, note); // eslint-disable-line
+          assert.deepEqual(notes[1].body, 'added ~7432900 ~7432901 labels');
+
+          assert.deepEqual(gitlabIssue.state, 'closed');
+
+          done();
+        } catch (err) {
+          done(err);
+        }
+      }, config.WAIT_TIME * WAIT_TIME_MULTIPLIER);
     });
   });
 });
