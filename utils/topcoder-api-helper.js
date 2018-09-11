@@ -212,6 +212,29 @@ async function activateChallenge(id) {
 }
 
 /**
+ * Get challenge details by id
+ * @param {Number} id challenge ID
+ * @returns {Object} topcoder challenge
+ */
+async function getChallengeById(id) {
+  if (!_.isNumber(id)) {
+    throw new Error('The challenge id must valid number');
+  }
+  const apiKey = await getAccessToken();
+  logger.debug('Getting topcoder challenge details');
+  try {
+    const response = await axios.get(`${projectsClient.basePath}/challenges/${id}`, {
+      authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    });
+    const challenge = _.get(response, 'data.result.content');
+    return challenge;
+  } catch (er) {
+    throw errors.convertTopcoderApiError(er, 'Failed to get challenge details by Id');
+  }
+}
+
+/**
  * closes the topcoder challenge
  * @param {Number} id the challenge id
  * @param {Number} winnerId the winner id
@@ -302,13 +325,120 @@ async function addResourceToChallenge(id, resource) {
   }
 }
 
+/**
+ * unregister user from topcoder challenge
+ * @param {Number} id the challenge id
+ * @param {Object} resource the resource  resource to remove
+ */
+async function unregisterUserFromChallenge(id) {
+  bearer.apiKey = await getAccessToken();
+  logger.debug(`removing resource from challenge ${id}`);
+  try {
+    await new Promise((resolve, reject) => {
+      challengesApiInstance.unregisterChallenge(id, (err, res) => {
+        if (err) {
+          // TODO:* Handle when a user tries to unregister a user twice.
+          // if (_.get(JSON.parse(_.get(err, 'response.text')), 'result.content')
+          //   === `User ${resource.resourceUserId} with role ${resource.roleId} already exist`) {
+          //   resolve(res);
+          // } else {
+          //   logger.error(JSON.stringify(err));
+          //   reject(err);
+          // }
+          logger.debug(`Error - ${err}`);
+          reject(err);
+        } else {
+          logger.debug(`user is removed from the challenge ${id} successfuly.`);
+          resolve(res);
+        }
+      });
+    });
+  } catch (err) {
+    throw errors.convertTopcoderApiError(err, 'Failed to remove resource from the challenge');
+  }
+}
+
+/**
+ * cancels the private contents
+ * @param {Number} id the challenge id
+ */
+async function cancelPrivateContent(id) {
+  bearer.apiKey = await getAccessToken();
+  logger.debug(`Cancelling challenge ${id}`);
+  try {
+    await new Promise((resolve, reject) => {
+      challengesApiInstance.cancelPrivateContest(id, (err, data) => {
+        if (err) {
+          logger.error(err);
+          logger.debug(JSON.stringify(err));
+          reject(err);
+        } else {
+          resolve(data);
+        }
+      });
+    });
+    logger.debug(`Challenge ${id} is cancelled successfully.`);
+  } catch (err) {
+    throw errors.convertTopcoderApiError(err, 'Failed to cancel challenge.');
+  }
+}
+
+/**
+ * adds assignee as challenge registrant
+ * @param {Number} topcoderUserId the topcoder user id
+ * @param {Object} challengeId the challenge id
+ * @private
+ */
+async function assignUserAsRegistrant(topcoderUserId, challengeId) {
+  // role 1 from registrant
+  const registrantBody = {
+    roleId: 1,
+    resourceUserId: topcoderUserId,
+    phaseId: 0,
+    addNotification: true,
+    addForumWatch: true
+  };
+  await addResourceToChallenge(challengeId, registrantBody);
+}
+
+/**
+ * removes the resource from the topcoder challenge
+ * @param {Number} id the challenge id
+ * @param {Object} resource the resource resource to remove
+ */
+async function removeResourceToChallenge(id, resource) {
+  bearer.apiKey = await getAccessToken();
+  logger.debug(`removing resource from challenge ${id}`);
+  try {
+    await new Promise((resolve, reject) => {
+      challengesApiInstance.challengesIdResourcesDelete(id, resource, (err, res) => {
+        if (err) {
+          logger.error(JSON.stringify(err));
+          reject(err);
+        } else {
+          logger.debug(`resource is removed from challenge ${id} successfully.`);
+          resolve(res);
+        }
+      });
+    });
+  } catch (err) {
+    throw errors.convertTopcoderApiError(err, 'Failed to remove resource from the challenge.');
+  }
+}
+
+
 module.exports = {
   createProject,
+  getChallengeById,
   createChallenge,
   updateChallenge,
   activateChallenge,
   closeChallenge,
   getProjectBillingAccountId,
   getTopcoderMemberId,
-  addResourceToChallenge
+  addResourceToChallenge,
+  unregisterUserFromChallenge,
+  cancelPrivateContent,
+  assignUserAsRegistrant,
+  removeResourceToChallenge
 };

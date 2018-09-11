@@ -113,7 +113,7 @@ logger.buildService = function buildService(service) {
   logger.decorateWithLogging(service);
 };
 
-globalLog.initialize();
+// globalLog.initialize();
 
 // global any http success request interceptor
 globalLog.on('success', (request, response) => {

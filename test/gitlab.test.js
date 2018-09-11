@@ -98,7 +98,7 @@ async function _getIssue(projectId, issueIid) {
 
 
 describe('Topcoder-X-Processor tests', function tcXTests() {
-    this.timeout(config.WAIT_TIME); // eslint-disable-line
+  this.timeout(config.WAIT_TIME); // eslint-disable-line
 
   let project;
   let tcDirectId;
@@ -115,16 +115,16 @@ describe('Topcoder-X-Processor tests', function tcXTests() {
     challengeDescription: '<p>This is a description</p>\n',
     prize: [1],
     updatedIssuePrizeTitle: '[$2] This is a test issue',
-        updatedPrizeNote: 'changed title from **[${-1-}] This is a test issue** to **[${+2+}] This is a test issue**', // eslint-disable-line
-        updatedPrize: [2], // eslint-disable-line
+    updatedPrizeNote: 'changed title from **[${-1-}] This is a test issue** to **[${+2+}] This is a test issue**', // eslint-disable-line
+    updatedPrize: [2], // eslint-disable-line
     updatedIssueTitle: '[$2] This is an updated test issue',
     updatedChallengeTitle: 'This is an updated test issue',
-        updatedTitleNote: 'changed title from **[$2] This is a test issue** to **[$2] This is a{+n updated+} test issue**', // eslint-disable-line
+    updatedTitleNote: 'changed title from **[$2] This is a test issue** to **[$2] This is a{+n updated+} test issue**', // eslint-disable-line
     updatedIssueDescription: 'This is an updated description',
     updatedChallengeDescription: '<p>This is an updated description</p>\n'
   };
 
-  before('gather project and user details', async() => {
+  before('gather project and user details', async () => {
     this.timeout(config.WAIT_TIME * 2); // eslint-disable-line
 
     const dbProject = await models.Project.findOne({
@@ -158,17 +158,18 @@ describe('Topcoder-X-Processor tests', function tcXTests() {
 
     gitlabServices = await _authenticate(copilot.accessToken);
     const projects = await gitlabServices.Projects.all({
-      search: dbProject.title
+      search: dbProject.title,
+      owned: true
     });
     project = projects[0];
   });
 
-  after('cleanup', async() => {
+  after('cleanup', async () => {
     await gitlabServices.Issues.remove(project.id, issueIid);
   });
 
   describe('tests for creating a new Gitlab ticket', () => {
-    before('create an issue in gitlab', async() => {
+    before('create an issue in gitlab', async () => {
       const response = await gitlabServices.Issues.create(project.id, {
         title: data.issueTitle,
         description: data.issueDescription
@@ -176,10 +177,10 @@ describe('Topcoder-X-Processor tests', function tcXTests() {
       issueIid = response.iid;
     });
 
-    it('ensures that the challenge is created properly in the Topcoder platform', function(done) { // eslint-disable-line
+    it('ensures that the challenge is created properly in the Topcoder platform', function (done) { // eslint-disable-line
       this.timeout(config.WAIT_TIME + 60000); // eslint-disable-line
 
-      setTimeout(async() => {
+      setTimeout(async () => {
         try {
           const issue = await _getIssue(project.id, issueIid);
           const challenge = await _getChallenge(issue.challengeId);
@@ -195,7 +196,8 @@ describe('Topcoder-X-Processor tests', function tcXTests() {
           assert.exists(notes);
           assert.isArray(notes);
           const contestUrl = getUrlForChallengeId(challengeId);
-          const note = `Contest ${contestUrl} has been created for this ticket.`;
+          let note = `Contest ${contestUrl} has been created for this ticket.`;
+          note += `<br/><br/>\`\`\`This is an automated message for ${userMapping.topcoderUsername} via Topcoder X\`\`\``;
           assert.strictEqual(notes[0].body, note);
 
           done();
@@ -207,16 +209,16 @@ describe('Topcoder-X-Processor tests', function tcXTests() {
   });
 
   describe('tests for updating a Gitlab ticket - prize', () => {
-    before('update prize of an issue in gitlab', async() => {
+    before('update prize of an issue in gitlab', async () => {
       await gitlabServices.Issues.edit(project.id, issueIid, {
         title: data.updatedIssuePrizeTitle
       });
     });
 
-    it('ensures that the prize is updated properly on the TC challenge', function(done) { // eslint-disable-line
+    it('ensures that the prize is updated properly on the TC challenge', function (done) { // eslint-disable-line
       this.timeout(config.WAIT_TIME * WAIT_TIME_MULTIPLIER + 60000); // eslint-disable-line
 
-      setTimeout(async() => {
+      setTimeout(async () => {
         try {
           const challenge = await _getChallenge(challengeId);
           const notes = await gitlabServices.IssueNotes.all(project.id, issueIid);
@@ -227,7 +229,8 @@ describe('Topcoder-X-Processor tests', function tcXTests() {
           assert.exists(notes);
           assert.isArray(notes);
           const contestUrl = getUrlForChallengeId(challengeId);
-          const note = `Contest ${contestUrl} has been updated - the new changes has been updated for this ticket.`;
+          let note = `Contest ${contestUrl} has been updated - the new changes has been updated for this ticket.`;
+          note += `<br/><br/>\`\`\`This is an automated message for ${userMapping.topcoderUsername} via Topcoder X\`\`\``;
           assert.deepEqual(notes[0].body, note);
           assert.deepEqual(notes[1].body, data.updatedPrizeNote);
 
@@ -235,21 +238,21 @@ describe('Topcoder-X-Processor tests', function tcXTests() {
         } catch (err) {
           done(err);
         }
-        }, config.WAIT_TIME * WAIT_TIME_MULTIPLIER); // eslint-disable-line
+      }, config.WAIT_TIME * WAIT_TIME_MULTIPLIER); // eslint-disable-line
     });
   });
 
   describe('tests for updating a Gitlab ticket - title', () => {
-    before('update title of an issue in gitlab', async() => {
+    before('update title of an issue in gitlab', async () => {
       await gitlabServices.Issues.edit(project.id, issueIid, {
         title: data.updatedIssueTitle
       });
     });
 
-    it('ensures that the title is updated properly on the TC challenge', function(done) { // eslint-disable-line
+    it('ensures that the title is updated properly on the TC challenge', function (done) { // eslint-disable-line
       this.timeout(config.WAIT_TIME * WAIT_TIME_MULTIPLIER + 60000); // eslint-disable-line
 
-      setTimeout(async() => {
+      setTimeout(async () => {
         try {
           const challenge = await _getChallenge(challengeId);
           const notes = await gitlabServices.IssueNotes.all(project.id, issueIid);
@@ -260,7 +263,8 @@ describe('Topcoder-X-Processor tests', function tcXTests() {
           assert.exists(notes);
           assert.isArray(notes);
           const contestUrl = getUrlForChallengeId(challengeId);
-          const note = `Contest ${contestUrl} has been updated - the new changes has been updated for this ticket.`;
+          let note = `Contest ${contestUrl} has been updated - the new changes has been updated for this ticket.`;
+          note += `<br/><br/>\`\`\`This is an automated message for ${userMapping.topcoderUsername} via Topcoder X\`\`\``;
           assert.deepEqual(notes[0].body, note);
           assert.deepEqual(notes[1].body, data.updatedTitleNote);
 
@@ -273,16 +277,16 @@ describe('Topcoder-X-Processor tests', function tcXTests() {
   });
 
   describe('tests for updating a Gitlab ticket - description', () => {
-    before('update description of an issue in gitlab', async() => {
+    before('update description of an issue in gitlab', async () => {
       await gitlabServices.Issues.edit(project.id, issueIid, {
         description: data.updatedIssueDescription
       });
     });
 
-    it('ensure that the description is updated properly on the TC challenge', function(done) { // eslint-disable-line
+    it('ensure that the description is updated properly on the TC challenge', function (done) { // eslint-disable-line
       this.timeout(config.WAIT_TIME * WAIT_TIME_MULTIPLIER + 60000); // eslint-disable-line
 
-      setTimeout(async() => {
+      setTimeout(async () => {
         try {
           const challenge = await _getChallenge(challengeId);
           const notes = await gitlabServices.IssueNotes.all(project.id, issueIid);
@@ -293,7 +297,8 @@ describe('Topcoder-X-Processor tests', function tcXTests() {
           assert.exists(notes);
           assert.isArray(notes);
           const contestUrl = getUrlForChallengeId(challengeId);
-          const note = `Contest ${contestUrl} has been updated - the new changes has been updated for this ticket.`;
+          let note = `Contest ${contestUrl} has been updated - the new changes has been updated for this ticket.`;
+          note += `<br/><br/>\`\`\`This is an automated message for ${userMapping.topcoderUsername} via Topcoder X\`\`\``;
           assert.deepEqual(notes[0].body, note);
           assert.deepEqual(notes[1].body, 'changed the description');
 
@@ -306,16 +311,16 @@ describe('Topcoder-X-Processor tests', function tcXTests() {
   });
 
   describe('tests for assigning a gitlab ticket', () => {
-    before('assign issue to member on gitlab', async() => {
+    before('assign issue to member on gitlab', async () => {
       await gitlabServices.Issues.edit(project.id, issueIid, {
         assignee_ids: [userMapping.gitlabUserId]
       });
     });
 
-    it('ensures that the TC member is added to the TC challenge as expected', function(done) { // eslint-disable-line
+    it('ensures that the TC member is added to the TC challenge as expected', function (done) { // eslint-disable-line
       this.timeout(config.WAIT_TIME * WAIT_TIME_MULTIPLIER + 60000); // eslint-disable-line
 
-      setTimeout(async() => {
+      setTimeout(async () => {
         try {
           const challenge = await _getChallenge(challengeId);
           const notes = await gitlabServices.IssueNotes.all(project.id, issueIid);
@@ -329,7 +334,8 @@ describe('Topcoder-X-Processor tests', function tcXTests() {
           assert.exists(notes);
           assert.isArray(notes);
           const contestUrl = getUrlForChallengeId(challengeId);
-          const note = `Contest ${contestUrl} has been updated - it has been assigned to ${userMapping.topcoderUsername}.`;
+          let note = `Contest ${contestUrl} has been updated - it has been assigned to ${userMapping.topcoderUsername}.`;
+          note += `<br/><br/>\`\`\`This is an automated message for ${userMapping.topcoderUsername} via Topcoder X\`\`\``;
           assert.deepEqual(notes[0].body, note);
           assert.deepEqual(notes[1].body, `assigned to @${userMapping.gitlabUsername}`);
 
@@ -342,7 +348,7 @@ describe('Topcoder-X-Processor tests', function tcXTests() {
   });
 
   describe('tests for assigning a gitlab ticket - unregistered user', () => {
-    before('remove mapping from userMapping, unassign and then assign issue to member on gitlab', async() => {
+    before('remove mapping from userMapping, unassign and then assign issue to member on gitlab', async () => {
       // Temporarily remove mapping in DB
       await models.UserMapping.update({
         gitlabUserId: userMapping.gitlabUserId
@@ -357,7 +363,7 @@ describe('Topcoder-X-Processor tests', function tcXTests() {
       });
     });
 
-    after('add back correct mapping to userMapping, reassign', async() => {
+    after('add back correct mapping to userMapping, reassign', async () => {
       // Add back mapping in DB
       await models.UserMapping.update({
         gitlabUserId: 123
@@ -369,15 +375,19 @@ describe('Topcoder-X-Processor tests', function tcXTests() {
       });
     });
 
-    it('ensures that the TC member assignment is rolled back', function(done) { // eslint-disable-line
+    it('ensures that the TC member assignment is rolled back', function (done) { // eslint-disable-line
       this.timeout(config.WAIT_TIME + 60000); // eslint-disable-line
-      setTimeout(async() => {
+      setTimeout(async () => {
         try {
           const notes = await gitlabServices.IssueNotes.all(project.id, issueIid);
 
           assert.exists(notes);
           assert.isArray(notes);
-          assert.deepEqual(notes[0].body, `unassigned @${userMapping.gitlabUsername}`);
+          let note = `unassigned @${userMapping.gitlabUsername}`;
+          note += `<br/><br/>\`\`\`This is an automated message for ${userMapping.topcoderUsername} via Topcoder X\`\`\``;
+          assert.deepEqual(notes[0].body, note);
+          note = `@${userMapping.gitlabUsername}, please sign-up with Topcoder X tool`;
+          note += `<br/><br/>\`\`\`This is an automated message for ${userMapping.topcoderUsername} via Topcoder X\`\`\``;
           assert.deepEqual(notes[1].body, `@${userMapping.gitlabUsername}, please sign-up with Topcoder X tool`);
 
           done();
@@ -390,23 +400,23 @@ describe('Topcoder-X-Processor tests', function tcXTests() {
 
   // THIS TEST WILL FAIL as the member is not removed as a registrant on TC challenge
   describe('tests for unassigning a gitlab ticket', () => {
-    before('unassign issue to member on gitlab', async() => {
+    before('unassign issue to member on gitlab', async () => {
       await gitlabServices.Issues.edit(project.id, issueIid, {
         assignee_ids: []
       });
     });
 
-    after('reassign issue to member', async() => {
-            // for subsequent tests
+    after('reassign issue to member', async () => {
+      // for subsequent tests
       await gitlabServices.Issues.edit(project.id, issueIid, {
         assignee_ids: [userMapping.gitlabUserId]
       });
     });
 
-    it('ensures that the TC challenge goes back to unassigned and the existing assignee is removed', function(done) { // eslint-disable-line
+    it('ensures that the TC challenge goes back to unassigned and the existing assignee is removed', function (done) { // eslint-disable-line
       this.timeout(config.WAIT_TIME * WAIT_TIME_MULTIPLIER + 60000); // eslint-disable-line
 
-      setTimeout(async() => {
+      setTimeout(async () => {
         try {
           const challenge = await _getChallenge(challengeId);
           const notes = await gitlabServices.IssueNotes.all(project.id, issueIid);
@@ -418,7 +428,9 @@ describe('Topcoder-X-Processor tests', function tcXTests() {
 
           assert.exists(notes);
           assert.isArray(notes);
-          assert.deepEqual(notes[0].body, `unassigned @${userMapping.gitlabUsername}`);
+          let note = `unassigned @${userMapping.gitlabUsername}`;
+          note += `<br/><br/>\`\`\`This is an automated message for ${userMapping.topcoderUsername} via Topcoder X\`\`\``;
+          assert.deepEqual(notes[0].body, note);
 
           done();
         } catch (err) {
@@ -428,9 +440,9 @@ describe('Topcoder-X-Processor tests', function tcXTests() {
     });
   });
 
-    // THIS TEST WILL FAIL as the issue is not reopened if no assignee exists. It is ignored with a log message
+  // THIS TEST WILL FAIL as the issue is not reopened if no assignee exists. It is ignored with a log message
   describe('tests for closing a gitlab ticket - no assigne exists', () => {
-    before('close an issue on gitlab', async() => {
+    before('close an issue on gitlab', async () => {
       await gitlabServices.Issues.edit(project.id, issueIid, {
         assignee_ids: []
       });
@@ -439,7 +451,7 @@ describe('Topcoder-X-Processor tests', function tcXTests() {
       });
     });
 
-    after('reassign issue to member, reopen issue', async() => {
+    after('reassign issue to member, reopen issue', async () => {
       // for subsequent tests
       await gitlabServices.Issues.edit(project.id, issueIid, {
         assignee_ids: [userMapping.gitlabUserId]
@@ -449,10 +461,10 @@ describe('Topcoder-X-Processor tests', function tcXTests() {
       });
     });
 
-    it('ensures a comment is added to the Gitlab ticket and the ticket is reopened', function(done) { // eslint-disable-line
+    it('ensures a comment is added to the Gitlab ticket and the ticket is reopened', function (done) { // eslint-disable-line
       this.timeout(config.WAIT_TIME + 60000); // eslint-disable-line
 
-      setTimeout(async() => {
+      setTimeout(async () => {
         try {
           const gitlabIssues = await gitlabServices.Issues.all(project.id, issueIid);
           const gitlabIssue = gitlabIssues.find((i) => i.iid === issueIid);
@@ -463,7 +475,8 @@ describe('Topcoder-X-Processor tests', function tcXTests() {
           assert.exists(notes);
           assert.isArray(notes);
           const contestUrl = getUrlForChallengeId(challengeId);
-          const note = `Contest ${contestUrl} has been updated - it has been assigned to ${userMapping.topcoderUsername}.`;
+          let note = `Contest ${contestUrl} has been updated - it has been assigned to ${userMapping.topcoderUsername}.`;
+          note += `<br/><br/>\`\`\`This is an automated message for ${userMapping.topcoderUsername} via Topcoder X\`\`\``;
           assert.deepEqual(notes[0].body, note);
           assert.deepEqual(notes[1].body, 'closed');
 
@@ -476,7 +489,7 @@ describe('Topcoder-X-Processor tests', function tcXTests() {
   });
 
   describe('tests for closing a gitlab ticket', () => {
-    before('close an issue on gitlab', async() => {
+    before('close an issue on gitlab', async () => {
       await gitlabServices.Issues.edit(project.id, issueIid, {
         assignee_ids: [userMapping.gitlabUserId]
       });
@@ -485,10 +498,10 @@ describe('Topcoder-X-Processor tests', function tcXTests() {
       });
     });
 
-    it('ensures that the copilot is assigned and the challenge is closed', function(done) { // eslint-disable-line
+    it('ensures that the copilot is assigned and the challenge is closed', function (done) { // eslint-disable-line
       this.timeout(config.WAIT_TIME * WAIT_TIME_MULTIPLIER + 60000); // eslint-disable-line
 
-      setTimeout(async() => {
+      setTimeout(async () => {
         try {
           const notes = await gitlabServices.IssueNotes.all(project.id, issueIid);
           const gitlabIssues = await gitlabServices.Issues.all(project.id, issueIid);
@@ -496,7 +509,9 @@ describe('Topcoder-X-Processor tests', function tcXTests() {
 
           assert.exists(notes);
           assert.isArray(notes);
-          assert.deepEqual(notes[0].body, `Payment task has been updated: https://software.topcoder-dev.com/review/actions/ViewProjectDetails?pid=${challengeId}`); // eslint-disable-line
+          let note = `Payment task has been updated: https://software.topcoder-dev.com/review/actions/ViewProjectDetails?pid=${challengeId}`;
+          note += `<br/><br/>\`\`\`This is an automated message for ${userMapping.topcoderUsername} via Topcoder X\`\`\``;
+          assert.deepEqual(notes[0].body, note); // eslint-disable-line
           assert.deepEqual(notes[1].body, 'added ~7432900 ~7432901 labels');
 
           assert.deepEqual(gitlabIssue.state, 'closed');

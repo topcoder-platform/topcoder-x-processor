@@ -22,9 +22,9 @@ building:
 
 testing:
   script:
-    - echo "Running gitlab tests"
+    - echo "Running all tests"
     - npm i
-    - npm run test:gitlab
+    - npm test
   stage: test
 
 deploy_dev:

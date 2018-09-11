@@ -6,7 +6,9 @@
   "scripts": {
     "start": "node ./index.js",
     "lint": "eslint . --ignore-pattern 'public/*' --ext .js --fix || true",
-    "test": "mocha --exit"
+    "test": "mocha",
+    "test:github": "mocha test/github.test.js",
+    "test:gitlab": "mocha test/gitlab.test.js"
   },
   "engines": {
     "node": "~8.6.0"
@@ -44,12 +46,14 @@
     "winston": "^2.4.3"
   },
   "devDependencies": {
+    "@octokit/rest": "^15.10.0",
     "chai": "^4.1.2",
     "eslint-config-topcoder": "^2.0.0",
     "eslint-plugin-babel": "^4.1.2",
     "eslint-plugin-chai-expect": "^1.1.1",
     "eslint-plugin-react": "^7.10.0",
     "gitlab": "^3.7.0",
-    "mocha": "^5.2.0"
+    "mocha": "^5.2.0",
+    "uuid": "^3.3.2"
   }
 }

@@ -116,19 +116,16 @@ async function ensureChallengeExists(event, issue) {
     provider: issue.provider,
     repositoryId: issue.repositoryId
   });
+  if (dbIssue && dbIssue.status === 'challenge_creation_pending') {
+    throw errors.internalDependencyError(`Challenge for the updated issue ${issue.number} is creating, rescheduling this event`);
+  }
   if (!dbIssue) {
-    // create if only in next retry of event
-    // else there can be conflict when issue being created
-    if (event.retryCount && _.toInteger(event.retryCount) > 1) {
-      await handleIssueCreate(event, issue);
-      dbIssue = await Issue.findOne({
-        number: issue.number,
-        provider: issue.provider,
-        repositoryId: issue.repositoryId
-      });
-    } else {
-      throw errors.internalDependencyError(`there is no challenge for the updated issue ${issue.number}`);
-    }
+    await handleIssueCreate(event, issue);
+    dbIssue = await Issue.findOne({
+      number: issue.number,
+      provider: issue.provider,
+      repositoryId: issue.repositoryId
+    });
   }
   return dbIssue;
 }
@@ -151,24 +148,6 @@ async function getProjectDetail(issue, event) {
     repoUrl: fullRepoUrl
   });
   return project;
-}
-
-/**
- * adds assignee as challenge registrant
- * @param {Number} topcoderUserId the topcoder user id
- * @param {Object} challengeId the challenge id
- * @private
- */
-async function assignUserAsRegistrant(topcoderUserId, challengeId) {
-  // role 1 from registrant
-  const registrantBody = {
-    roleId: 1,
-    resourceUserId: topcoderUserId,
-    phaseId: 0,
-    addNotification: true,
-    addForumWatch: true
-  };
-  await topcoderApiHelper.addResourceToChallenge(challengeId, registrantBody);
 }
 
 /**
@@ -274,11 +253,22 @@ async function handleIssueAssignment(event, issue) {
       const topcoderUserId = await topcoderApiHelper.getTopcoderMemberId(userMapping.topcoderUsername);
       // Update the challenge
       logger.debug(`Assigning user to challenge: ${userMapping.topcoderUsername}`);
-      assignUserAsRegistrant(topcoderUserId, dbIssue.challengeId);
+      topcoderApiHelper.assignUserAsRegistrant(topcoderUserId, dbIssue.challengeId);
       dbIssue.set({
         assignee: issue.assignee
       });
       await dbIssue.save();
+      // remove open for pickup and add assigned
+      const updateLabels = _(issue.labels)
+        .filter((i) => i !== config.OPEN_FOR_PICKUP_ISSUE_LABEL)
+        .push(config.ASSIGNED_ISSUE_LABEL)
+        .value();
+
+      if (event.provider === 'github') {
+        await gitHubService.addLabels(event.copilot, event.data.repository.full_name, issue.number, updateLabels);
+      } else {
+        await gitlabService.addLabels(event.copilot, event.data.repository.id, issue.number, updateLabels);
+      }
     } catch (err) {
       handleEventGracefully(event, issue, err);
       return;
@@ -391,11 +381,25 @@ async function handleIssueClose(event, issue) {
   try {
     dbIssue = await ensureChallengeExists(event, issue);
     if (!event.paymentSuccessful) {
+      // if issue is closed without Fix accepted label
+      if (!_.includes(event.data.issue.labels, config.FIX_ACCEPTED_ISSUE_LABEL)) {
+        logger.debug(`This issue ${issue.number} is closed without fix accepted label.`);
+        let comment = 'This ticket was not processed for payment. If you would like to process it for payment,';
+        comment += ' please reopen it, add the ```' + config.FIX_ACCEPTED_ISSUE_LABEL + '``` label, and then close it again';// eslint-disable-line
+        if (event.provider === 'github') {
+          await gitHubService.createComment(event.copilot, event.data.repository.full_name, issue.number, comment);
+        } else {
+          await gitlabService.createComment(event.copilot, event.data.repository.id, issue.number, comment);
+        }
+        return;
+      }
+
       // if issue is closed without assignee then do nothing
       if (!event.data.assignee.id) {
         logger.debug(`This issue ${issue.number} doesn't have assignee so ignoring this event.`);
         return;
       }
+
       // if issue has paid label don't process further
       if (_.includes(event.data.issue.labels, config.PAID_ISSUE_LABEL)) {
         logger.debug(`This issue ${issue.number} is already paid with challenge ${dbIssue.challengeId}`);
@@ -445,7 +449,7 @@ async function handleIssueClose(event, issue) {
       await topcoderApiHelper.addResourceToChallenge(dbIssue.challengeId, copilotResourceBody);
 
       // adding reg
-      await assignUserAsRegistrant(winnerId, dbIssue.challengeId);
+      await topcoderApiHelper.assignUserAsRegistrant(winnerId, dbIssue.challengeId);
 
       // activate challenge
       await topcoderApiHelper.activateChallenge(dbIssue.challengeId);
@@ -461,6 +465,11 @@ async function handleIssueClose(event, issue) {
   }
   try {
     logger.debug('update issue as paid');
+    dbIssue.set({
+      labels: _(dbIssue.labels).filter((i) => i !== config.OPEN_FOR_PICKUP_ISSUE_LABEL)
+        .push(config.ASSIGNED_ISSUE_LABEL).value()
+    });
+    await dbIssue.save();
     if (event.provider === 'github') {
       await gitHubService.markIssueAsPaid(event.copilot, event.data.repository.full_name, issue.number, dbIssue.challengeId);
     } else {
@@ -483,8 +492,13 @@ async function handleIssueCreate(event, issue) {
   // check if project for such repository is already created
   const project = await getProjectDetail(issue, event);
 
+  if (!project) {
+    throw new Error(
+      'There is no project associated with this repository');
+  }// if existing found don't create a project
+
   // Check if duplicated
-  const dbIssue = await Issue.findOne({
+  let dbIssue = await Issue.findOne({
     number: issue.number,
     provider: issue.provider,
     repositoryId: issue.repositoryId
@@ -492,13 +506,14 @@ async function handleIssueCreate(event, issue) {
 
   if (dbIssue) {
     throw new Error(
-      `challenge ${dbIssue.challengeId} existed already for the issue ${issue.number}`);
+      `Issue ${issue.number} is already in ${dbIssue.status}`);
   }
 
-  if (!project) {
-    throw new Error(
-      'There is no project associated with this repository');
-  }// if existing found don't create a project
+  // create issue with challenge creation pending
+  dbIssue = await Issue.create(_.assign({}, issue, {
+    status: 'challenge_creation_pending'
+  }));
+
   const projectId = project.tcDirectId;
   logger.debug(`existing project was found with id ${projectId} for repository ${event.data.repository.full_name}`);
   try {
@@ -512,7 +527,11 @@ async function handleIssueCreate(event, issue) {
     });
 
     // Save
-    await Issue.create(issue);
+    // update db payment
+    await Issue.updateOne({_id: dbIssue.id}, {
+      challengeId: issue.challengeId,
+      status: 'challenge_creation_successful'
+    });
   } catch (e) {
     await handleEventGracefully(event, issue, e);
     return;
@@ -568,6 +587,29 @@ async function handleIssueUnAssignment(event, issue) {
   let dbIssue;
   try {
     dbIssue = await ensureChallengeExists(event, issue);
+    if (dbIssue.assignee) {
+      const assigneeUserId = await gitlabService.getUserIdByLogin(event.copilot, dbIssue.assignee);
+      logger.debug(`Looking up TC handle of git user: ${assigneeUserId}`);
+      const userMapping = await userService.getTCUserName(event.provider, assigneeUserId);
+      if (userMapping && userMapping.topcoderUsername) {
+        logger.debug(`Getting the topcoder member ID for member name: ${userMapping.topcoderUsername}`);
+        const topcoderUserId = await topcoderApiHelper.getTopcoderMemberId(userMapping.topcoderUsername);
+        // Update the challenge to remove the assignee
+        logger.debug(`un-assigning user from challenge: ${userMapping.topcoderUsername}`);
+        topcoderApiHelper.removeResourceToChallenge(dbIssue.challengeId, {
+          roleId: 1,
+          resourceUserId: topcoderUserId
+        });
+        const contestUrl = getUrlForChallengeId(dbIssue.challengeId);
+        const comment = `Contest ${contestUrl} has been updated - ${userMapping.topcoderUsername} has been unassigned.`;
+        if (event.provider === 'github') {
+          await gitHubService.createComment(event.copilot, event.data.repository.full_name, issue.number, comment);
+        } else {
+          await gitlabService.createComment(event.copilot, event.data.repository.id, issue.number, comment);
+        }
+        logger.debug(`Member ${userMapping.topcoderUsername} is unassigned from challenge with id ${dbIssue.challengeId}`);
+      }
+    }
   } catch (e) {
     await handleEventGracefully(event, issue, e);
     return;

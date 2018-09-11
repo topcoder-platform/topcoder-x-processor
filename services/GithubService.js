@@ -15,6 +15,7 @@ const GitHubApi = require('github');
 const config = require('config');
 const logger = require('../utils/logger');
 const errors = require('../utils/errors');
+const helper = require('../utils/helper');
 
 const copilotUserSchema = Joi.object().keys({
   accessToken: Joi.string().required(),
@@ -174,10 +175,10 @@ removeAssign.schema = assignUser.schema;
  */
 async function createComment(copilot, repoFullName, number, body) {
   Joi.attempt({copilot, repoFullName, number, body}, createComment.schema);
-
   const github = await _authenticate(copilot.accessToken);
   const {owner, repo} = _parseRepoUrl(repoFullName);
   try {
+    body = helper.prepareAutomatedComment(body, copilot);
     await github.issues.createComment({owner, repo, number, body});
   } catch (err) {
     throw errors.convertGitHubError(err, 'Error occurred during creating comment on issue.');
@@ -242,7 +243,7 @@ async function markIssueAsPaid(copilot, repoFullName, number, challengeId) {
   const labels = [config.PAID_ISSUE_LABEL, config.FIX_ACCEPTED_ISSUE_LABEL];
   try {
     await github.issues.edit({owner, repo, number, labels});
-    const body = `Payment task has been updated: ${config.TC_OR_DETAIL_LINK}${challengeId}`;
+    const body = helper.prepareAutomatedComment(`Payment task has been updated: ${config.TC_OR_DETAIL_LINK}${challengeId}`, copilot);
     await github.issues.createComment({owner, repo, number, body});
   } catch (err) {
     throw errors.convertGitHubError(err, 'Error occurred during updating issue as paid.');
