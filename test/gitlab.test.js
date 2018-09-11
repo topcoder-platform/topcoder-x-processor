@@ -161,7 +161,6 @@ describe('Topcoder-X-Processor tests', function tcXTests() {
       search: dbProject.title,
       owned: true
     });
-    console.log(projects);
     project = projects[0];
   });
 

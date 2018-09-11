@@ -25,6 +25,8 @@ The following config parameters are supported, they are defined in `config/defau
 |GITLAB_API_BASE_URL| the URL for gitlab host| defaults to `https://gitlab.com`|
 |PAID_ISSUE_LABEL|the label name for paid, should be one of the label configured in topcoder x ui|'tcx_Paid'|
 |FIX_ACCEPTED_ISSUE_LABEL|the label name for fix accepted, should be one of the label configured in topcoder x ui|'tcx_FixAccepted'|
+|ASSIGNED_ISSUE_LABEL| the label name for assigned, should be one of the label configured in topcoder x ui| 'tcx_Assigned'|
+|OPEN_FOR_PICKUP_ISSUE_LABEL| the label name for open for pickup, should be one of the label configured in topcoder x ui| 'tcx_OpenForPickup'|
 |TC_OR_DETAIL_LINK|the link to online review detail of challenge| see `default.js`, OR link for dev environment|
 |RETRY_COUNT| the number of times an event should be retried to process| 3|
 |RETRY_INTERVAL| the interval at which the event should be retried to process in milliseconds | 120000|

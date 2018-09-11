@@ -401,6 +401,32 @@ async function assignUserAsRegistrant(topcoderUserId, challengeId) {
   await addResourceToChallenge(challengeId, registrantBody);
 }
 
+/**
+ * removes the resource from the topcoder challenge
+ * @param {Number} id the challenge id
+ * @param {Object} resource the resource resource to remove
+ */
+async function removeResourceToChallenge(id, resource) {
+  bearer.apiKey = await getAccessToken();
+  logger.debug(`removing resource from challenge ${id}`);
+  try {
+    await new Promise((resolve, reject) => {
+      challengesApiInstance.challengesIdResourcesDelete(id, resource, (err, res) => {
+        if (err) {
+          logger.error(JSON.stringify(err));
+          reject(err);
+        } else {
+          logger.debug(`resource is removed from challenge ${id} successfully.`);
+          resolve(res);
+        }
+      });
+    });
+  } catch (err) {
+    throw errors.convertTopcoderApiError(err, 'Failed to remove resource from the challenge.');
+  }
+}
+
+
 module.exports = {
   createProject,
   getChallengeById,
@@ -413,5 +439,6 @@ module.exports = {
   addResourceToChallenge,
   unregisterUserFromChallenge,
   cancelPrivateContent,
-  assignUserAsRegistrant
+  assignUserAsRegistrant,
+  removeResourceToChallenge
 };
