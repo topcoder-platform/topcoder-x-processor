@@ -217,6 +217,7 @@ When an issue is closed it will first check if issue has any assignee or not,
   - closes the challenge with winner as assignee
   - you can verify the challenge closed in OR (link will be commented in same issue in git host)
   - issue label will be updated from configured paid and fix accepted label name
+- if there is no fix_accepted label or prize is zero then the challenge will cancelled
 
 You can see following logs
 ```
