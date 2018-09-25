@@ -255,7 +255,8 @@ async function handleIssueAssignment(event, issue) {
       logger.debug(`Assigning user to challenge: ${userMapping.topcoderUsername}`);
       topcoderApiHelper.assignUserAsRegistrant(topcoderUserId, dbIssue.challengeId);
       dbIssue.set({
-        assignee: issue.assignee
+        assignee: issue.assignee,
+        assignedAt: new Date()
       });
       await dbIssue.save();
       // remove open for pickup and add assigned
@@ -381,6 +382,7 @@ async function handleIssueClose(event, issue) {
   try {
     dbIssue = await ensureChallengeExists(event, issue);
     if (!event.paymentSuccessful) {
+      let closeChallenge = false;
       // if issue is closed without Fix accepted label
       if (!_.includes(event.data.issue.labels, config.FIX_ACCEPTED_ISSUE_LABEL)) {
         logger.debug(`This issue ${issue.number} is closed without fix accepted label.`);
@@ -391,8 +393,12 @@ async function handleIssueClose(event, issue) {
         } else {
           await gitlabService.createComment(event.copilot, event.data.repository.id, issue.number, comment);
         }
-        return;
+        closeChallenge = true;
       }
+      if (issue.prizes[0] === 0) {
+        closeChallenge = true;
+      }
+
 
       // if issue is closed without assignee then do nothing
       if (!event.data.assignee.id) {
@@ -453,7 +459,14 @@ async function handleIssueClose(event, issue) {
 
       // activate challenge
       await topcoderApiHelper.activateChallenge(dbIssue.challengeId);
-
+      if (closeChallenge) {
+        logger.debug(`The associated challenge ${dbIssue.challengeId} is scheduled for cancel`);
+        setTimeout(async () => {
+          await topcoderApiHelper.cancelPrivateContent(dbIssue.challengeId);
+          logger.debug(`The challenge ${dbIssue.challengeId} is deleted`);
+        }, config.CANCEL_CHALLENGE_INTERVAL); //eslint-disable-line
+        return;
+      }
       logger.debug(`close challenge with winner ${assigneeMember.topcoderUsername}(${winnerId})`);
       await topcoderApiHelper.closeChallenge(dbIssue.challengeId, winnerId);
       event.paymentSuccessful = true;
@@ -615,7 +628,8 @@ async function handleIssueUnAssignment(event, issue) {
     return;
   }
   dbIssue.set({
-    assignee: null
+    assignee: null,
+    assignedAt: null
   });
   await dbIssue.save();
 }

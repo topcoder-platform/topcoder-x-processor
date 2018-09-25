@@ -67,13 +67,13 @@ async function getRepositoryCopilot(provider, repoFullName) {
     repoUrl: fullRepoUrl
   });
 
-  if (!project || !project.username) {
+  if (!project || !project.owner || !project.copilot) {
     // throw this repo is not managed by Topcoder x tool
     throw new Error(`This repository '${repoFullName}' is not managed by Topcoder X tool.`);
   }
 
   const userMapping = await models.UserMapping.findOne({
-    topcoderUsername: project.username.toLowerCase()
+    topcoderUsername: project.copilot.toLowerCase()
   });
 
   if (!userMapping || (provider === 'github' && !userMapping.githubUserId) || (provider === 'gitlab' && !userMapping.gitlabUserId)) {
