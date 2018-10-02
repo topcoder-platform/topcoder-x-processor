@@ -546,6 +546,11 @@ async function handleIssueCreate(event, issue) {
       status: 'challenge_creation_successful'
     });
   } catch (e) {
+    await Issue.remove({
+      number: issue.number,
+      provider: issue.provider,
+      repositoryId: issue.repositoryId
+    });
     await handleEventGracefully(event, issue, e);
     return;
   }
