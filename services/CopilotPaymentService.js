@@ -74,7 +74,7 @@ async function getExistingChallengeIdIfExists(event, dbPayment) {
   if (existingPayments) {
     dbPayment.challengeId = existingPayments.challengeId;
     // update db payment
-    await CopilotPayment.updateOne({_id: dbPayment.id}, {
+    await CopilotPayment.updateOne({ _id: dbPayment.id }, {
       challengeId: existingPayments.challengeId
     });
   }
@@ -108,7 +108,7 @@ async function _updateChallenge(copilotUsername, projectId, challengeId) {
   });
 
   if (dbPayments.length) {
-    const {requirements, prizes} = updateChallengeDetails(dbPayments);
+    const { requirements, prizes } = updateChallengeDetails(dbPayments);
 
     const challengeTitle = constructChallengeName(project);
 
@@ -158,7 +158,7 @@ async function _checkAndReSchedule(event, payment) {
  * @private
  */
 async function handlePaymentAdd(event, payment) {
-  const copilot = {handle: event.project.copilot};
+  const copilot = { handle: event.project.copilot };
 
   payment = await getExistingChallengeIdIfExists(event, payment);
   if (!_.isNil(payment.challengeId)) {
@@ -169,7 +169,7 @@ async function handlePaymentAdd(event, payment) {
     }
     // update issue as challenge creation pending
     // update db payment
-    await CopilotPayment.updateOne({_id: payment.id}, {
+    await CopilotPayment.updateOne({ _id: payment.id }, {
       status: 'challenge_creation_pending'
     });
     // check if project for such repository is already created
@@ -191,11 +191,12 @@ async function handlePaymentAdd(event, payment) {
         name: challengeTitle,
         projectId: project.tcDirectId,
         detailedRequirements: challengeRequirements,
-        prizes: [payment.amount - 1],
+        prizes: [1],
         task: true,
         billingAccountId: accountId,
         copilotId: topcoderMemberId,
-        copilotFee: 1
+        copilotFee: payment.amount - 1,
+        reviewType: 'INTERNAL'
       };
 
       // Create a new challenge
@@ -204,7 +205,7 @@ async function handlePaymentAdd(event, payment) {
       logger.debug(`updating database payment with new challenge id:${challengeId}`);
 
       // update db payment
-      await CopilotPayment.updateOne({_id: payment.id}, {
+      await CopilotPayment.updateOne({ _id: payment.id }, {
         challengeId,
         status: 'challenge_creation_successful'
       });
@@ -217,7 +218,7 @@ async function handlePaymentAdd(event, payment) {
 
       logger.debug(`challenge ${challengeId} has been activated!`);
     } catch (ex) {
-      await CopilotPayment.updateOne({_id: payment.id}, {
+      await CopilotPayment.updateOne({ _id: payment.id }, {
         status: 'challenge_creation_failed'
       });
       throw ex;
@@ -232,7 +233,7 @@ async function handlePaymentAdd(event, payment) {
  * @private
  */
 async function handlePaymentUpdate(event, payment) {
-  const copilot = {handle: event.project.copilot};
+  const copilot = { handle: event.project.copilot };
   await _updateChallenge(copilot.handle, payment.project, payment.challengeId);
   logger.debug(`updated payment for challenge ${payment.challengeId} successful.`);
 }
@@ -245,7 +246,7 @@ async function handlePaymentUpdate(event, payment) {
  * @private
  */
 async function handlePaymentDelete(event, payment) {
-  const copilot = {handle: event.project.copilot};
+  const copilot = { handle: event.project.copilot };
   await _updateChallenge(copilot.handle, payment.project, payment.challengeId);
   logger.debug(`updated payment for challenge ${payment.challengeId} successful.`);
 }
@@ -257,14 +258,14 @@ async function handlePaymentDelete(event, payment) {
 async function handlePaymentUpdates(event) {
   const projectIds = await Project.find({
     $or: [
-      {owner: event.copilot.handle},
-      {copilot: event.copilot.handle}
+      { owner: event.data.copilot.handle },
+      { copilot: event.data.copilot.handle }
     ]
   }).select('_id');
 
   // get all unclosed payments for current user
   const dbPayments = await CopilotPayment.find({
-    project: {$in: projectIds},
+    project: { $in: projectIds },
     closed: false
   });
   if (dbPayments) {
@@ -274,7 +275,7 @@ async function handlePaymentUpdates(event) {
       const challengeId = challengeIds[i];
       const challengeDetail = await topcoderApiHelper.getChallengeById(challengeId);
       if (challengeDetail && challengeDetail.currentStatus === 'Completed') {
-        await CopilotPayment.updateMany({challengeId, closed: false}, {closed: true});
+        await CopilotPayment.updateMany({ challengeId, closed: false }, { closed: true });
       }
     }
     logger.debug('Success updating payments status.');
@@ -300,6 +301,9 @@ async function process(event) {
   }
   if (payment.project) {
     event.project = await Project.findById(payment.project);
+    if (_.isNil(event.project.copilot)) {
+      throw new Error('copilot cannot be empty for a project');
+    }
   }
   if (event.event === 'copilotPayment.add') {
     await handlePaymentAdd(event, payment);
