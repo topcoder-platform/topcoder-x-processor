@@ -40,17 +40,19 @@ function getUrlForChallengeId(challengeId) {
 /**
  * Parse the prize from issue title.
  * @param {Object} issue the issue
+ * @returns {boolean} true if the prizes can be parsed; or false otherwise
  * @private
  */
 function parsePrizes(issue) {
   const matches = issue.title.match(/(\$[0-9]+)(?=.*\])/g);
 
   if (!matches || matches.length === 0) {
-    throw new Error(`Cannot parse prize from title: ${issue.title}`);
+    return false;
   }
 
   issue.prizes = _.map(matches, (match) => parseInt(match.replace('$', ''), 10));
   issue.title = issue.title.replace(/^(\[.*\])/, '').trim();
+  return true;
 }
 
 /**
@@ -668,7 +670,11 @@ async function process(event) {
   issue.projectId = project.id;
 
   // Parse prize from title
-  parsePrizes(issue);
+  let hasPrizes = parsePrizes(issue);
+  // If the issue does not have prizes set, skip all processing
+  if (!hasPrizes) {
+    return;
+  }
   const copilot = await userService.getRepositoryCopilot(event.provider, event.data.repository.full_name);
   event.copilot = copilot;
 
