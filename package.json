@@ -26,6 +26,7 @@
   "dependencies": {
     "axios": "^0.16.2",
     "config": "^1.30.0",
+    "dotenv": "^6.0.0",
     "get-parameter-names": "^0.3.0",
     "github": "^12.1.0",
     "global-request-logger": "^0.1.1",

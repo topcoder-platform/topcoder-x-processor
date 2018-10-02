@@ -2,6 +2,7 @@
  * Copyright (c) 2017 TopCoder, Inc. All rights reserved.
  */
 'use strict';
+require('dotenv').config();
 const fs = require('fs');
 /**
  * This module is the configuration of the app.
@@ -14,14 +15,14 @@ const fs = require('fs');
 
 module.exports = {
   LOG_LEVEL: process.env.LOG_LEVEL || 'debug',
-  PARTITION: process.env.PARTITION || 0,
+  PARTITION: process.env.PARTITION ? parseInt(process.env.PARTITION) : 0,
   TOPIC: process.env.TOPIC || 'tc-x-events',
   KAFKA_OPTIONS: {
     connectionString: process.env.KAFKA_HOST || 'localhost:9092',
     ssl: {
       cert: process.env.KAFKA_CLIENT_CERT || fs.readFileSync('./kafka_client.cer'), // eslint-disable-line no-sync
       key: process.env.KAFKA_CLIENT_CERT_KEY || fs.readFileSync('./kafka_client.key'), // eslint-disable-line no-sync
-      passphrase: 'secret', // NOTE:* This configuration specifies the private key passphrase used while creating it.
+      passphrase: process.env.KAFKA_CLIENT_CERT_KEY_PASS || 'secret', // NOTE:* This configuration specifies the private key passphrase used while creating it.
     }
   },
   MONGODB_URL: process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/topcoderx',
@@ -39,7 +40,7 @@ module.exports = {
     device: 'Browser'
   },
   TC_AUTHZ_URL: process.env.TC_AUTHZ_URL || 'https://api.topcoder-dev.com/v3/authorizations',
-  NEW_CHALLENGE_TEMPLATE: process.env.NEW_CHALLENGE_TEMPLATE || {
+  NEW_CHALLENGE_TEMPLATE: process.env.NEW_CHALLENGE_TEMPLATE ? JSON.parse(process.env.NEW_CHALLENGE_TEMPLATE) : {
     milestoneId: 1,
     subTrack: 'FIRST_2_FINISH',
     reviewType: 'COMMUNITY',
@@ -66,11 +67,11 @@ module.exports = {
 
   // NOTE: if subTrack is FIRST_2_FINISH,
   // this config has no effect since the ***EndsAt will be set automatically by TC APIs
-  NEW_CHALLENGE_DURATION_IN_DAYS: process.env.NEW_CHALLENGE_DURATION_IN_DAYS || 5,
+  NEW_CHALLENGE_DURATION_IN_DAYS: process.env.NEW_CHALLENGE_DURATION_IN_DAYS ? parseInt(process.env.NEW_CHALLENGE_DURATION_IN_DAYS) : 5,
   // node mailer option
   NODE_MAILER_OPTIONS: {
     host: process.env.SMTP_HOST || process.env.MAILGUN_SMTP_SERVER || 'smtp.gmail.com',
-    port: process.env.SMTP_PORT || process.env.MAILGUN_SMTP_POR || 465,
+    port: process.env.SMTP_PORT || process.env.MAILGUN_SMTP_PORT || 465,
     secure: process.env.SMTP_IS_SECURE || true,
     auth: {
       user: process.env.SMTP_USERNAME || process.env.MAILGUN_SMTP_LOGIN || '',
@@ -84,9 +85,9 @@ module.exports = {
   PAID_ISSUE_LABEL: process.env.PAID_ISSUE_LABEL || 'tcx_Paid',
   FIX_ACCEPTED_ISSUE_LABEL: process.env.FIX_ACCEPTED_ISSUE_LABEL || 'tcx_FixAccepted',
   READY_FOR_REVIEW_ISSUE_LABEL: process.env.READY_FOR_REVIEW_ISSUE_LABEL || 'tcx_ReadyForReview',
-  ASSIGNED_ISSUE_LABEL: process.env.READY_FOR_REVIEW_ISSUE_LABEL || 'tcx_Assigned',
-  OPEN_FOR_PICKUP_ISSUE_LABEL: process.env.READY_FOR_REVIEW_ISSUE_LABEL || 'tcx_OpenForPickup',
+  ASSIGNED_ISSUE_LABEL: process.env.ASSIGNED_ISSUE_LABEL || 'tcx_Assigned',
+  OPEN_FOR_PICKUP_ISSUE_LABEL: process.env.OPEN_FOR_PICKUP_ISSUE_LABEL || 'tcx_OpenForPickup',
   TC_OR_DETAIL_LINK: process.env.TC_OR_DETAIL_LINK || 'https://software.topcoder-dev.com/review/actions/ViewProjectDetails?pid=',
-  RETRY_COUNT: process.env.RETRY_COUNT || 3,
-  RETRY_INTERVAL: process.env.RETRY_INTERVAL || 120000, // 2 minutes
+  RETRY_COUNT: process.env.RETRY_COUNT ? parseInt(process.env.RETRY_COUNT) : 3,
+  RETRY_INTERVAL: process.env.RETRY_INTERVAL ? parseInt(process.env.RETRY_INTERVAL) : 120000, // 2 minutes
 };
