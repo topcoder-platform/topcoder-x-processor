@@ -18,7 +18,7 @@ const models = require('../models');
 const logger = require('../utils/logger');
 const errors = require('../utils/errors');
 const topcoderApiHelper = require('../utils/topcoder-api-helper');
-const gitHubService = require('./GithubService');
+const gitHelper = require('../utils/git-helper');
 const emailService = require('./EmailService');
 const userService = require('./UserService');
 const gitlabService = require('./GitlabService');
@@ -83,22 +83,14 @@ async function handleEventGracefully(event, issue, err) {
         comment = `Payment failed: ${comment}`;
       }
       // notify error in git host
-      if (event.provider === 'github') {
-        await gitHubService.createComment(event.copilot, event.data.repository.full_name, issue.number, comment);
-      } else {
-        await gitlabService.createComment(event.copilot, event.data.repository.id, issue.number, comment);
-      }
+      await gitHelper.createComment(event, issue.number, comment);
 
       if (event.event === 'issue.closed') {
         // reopen
-        await reOpenIssue(event, issue);
+        await gitHelper.reOpenIssue(event, issue);
         // ensure label is ready for review
         const readyForReviewLabels = [config.READY_FOR_REVIEW_ISSUE_LABEL];
-        if (event.provider === 'github') {
-          await gitHubService.addLabels(event.copilot, event.data.repository.full_name, issue.number, readyForReviewLabels);
-        } else {
-          await gitlabService.addLabels(event.copilot, event.data.repository.id, issue.number, readyForReviewLabels);
-        }
+        await gitHelper.addLabels(event, issue.number, readyForReviewLabels);
       }
     }
   }
@@ -140,29 +132,11 @@ async function ensureChallengeExists(event, issue) {
  * @private
  */
 async function getProjectDetail(issue, event) {
-  let fullRepoUrl;
-  if (issue.provider === 'github') {
-    fullRepoUrl = `https://github.com/${event.data.repository.full_name}`;
-  } else if (issue.provider === 'gitlab') {
-    fullRepoUrl = `${config.GITLAB_API_BASE_URL}/${event.data.repository.full_name}`;
-  }
+  const fullRepoUrl = gitHelper.getFullRepoUrl(event);
   const project = await models.Project.findOne({
     repoUrl: fullRepoUrl
   });
   return project;
-}
-
-/**
- * re opens the issue
- * @param {Object} event the event
- * @param {Object} issue the issue
- */
-async function reOpenIssue(event, issue) {
-  if (event.provider === 'github') {
-    await gitHubService.changeState(event.copilot, event.data.repository.full_name, issue.number, 'open');
-  } else {
-    await gitlabService.changeState(event.copilot, event.data.repository.id, issue.number, 'reopen');
-  }
 }
 
 /**
@@ -175,25 +149,14 @@ async function reOpenIssue(event, issue) {
  * @private
  */
 async function rollbackAssignee(event, assigneeUserId, issue, reOpen = false) {
-  let assigneeUsername;
-  if (event.provider === 'github') {
-    assigneeUsername = await gitHubService.getUsernameById(event.copilot, assigneeUserId);
-  } else {
-    assigneeUsername = await gitlabService.getUsernameById(event.copilot, assigneeUserId);
-  }
+  const assigneeUsername = await gitHelper.getUsernameById(event, assigneeUserId);
   // comment on the git ticket for the user to self-sign up with the Topcoder x Self-Service tool
   const comment = `@${assigneeUsername}, please sign-up with Topcoder X tool`;
-  if (event.provider === 'github') {
-    await gitHubService.createComment(event.copilot, event.data.repository.full_name, issue.number, comment);
-    // un-assign the user from the ticket
-    await gitHubService.removeAssign(event.copilot, event.data.repository.full_name, issue.number, assigneeUsername);
-  } else {
-    await gitlabService.createComment(event.copilot, event.data.repository.id, issue.number, comment);
-    // un-assign the user from the ticket
-    await gitlabService.removeAssign(event.copilot, event.data.repository.id, issue.number, assigneeUserId);
-  }
+  await gitHelper.createComment(event, issue.number, comment);
+  // un-assign the user from the ticket
+  await gitHelper.removeAssign(event, issue.number, assigneeUserId, assigneeUsername);
   if (reOpen) {
-    await reOpenIssue(event, issue);
+    await gitHelper.reOpenIssue(event, issue);
   }
 }
 
@@ -267,22 +230,14 @@ async function handleIssueAssignment(event, issue) {
         .push(config.ASSIGNED_ISSUE_LABEL)
         .value();
 
-      if (event.provider === 'github') {
-        await gitHubService.addLabels(event.copilot, event.data.repository.full_name, issue.number, updateLabels);
-      } else {
-        await gitlabService.addLabels(event.copilot, event.data.repository.id, issue.number, updateLabels);
-      }
+      await gitHelper.addLabels(event, issue.number, updateLabels);
     } catch (err) {
       handleEventGracefully(event, issue, err);
       return;
     }
     const contestUrl = getUrlForChallengeId(dbIssue.challengeId);
     const comment = `Contest ${contestUrl} has been updated - it has been assigned to ${userMapping.topcoderUsername}.`;
-    if (event.provider === 'github') {
-      await gitHubService.createComment(event.copilot, event.data.repository.full_name, issue.number, comment);
-    } else {
-      await gitlabService.createComment(event.copilot, event.data.repository.id, issue.number, comment);
-    }
+    await gitHelper.createComment(event, issue.number, comment);
 
     logger.debug(`Member ${userMapping.topcoderUsername} is assigned to challenge with id ${dbIssue.challengeId}`);
   } else {
@@ -307,20 +262,11 @@ async function handleIssueComment(event, issue) {
     const newTitle = `[$${parsedComment.acceptedBidAmount}] ${issue.title}`;
     logger.debug(`updating issue: ${event.data.repository.name}/${issue.number}`);
 
-    if (event.provider === 'github') {
-      await gitHubService.updateIssue(event.copilot, event.data.repository.full_name, issue.number, newTitle);
-    } else {
-      await gitlabService.updateIssue(event.copilot, event.data.repository.id, issue.number, newTitle);
-    }
+    await gitHelper.updateIssue(event, issue.number, newTitle);
 
     // assign user
     logger.debug(`assigning user, ${parsedComment.assignedUser} to issue: ${event.data.repository.name}/${issue.number}`);
-    if (event.provider === 'github') {
-      await gitHubService.assignUser(event.copilot, event.data.repository.full_name, issue.number, parsedComment.assignedUser);
-    } else {
-      const userId = await gitlabService.getUserIdByLogin(event.copilot, parsedComment.assignedUser);
-      await gitlabService.assignUser(event.copilot, event.data.repository.id, issue.number, userId);
-    }
+    await gitHelper.assignUser(event, issue.number, parsedComment.assignedUser);
   }
 }
 
@@ -363,11 +309,7 @@ async function handleIssueUpdate(event, issue) {
   // comment on the git ticket for the user to self-sign up with the Topcoder x Self-Service tool
   const contestUrl = getUrlForChallengeId(dbIssue.challengeId);
   const comment = `Contest ${contestUrl} has been updated - the new changes has been updated for this ticket.`;
-  if (event.provider === 'github') {
-    await gitHubService.createComment(event.copilot, event.data.repository.full_name, issue.number, comment);
-  } else {
-    await gitlabService.createComment(event.copilot, event.data.repository.id, issue.number, comment);
-  }
+  await gitHelper.createComment(event, issue.number, comment);
 
   logger.debug(`updated challenge ${dbIssue.challengeId} for for issue ${issue.number}`);
 }
@@ -390,11 +332,7 @@ async function handleIssueClose(event, issue) {
         logger.debug(`This issue ${issue.number} is closed without fix accepted label.`);
         let comment = 'This ticket was not processed for payment. If you would like to process it for payment,';
         comment += ' please reopen it, add the ```' + config.FIX_ACCEPTED_ISSUE_LABEL + '``` label, and then close it again';// eslint-disable-line
-        if (event.provider === 'github') {
-          await gitHubService.createComment(event.copilot, event.data.repository.full_name, issue.number, comment);
-        } else {
-          await gitlabService.createComment(event.copilot, event.data.repository.id, issue.number, comment);
-        }
+        await gitHelper.createComment(event, issue.number, comment);
         closeChallenge = true;
       }
       if (issue.prizes[0] === 0) {
@@ -485,11 +423,7 @@ async function handleIssueClose(event, issue) {
         .push(config.ASSIGNED_ISSUE_LABEL).value()
     });
     await dbIssue.save();
-    if (event.provider === 'github') {
-      await gitHubService.markIssueAsPaid(event.copilot, event.data.repository.full_name, issue.number, dbIssue.challengeId);
-    } else {
-      await gitlabService.markIssueAsPaid(event.copilot, event.data.repository.id, issue.number, dbIssue.challengeId);
-    }
+    await gitHelper.markIssueAsPaid(event, issue.number, dbIssue.challengeId);
   } catch (e) {
     await handleEventGracefully(event, issue, e, event.paymentSuccessful);
     return;
@@ -559,11 +493,7 @@ async function handleIssueCreate(event, issue) {
 
   const contestUrl = getUrlForChallengeId(issue.challengeId);
   const comment = `Contest ${contestUrl} has been created for this ticket.`;
-  if (event.provider === 'github') {
-    await gitHubService.createComment(event.copilot, event.data.repository.full_name, issue.number, comment);
-  } else {
-    await gitlabService.createComment(event.copilot, event.data.repository.id, issue.number, comment);
-  }
+  await gitHelper.createComment(event, issue.number, comment);
   if (event.provider === 'gitlab') {
     // if assignee is added during issue create then assign as well
     if (event.data.issue.assignees && event.data.issue.assignees.length > 0 && event.data.issue.assignees[0].id) {
@@ -622,11 +552,7 @@ async function handleIssueUnAssignment(event, issue) {
         });
         const contestUrl = getUrlForChallengeId(dbIssue.challengeId);
         const comment = `Contest ${contestUrl} has been updated - ${userMapping.topcoderUsername} has been unassigned.`;
-        if (event.provider === 'github') {
-          await gitHubService.createComment(event.copilot, event.data.repository.full_name, issue.number, comment);
-        } else {
-          await gitlabService.createComment(event.copilot, event.data.repository.id, issue.number, comment);
-        }
+        await gitHelper.createComment(event, issue.number, comment);
         logger.debug(`Member ${userMapping.topcoderUsername} is unassigned from challenge with id ${dbIssue.challengeId}`);
       }
     }
@@ -656,12 +582,7 @@ async function process(event) {
     repositoryId: event.data.repository.id,
     labels: event.data.issue.labels
   };
-  let fullRepoUrl;
-  if (event.provider === 'github') {
-    fullRepoUrl = `https://github.com/${event.data.repository.full_name}`;
-  } else if (event.provider === 'gitlab') {
-    fullRepoUrl = `${config.GITLAB_API_BASE_URL}/${event.data.repository.full_name}`;
-  }
+  const fullRepoUrl = gitHelper.getFullRepoUrl(event);
 
   const project = await models.Project.findOne({
     repoUrl: fullRepoUrl
@@ -682,11 +603,7 @@ async function process(event) {
   issue.body = md.render(_.get(issue, 'body', ''));
 
   if (event.data.issue.assignees && event.data.issue.assignees.length > 0 && event.data.issue.assignees[0].id) {
-    if (event.provider === 'github') {
-      issue.assignee = await gitHubService.getUsernameById(copilot, event.data.issue.assignees[0].id);
-    } else if (event.provider === 'gitlab') {
-      issue.assignee = await gitlabService.getUsernameById(copilot, event.data.issue.assignees[0].id);
-    }
+    issue.assign = await gitHelper.getUsernameById(event, event.data.issue.assignees[0].id);
   }
   if (event.event === 'issue.created') {
     await handleIssueCreate(event, issue);
