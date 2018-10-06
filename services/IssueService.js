@@ -56,6 +56,43 @@ function parsePrizes(issue) {
 }
 
 /**
+ * Check challenge data and challenge resources
+ * @param {Object} event the event
+ * @param {Object} challenge the challenge
+ * @param {Object} challengeResources the challenge resources
+ * @returns {boolean} true if the challenge and challenge resources is valid; or false otherwise
+ * @private
+ */
+function checkChallenge(event, challenge, challengeResources) {
+  // check prize
+  const validPrize = _.isEqual(challenge.prize.sort(), event.dbIssue.prizes.sort());
+
+  // check copilot
+  const copilot = _.find(challengeResources, { role: 'Copilot' });
+  const validCopilot = copilot ? copilot.properties.Handle === event.copilot.topcoderUsername : false;
+
+  // check assignee
+  const assignee = _.find(challengeResources, { role: 'Submitter' });
+  const validAssignee = assignee ? assignee.properties.Handle === event.assigneeMember.topcoderUsername : false;
+
+  // check status
+  const validStatus = challenge.currentStatus.toLowerCase() === 'active';
+
+  return validPrize && validCopilot && validAssignee && validStatus;
+}
+
+/**
+ * Check the error object contains some error messages
+ * @param {Object} err the error object
+ * @param {Array} validErrorMessages the valid error messages
+ * @returns {boolean} true if the error contains some valid error messages; or false otherwise
+ * @private
+ */
+function checkErrorMessages(err, validErrorMessages) {
+  return _.some(validErrorMessages, (errorMessage) => err.message && err.message.includes(errorMessage));
+}
+
+/**
  * handles the event gracefully when there is error processing the event
  * @param {Object} event the event
  * @param {Object} issue the issue
@@ -69,6 +106,16 @@ async function handleEventGracefully(event, issue, err) {
       logger.debug('Scheduling event for next retry');
       const newEvent = {...event};
       newEvent.retryCount += 1;
+
+      const validErrorMessages = ['Failed to create challenge.', 'Failed to activate challenge.'];
+
+      if (newEvent.event === 'issue.closed' && checkErrorMessages(err, validErrorMessages)) {
+        const challenge = await topcoderApiHelper.getChallengeById(newEvent.dbIssue.challengeId);
+        const challengeResources = await topcoderApiHelper.getResourcesFromChallenge(newEvent.dbIssue.challengeId);
+
+        newEvent.challengeValid = checkChallenge(newEvent, challenge, challengeResources);
+      }
+
       delete newEvent.copilot;
       setTimeout(async () => {
         const kafka = require('../utils/kafka'); // eslint-disable-line
@@ -325,6 +372,8 @@ async function handleIssueClose(event, issue) {
   let dbIssue;
   try {
     dbIssue = await ensureChallengeExists(event, issue);
+    event.dbIssue = dbIssue;
+
     if (!event.paymentSuccessful) {
       let closeChallenge = false;
       // if issue is closed without Fix accepted label
@@ -338,7 +387,6 @@ async function handleIssueClose(event, issue) {
       if (issue.prizes[0] === 0) {
         closeChallenge = true;
       }
-
 
       // if issue is closed without assignee then do nothing
       if (!event.data.assignee.id) {
@@ -354,6 +402,7 @@ async function handleIssueClose(event, issue) {
 
       logger.debug(`Looking up TC handle of git user: ${event.data.assignee.id}`);
       const assigneeMember = await userService.getTCUserName(event.provider, event.data.assignee.id);
+      event.assigneeMember = assigneeMember
 
       // no mapping is found for current assignee remove assign, re-open issue and make comment
       // to assignee to login with Topcoder X
@@ -398,7 +447,10 @@ async function handleIssueClose(event, issue) {
       await topcoderApiHelper.assignUserAsRegistrant(winnerId, dbIssue.challengeId);
 
       // activate challenge
-      await topcoderApiHelper.activateChallenge(dbIssue.challengeId);
+      if (!event.challengeValid) {
+        await topcoderApiHelper.activateChallenge(dbIssue.challengeId);
+      }
+
       if (closeChallenge) {
         logger.debug(`The associated challenge ${dbIssue.challengeId} is scheduled for cancel`);
         setTimeout(async () => {
@@ -413,7 +465,7 @@ async function handleIssueClose(event, issue) {
     }
   } catch (e) {
     event.paymentSuccessful = event.paymentSuccessful === true; // if once paid shouldn't be false
-    await handleEventGracefully(event, issue, e, event.paymentSuccessful);
+    await handleEventGracefully(event, issue, e);
     return;
   }
   try {
@@ -425,7 +477,7 @@ async function handleIssueClose(event, issue) {
     await dbIssue.save();
     await gitHelper.markIssueAsPaid(event, issue.number, dbIssue.challengeId);
   } catch (e) {
-    await handleEventGracefully(event, issue, e, event.paymentSuccessful);
+    await handleEventGracefully(event, issue, e);
     return;
   }
 }
@@ -657,7 +709,10 @@ process.schema = Joi.object().keys({
     labels: Joi.array().items(Joi.string())
   }).required(),
   retryCount: Joi.number().integer().default(0).optional(),
-  paymentSuccessful: Joi.boolean().default(false).optional()
+  paymentSuccessful: Joi.boolean().default(false).optional(),
+  challengeValid: Joi.boolean().default(false).optional(),
+  dbIssue: Joi.object().optional(),
+  assigneeMember: Joi.object().optional(),
 });
 
 

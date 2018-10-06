@@ -224,13 +224,15 @@ async function getChallengeById(id) {
   logger.debug('Getting topcoder challenge details');
   try {
     const response = await axios.get(`${projectsClient.basePath}/challenges/${id}`, {
-      authorization: `Bearer ${apiKey}`,
+      headers: {
+        authorization: `Bearer ${apiKey}`
+      },
       'Content-Type': 'application/json'
     });
     const challenge = _.get(response, 'data.result.content');
     return challenge;
-  } catch (er) {
-    throw errors.convertTopcoderApiError(er, 'Failed to get challenge details by Id');
+  } catch (err) {
+    throw errors.convertTopcoderApiError(err, 'Failed to get challenge details by Id');
   }
 }
 
@@ -322,6 +324,31 @@ async function addResourceToChallenge(id, resource) {
     });
   } catch (err) {
     throw errors.convertTopcoderApiError(err, 'Failed to add resource to the challenge.');
+  }
+}
+
+/**
+ * Get challenge resources details by id
+ * @param {Number} id challenge ID
+ * @returns {Object} topcoder challenge resources
+ */
+async function getResourcesFromChallenge(id) {
+  if (!_.isNumber(id)) {
+    throw new Error('The challenge id must valid number');
+  }
+  const apiKey = await getAccessToken();
+  logger.debug(`fetch resource from challenge ${id}`);
+  try {
+    const response = await axios.get(`${projectsClient.basePath}/challenges/${id}/resources`, {
+      headers: {
+        authorization: `Bearer ${apiKey}`
+      },
+      'Content-Type': 'application/json'
+    });
+    const resources = _.get(response, 'data.result.content');
+    return resources;
+  } catch (err) {
+    throw errors.convertTopcoderApiError(err, 'Failed to fetch resource from the challenge.');
   }
 }
 
@@ -437,6 +464,7 @@ module.exports = {
   getProjectBillingAccountId,
   getTopcoderMemberId,
   addResourceToChallenge,
+  getResourcesFromChallenge,
   unregisterUserFromChallenge,
   cancelPrivateContent,
   assignUserAsRegistrant,
