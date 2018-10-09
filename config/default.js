@@ -89,5 +89,5 @@ module.exports = {
   TC_OR_DETAIL_LINK: process.env.TC_OR_DETAIL_LINK || 'https://software.topcoder-dev.com/review/actions/ViewProjectDetails?pid=',
   RETRY_COUNT: process.env.RETRY_COUNT || 3,
   RETRY_INTERVAL: process.env.RETRY_INTERVAL || 120000, // 2 minutes
-  CANCEL_CHALLENGE_INTERVAL: process.env.CANCEL_CHALLENGE_INTERVAL || 20 * 1000,
+  CANCEL_CHALLENGE_INTERVAL: process.env.CANCEL_CHALLENGE_INTERVAL || 24*60*60*1000,
 };
