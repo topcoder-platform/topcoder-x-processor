@@ -17,6 +17,7 @@ const axios = require('axios');
 const config = require('config');
 const _ = require('lodash');
 const moment = require('moment');
+const circularJSON = require('circular-json');
 
 let topcoderApiProjects = require('topcoder-api-projects');
 let topcoderApiChallenges = require('topcoder-api-challenges');
@@ -25,6 +26,7 @@ const topcoderDevApiProjects = require('topcoder-dev-api-projects');
 const topcoderDevApiChallenges = require('topcoder-dev-api-challenges');
 
 const logger = require('./logger');
+const loggerFile = require('./logger-file');
 const errors = require('./errors');
 
 
@@ -98,7 +100,6 @@ async function getAccessToken() {
  */
 async function createProject(projectName) {
   bearer.apiKey = await getAccessToken();
-
   // eslint-disable-next-line new-cap
   const projectBody = new topcoderApiProjects.ProjectRequestBody.constructFromObject({
     projectName
@@ -113,8 +114,13 @@ async function createProject(projectName) {
         }
       });
     });
+    const statusCode = projectResponse.result ? projectResponse.result.status : null;
+    loggerFile.info(`EndPoint: POST /direct/projects,  POST parameters: ${circularJSON.stringify(projectBody)},
+    Status Code:${statusCode}, Response: ${circularJSON.stringify(projectResponse)}`);
     return _.get(projectResponse, 'result.content.projectId');
   } catch (err) {
+    loggerFile.info(`EndPoint: POST /direct/projects, POST parameters: ${circularJSON.stringify(projectBody)},
+    Status Code:null, Error: 'Failed to create project.', Details: ${circularJSON.stringify(err)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to create project.');
   }
 }
@@ -126,7 +132,6 @@ async function createProject(projectName) {
  */
 async function createChallenge(challenge) {
   bearer.apiKey = await getAccessToken();
-
   const start = new Date();
   const startTime = moment(start).toISOString();
   const end = moment(start).add(config.NEW_CHALLENGE_DURATION_IN_DAYS, 'days').toISOString();
@@ -150,9 +155,13 @@ async function createChallenge(challenge) {
         }
       });
     });
-
+    const statusCode = challengeResponse.result ? challengeResponse.result.status : null;
+    loggerFile.info(`EndPoint: POST /challenges,  POST parameters: ${circularJSON.stringify(challengeBody)},
+    Status Code:${statusCode}, Response: ${circularJSON.stringify(challengeResponse.result)}`);
     return _.get(challengeResponse, 'result.content.id');
   } catch (err) {
+    loggerFile.info(`EndPoint: POST /challenges,  POST parameters: ${circularJSON.stringify(challengeBody)}, Status Code:null,
+    Error: 'Failed to create challenge.', Details: ${circularJSON.stringify(err)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to create challenge.');
   }
 }
@@ -164,24 +173,28 @@ async function createChallenge(challenge) {
  */
 async function updateChallenge(id, challenge) {
   bearer.apiKey = await getAccessToken();
-  logger.debug(`Updating challenge ${id} with ${JSON.stringify(challenge)}`);
+  logger.debug(`Updating challenge ${id} with ${circularJSON.stringify(challenge)}`);
   // eslint-disable-next-line new-cap
   const challengeBody = new topcoderApiChallenges.UpdateChallengeBodyParam.constructFromObject({
     param: challenge
   });
   try {
-    await new Promise((resolve, reject) => {
+    const response = await new Promise((resolve, reject) => {
       challengesApiInstance.challengesIdPut(id, challengeBody, (err, res) => {
         if (err) {
           logger.error(err);
-          logger.debug(JSON.stringify(err));
+          logger.debug(circularJSON.stringify(err));
           reject(err);
         } else {
           resolve(res);
         }
       });
     });
+    const statusCode = response.result ? response.result.status : null;
+    loggerFile.info(`EndPoint: PUT /challenges/${id},  PUT parameters: null, Status Code:${statusCode}, Response: ${circularJSON.stringify(response)}`);
   } catch (err) {
+    loggerFile.info(`EndPoint: PUT /challenges/${id},  PUT parameters: null, Status Code:null,
+    Error: 'Failed to update challenge.', Details: ${circularJSON.stringify(err)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to update challenge.');
   }
 }
@@ -194,19 +207,24 @@ async function activateChallenge(id) {
   bearer.apiKey = await getAccessToken();
   logger.debug(`Activating challenge ${id}`);
   try {
-    await new Promise((resolve, reject) => {
+    const response = await new Promise((resolve, reject) => {
       challengesApiInstance.activateChallenge(id, (err, data) => {
         if (err) {
           logger.error(err);
-          logger.debug(JSON.stringify(err));
+          logger.debug(circularJSON.stringify(err));
           reject(err);
         } else {
           resolve(data);
         }
       });
     });
+    const statusCode = response.result ? response.result.status : null;
+    loggerFile.info(`EndPoint: POST /challenges/${id}/activate,
+    POST parameters: null, Status Code:${statusCode}, Response: ${circularJSON.stringify(response)}`);
     logger.debug(`Challenge ${id} is activated successfully.`);
   } catch (err) {
+    loggerFile.info(`EndPoint: POST /challenges/${id}/activate,  POST parameters: null, Status Code:null,
+    Error: 'Failed to activate challenge.', Details: ${circularJSON.stringify(err)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to activate challenge.');
   }
 }
@@ -228,9 +246,13 @@ async function getChallengeById(id) {
       'Content-Type': 'application/json'
     });
     const challenge = _.get(response, 'data.result.content');
+    const statusCode = response.result ? response.result.status : null;
+    loggerFile.info(`EndPoint: GET challenges/${id},  GET parameters: null, Status Code:${statusCode}, Response: ${circularJSON.stringify(response)}`);
     return challenge;
-  } catch (er) {
-    throw errors.convertTopcoderApiError(er, 'Failed to get challenge details by Id');
+  } catch (err) {
+    loggerFile.info(`EndPoint: GET challenges/${id},  GET parameters: null, Status Code:null,
+    Error: 'Failed to get challenge details by Id', Details: ${circularJSON.stringify(err)}`);
+    throw errors.convertTopcoderApiError(err, 'Failed to get challenge details by Id');
   }
 }
 
@@ -243,14 +265,18 @@ async function closeChallenge(id, winnerId) {
   const apiKey = await getAccessToken();
   logger.debug(`Closing challenge ${id}`);
   try {
-    await axios.post(`${projectsClient.basePath}/challenges/${id}/close?winnerId=${winnerId}`, null, {
+    const response = await axios.post(`${projectsClient.basePath}/challenges/${id}/close?winnerId=${winnerId}`, null, {
       headers: {
         authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
       }
     });
+    const statusCode = response ? response.status : null;
+    loggerFile.info(`EndPoint: POST /challenges/${id}/close,  POST parameters: null, Status Code:${statusCode}, Response:${circularJSON.stringify(response)}`);
     logger.debug(`Challenge ${id} is closed successfully.`);
   } catch (err) {
+    loggerFile.info(`EndPoint: POST /challenges/${id}/close, POST parameters: null, Status Code:null,
+    Error: 'Failed to close challenge.', Details: ${circularJSON.stringify(err)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to close challenge.');
   }
 }
@@ -274,8 +300,14 @@ async function getProjectBillingAccountId(id) {
       _.set(response, 'data.result.content', `There is no billing account id associated with project ${id}`);
       throw new Error(response);
     }
+
+    const statusCode = response ? response.status : null;
+    loggerFile.info(`EndPoint: GET /direct/projects/${id},
+    GET parameters: null, Status Code:${statusCode}, Response:${circularJSON.stringify(response.data)}`);
     return billingAccountId;
   } catch (err) {
+    loggerFile.info(`EndPoint: GET /direct/projects/${id}, GET parameters: null, Status Code:null,
+    Error: 'Failed to get billing detail for the project.', Details: ${circularJSON.stringify(err)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to get billing detail for the project.');
   }
 }
@@ -289,8 +321,12 @@ async function getTopcoderMemberId(handle) {
   bearer.apiKey = await getAccessToken();
   try {
     const response = await axios.get(`${projectsClient.basePath}/members/${handle}`);
+    const statusCode = response ? response.status : null;
+    loggerFile.info(`EndPoint: GET members/${handle},  GET parameters: null, Status Code:${statusCode}, Response:${circularJSON.stringify(response.data)}`);
     return _.get(response, 'data.result.content.userId');
   } catch (err) {
+    loggerFile.info(`EndPoint: GET members/${handle}, GET parameters: null, Status Code:null,
+    Error: 'Failed to get topcoder member id.', Details: ${circularJSON.stringify(err)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to get topcoder member id.');
   }
 }
@@ -304,14 +340,14 @@ async function addResourceToChallenge(id, resource) {
   bearer.apiKey = await getAccessToken();
   logger.debug(`adding resource to challenge ${id}`);
   try {
-    await new Promise((resolve, reject) => {
+    const response = await new Promise((resolve, reject) => {
       challengesApiInstance.challengesIdResourcesPost(id, resource, (err, res) => {
         if (err) {
           if (_.get(JSON.parse(_.get(err, 'response.text')), 'result.content')
             === `User ${resource.resourceUserId} with role ${resource.roleId} already exists`) {
             resolve();
           } else {
-            logger.error(JSON.stringify(err));
+            logger.error(circularJSON.stringify(err));
             reject(err);
           }
         } else {
@@ -320,7 +356,15 @@ async function addResourceToChallenge(id, resource) {
         }
       });
     });
+    let statusCode = null;
+    if (response && response.result) {
+      statusCode = response.result.status;
+    }
+    loggerFile.info(`EndPoint: POST /challenges/${id}/resources,
+    POST parameters: null, Status Code:${statusCode}, Response:${circularJSON.stringify(response)}`);
   } catch (err) {
+    loggerFile.info(`EndPoint: POST /challenges/${id}/resources, POST parameters: null, Status Code:null,
+    Error: 'Failed to add resource to the challenge.', Details: ${circularJSON.stringify(err)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to add resource to the challenge.');
   }
 }
@@ -334,7 +378,7 @@ async function unregisterUserFromChallenge(id) {
   bearer.apiKey = await getAccessToken();
   logger.debug(`removing resource from challenge ${id}`);
   try {
-    await new Promise((resolve, reject) => {
+    const response = await new Promise((resolve, reject) => {
       challengesApiInstance.unregisterChallenge(id, (err, res) => {
         if (err) {
           // TODO:* Handle when a user tries to unregister a user twice.
@@ -342,7 +386,7 @@ async function unregisterUserFromChallenge(id) {
           //   === `User ${resource.resourceUserId} with role ${resource.roleId} already exist`) {
           //   resolve(res);
           // } else {
-          //   logger.error(JSON.stringify(err));
+          //   logger.error(circularJSON.stringify(err));
           //   reject(err);
           // }
           logger.debug(`Error - ${err}`);
@@ -353,7 +397,12 @@ async function unregisterUserFromChallenge(id) {
         }
       });
     });
+    const statusCode = response.result ? response.result.status : null;
+    loggerFile.info(`EndPoint: POST /challenges/${id}/unregister,
+    POST parameters: null, Status Code:${statusCode}, Response:${circularJSON.stringify(response)}`);
   } catch (err) {
+    loggerFile.info(`EndPoint: POST /challenges/${id}/unregister, POST parameters: null, Status Code:null,
+    Error: 'Failed to remove resource from the challenge', Details: ${circularJSON.stringify(err)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to remove resource from the challenge');
   }
 }
@@ -366,11 +415,11 @@ async function cancelPrivateContent(id) {
   bearer.apiKey = await getAccessToken();
   logger.debug(`Cancelling challenge ${id}`);
   try {
-    await new Promise((resolve, reject) => {
+    const response = await new Promise((resolve, reject) => {
       challengesApiInstance.cancelPrivateContest(id, (err, data) => {
         if (err) {
           logger.error(err);
-          logger.debug(JSON.stringify(err));
+          logger.debug(circularJSON.stringify(err));
           reject(err);
         } else {
           resolve(data);
@@ -378,7 +427,11 @@ async function cancelPrivateContent(id) {
       });
     });
     logger.debug(`Challenge ${id} is cancelled successfully.`);
+    const statusCode = response.result ? response.result.status : null;
+    loggerFile.info(`EndPoint: POST /challenges/${id}/cancel,  POST parameters: null, Status Code:${statusCode}, Response:${circularJSON.stringify(response)}`);
   } catch (err) {
+    loggerFile.info(`EndPoint: POST /challenges/${id}/cancel, POST parameters: null, Status Code:null,
+    Error: 'Failed to cancel challenge.', Details: ${circularJSON.stringify(err)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to cancel challenge.');
   }
 }
@@ -410,10 +463,10 @@ async function removeResourceToChallenge(id, resource) {
   bearer.apiKey = await getAccessToken();
   logger.debug(`removing resource from challenge ${id}`);
   try {
-    await new Promise((resolve, reject) => {
+    const response = await new Promise((resolve, reject) => {
       challengesApiInstance.challengesIdResourcesDelete(id, resource, (err, res) => {
         if (err) {
-          logger.error(JSON.stringify(err));
+          logger.error(circularJSON.stringify(err));
           reject(err);
         } else {
           logger.debug(`resource is removed from challenge ${id} successfully.`);
@@ -421,7 +474,12 @@ async function removeResourceToChallenge(id, resource) {
         }
       });
     });
+    const statusCode = response.result ? response.result.status : null;
+    loggerFile.info(`EndPoint: DELETE /challenges/${id}/resources,
+    DELETE parameters: null, Status Code:${statusCode}, Response:${circularJSON.stringify(response)}`);
   } catch (err) {
+    loggerFile.info(`EndPoint: DELETE /challenges/${id}/resources, DELETE parameters: null, Status Code:null,
+    Error: 'Failed to remove resource from the challenge.', Details: ${circularJSON.stringify(err)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to remove resource from the challenge.');
   }
 }

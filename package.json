@@ -25,7 +25,9 @@
   "homepage": "https://gitlab.com/luettich/processor#README",
   "dependencies": {
     "axios": "^0.16.2",
+    "circular-json": "^0.5.7",
     "config": "^1.30.0",
+    "fs-extra": "^7.0.0",
     "get-parameter-names": "^0.3.0",
     "github": "^12.1.0",
     "global-request-logger": "^0.1.1",
