@@ -33,7 +33,7 @@ jobs:
           command: |
             git clone --branch master https://github.com/topcoder-platform/tc-deploy-scripts ../buildscript
             cp ./../buildscript/master_deply_v4.2.sh .
-            ./master_deply_v4.2.sh -d ECS -e DEV -t dev -s topcoder-x-processor -i topcoder-x-processor
+            ./master_deply_v4.2.sh -d ECS -e DEV  -i topcoder-x-processor -t dev -s topcoder-x-processor
   # Build & Deploy against production backend
   "build-prod":
     <<: *defaults
@@ -42,14 +42,14 @@ jobs:
       - setup_remote_docker
       - run: *install_dependency
       - restore_cache: *restore_cache_settings_for_build
-      - run: ./build.sh
+      - run: ./build.sh prod
       - save_cache: *save_cache_settings
       - deploy:
           name: Running MasterScript.
           command: |
             git clone --branch master https://github.com/topcoder-platform/tc-deploy-scripts ../buildscript
             cp ./../buildscript/master_deply_v4.2.sh .
-            ./master_deply_v4.2.sh -d ECS -e PROD  -t dev -s topcoder-x-processor -i topcoder-x-processor
+            ./master_deply_v4.2.sh -d ECS -e PROD  -i topcoder-x-processor -t prod -s topcoder-x-processor 
 workflows:
   version: 2
   build:
@@ -58,10 +58,9 @@ workflows:
       - "build-dev":
           filters:
             branches:
-              only:
-                - develop
+              only: [ develop, dev-circleci1]
       - "build-prod":
           filters:
             branches:
               only:
-                - master
+                - master1
