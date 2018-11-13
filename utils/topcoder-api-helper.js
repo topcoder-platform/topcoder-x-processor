@@ -484,6 +484,29 @@ async function removeResourceToChallenge(id, resource) {
   }
 }
 
+/**
+ * gets resources from the topcoder challenge
+ * @param {String} id the challenge id
+ * @returns {Array} the resources of challenge
+ */
+async function getChallengeResources(id) {
+  const apiKey = await getAccessToken();
+  logger.debug(`getting resource from challenge ${id}`);
+  try {
+    const response = await axios.get(`${projectsClient.basePath}/challenges/${id}/resources`, {
+      headers: {Authorization: `bearer ${apiKey}`}
+    });
+    const statusCode = response.data ? response.data.result.status : null;
+    loggerFile.info(`EndPoint: GET /challenges/${id}/resources,
+    GET parameters: null, Status Code:${statusCode}, Response:${circularJSON.stringify(response)}`);
+    return _.get(response, 'data.result.content');
+  } catch (err) {
+    loggerFile.info(`EndPoint: GET /challenges/${id}/resources, GET parameters: null, Status Code:null,
+    Error: 'Failed to get resource from the challenge.', Details: ${circularJSON.stringify(err)}`);
+    throw errors.convertTopcoderApiError(err, 'Failed to get resource from the challenge.');
+  }
+}
+
 
 module.exports = {
   createProject,
@@ -498,5 +521,6 @@ module.exports = {
   unregisterUserFromChallenge,
   cancelPrivateContent,
   assignUserAsRegistrant,
-  removeResourceToChallenge
+  removeResourceToChallenge,
+  getChallengeResources
 };

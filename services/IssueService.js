@@ -321,7 +321,10 @@ async function handleIssueUpdate(event, issue) {
   try {
     dbIssue = await ensureChallengeExists(event, issue);
 
-    if (_.isMatch(dbIssue, issue)) {
+    if (dbIssue.title === issue.title &&
+      dbIssue.body === issue.body &&
+      dbIssue.prizes.length === issue.prizes.length &&
+      dbIssue.prizes[0] === issue.prizes[0]) {
       // Title, body, prizes doesn't change, just ignore
       logger.debug(`nothing changed for issue ${issue.number}`);
       return;

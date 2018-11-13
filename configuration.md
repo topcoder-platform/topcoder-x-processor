@@ -49,20 +49,21 @@ For using with SSL, the options should be as
 
 The following config paramaters are supported in the test environment defined in `config/test.js` and can be configured in the system environment. Note that the test config inherits all config options present in the default config and adds/overrides some config options.
 
-| Name                           | Description                                | Default                          |
-| :----------------------------- | :----------------------------------------: | :------------------------------: |                             |
-| TC_URL                          | the topcoder development url             |  https://www.topcoder-dev.com                    |
-| TC_DEV_API_URL                  | the topcoder development api url            |  https://api.topcoder-dev.com/v3|
-| MAX_RETRY_COUNT                  | the maximum number of times to re-test before concluding that test failed            |  https://api.topcoder-dev.com/v3|
-| WAIT_TIME                  | the amount of time in milliseconds to wait before running a re-test            |  30000                  |
-| TC_DIRECT_ID                  | the topcoder direct id of the repository which is set up with a valid billing account            |  7377                  |
-| TOPCODER_USER_NAME                  | a valid username for topcoder dev platform            |  mess                  |
-| HOOK_BASE_URL                  | the webhook url of topcoder-x-receiver            |                    |
-| GITHUB_ACCESS_TOKEN                  | github personal access token            |                    |
-| GITHUB_REPOSITORY_NAME                  | the name of the repository to create for testing (should not already exist)            |                    |
-| GITLAB_USERNAME                  | gitlab username            |                    |
-| GITLAB_PASSWORD                  | gitlab password            |                    |
-| GITLAB_REPOSITORY_NAME                  | the name of the repository to create for testing (should not already exist)            |                    |
+| Name | Description | Default |
+|:--|:--|:--|
+| TC_URL | the topcoder development url |https://www.topcoder-dev.com |
+| TC_DEV_API_URL | the topcoder development api url |https://api.topcoder-dev.com/v3|
+| MAX_RETRY_COUNT | the maximum number of times to re-test before concluding that test failed | 17 |
+| WAIT_TIME | the amount of time in milliseconds to wait before running a re-test | 60000 |
+| TC_DIRECT_ID | the topcoder direct id of the repository which is set up with a valid billing account | 7377 |
+| TOPCODER_USER_NAME | a valid username for topcoder dev platform | mess |
+| HOOK_BASE_URL | the webhook url of topcoder-x-receiver | |
+| GITHUB_ACCESS_TOKEN | github personal access token | |
+| GITHUB_REPOSITORY_NAME | the name of the repository to create for testing (should not already exist) | |
+| GITLAB_USERNAME | gitlab username | |
+| GITLAB_PASSWORD | gitlab password | |
+| GITLAB_REPOSITORY_NAME | the name of the repository to create for testing (should already exist) | |
+| GITLAB_REPO_URL | the URL of the repository to create for testing (should already exist) | |
 
 ## Github Verification
 
@@ -73,7 +74,7 @@ Configure a Github project with a webhook with a format like this: https://<rece
 #### Smoke test
 - Create an issue in the repo, you can see the logs in `receiver`, the `issue.created` event is generated.  You should then see the processor receive the event and process it accordingly.  It's important to validate that the issue.created event is seen by the receiver *and* the processor.  This ensures that the Kafka communication between the two services is working properly.
 
-You can test other events, but just validating that an issue.created event is generated in Kafka is enough to smoke test the receiver is set up properly.  
+You can test other events, but just validating that an issue.created event is generated in Kafka is enough to smoke test the receiver is set up properly.
 
 ## Github Verification
 

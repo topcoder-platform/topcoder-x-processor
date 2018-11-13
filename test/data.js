@@ -15,6 +15,7 @@ const PRIZE = 1;
 const UPDATED_PRIZE = 2;
 
 module.exports = {
+  issueLabels: ['tcx_OpenForPickup'],
   issueTitle: `[$${PRIZE}] This is a test issue`,
   issueDescription: 'This is a description',
   updatedPrizeTitle: `[$${UPDATED_PRIZE}] This is a test issue`,
@@ -30,8 +31,9 @@ module.exports = {
   updatedTitleNote: 'changed title from **[$2] This is a test issue** to **[$2] This is a{+n updated+} test issue**',
   updatedDescriptionNote: 'changed the description',
   issueClosedWithNoAssigneeComment: 'Issue reopened as it was unassigned', // Change this when implemented
-  fixAcceptedLabel: 'Fix accepted',
-  paidLabel: 'Paid',
+  openForPickupLabel: 'tcx_OpenForPickup',
+  fixAcceptedLabel: 'tcx_FixAccepted',
+  paidLabel: 'tcx_Paid',
   renamePrizeEvent: {
     from: `[$${PRIZE}] This is a test issue`,
     to: `[$${UPDATED_PRIZE}] This is a test issue`
@@ -44,8 +46,11 @@ module.exports = {
   contestCreatedComment: (contestUrl) => `Contest ${contestUrl} has been created for this ticket.`,
   contestUpdatedComment: (contestUrl) => `Contest ${contestUrl} has been updated - the new changes has been updated for this ticket.`,
   contestAssignedComment: (contestUrl, username) => `Contest ${contestUrl} has been updated - it has been assigned to ${username}.`,
+  contestUnAssignedComment: (contestUrl, username) => `Contest ${contestUrl} has been updated - ${username} has been unassigned.`,
   assignedComment: (username) => `assigned to @${username}`,
   unassignedComment: (username) => `unassigned @${username}`,
   signUpComment: (username) => `@${username}, please sign-up with Topcoder X tool`,
-  paymentTaskComment: (challengeId) => `Payment task has been updated: https://software.topcoder-dev.com/review/actions/ViewProjectDetails?pid=${challengeId}`
+  paymentTaskComment: (challengeId) => `Payment task has been updated: https://software.topcoder-dev.com/review/actions/ViewProjectDetails?pid=${challengeId}`,
+  noPaymentTaskComment: (label) => `This ticket was not processed for payment. If you would like to process it for payment, please reopen it, add the \`\`\`${label}\`\`\` label, and then close it again`, // eslint-disable-line max-len,
+  prepareAutomatedComment: (body, copilot) => `${body}<br/><br/>\`\`\`This is an automated message for ${copilot} via Topcoder X\`\`\``
 };
