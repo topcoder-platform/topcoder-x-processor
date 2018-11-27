@@ -430,19 +430,20 @@ async function handleIssueClose(event, issue) {
         logger.debug('Copilot is already set, so skipping');
       }
 
+      logger.debug(`Getting the topcoder member ID for member name: ${assigneeMember.topcoderUsername}`);
+      const winnerId = await topcoderApiHelper.getTopcoderMemberId(assigneeMember.topcoderUsername);
+
       let assigneeAlreadySet = await topcoderApiHelper.roleAlreadySet(dbIssue.challengeId, 'Submitter');
 
       if(!assigneeAlreadySet){
         // adding reg
-        logger.debug(`Getting the topcoder member ID for member name: ${assigneeMember.topcoderUsername}`);
-        const winnerId = await topcoderApiHelper.getTopcoderMemberId(assigneeMember.topcoderUsername);
-
+        logger.debug('Adding assignee because one was not set');
         await topcoderApiHelper.assignUserAsRegistrant(winnerId, dbIssue.challengeId);
       }
       else{
         logger.debug('Assignee is already set, so skipping');
       }
-      
+
       // activate challenge
       if(challenge['currentStatus']=='Draft'){
         await topcoderApiHelper.activateChallenge(dbIssue.challengeId);
