@@ -431,10 +431,10 @@ async function handleIssueClose(event, issue) {
       logger.debug(`Getting the topcoder member ID for member name: ${assigneeMember.topcoderUsername}`);
       const winnerId = await topcoderApiHelper.getTopcoderMemberId(assigneeMember.topcoderUsername);
 
-      resources = await topcoderApiHelper.getResourcesFromChallenge(dbIssue.challengeId)
+      let resources = await topcoderApiHelper.getResourcesFromChallenge(dbIssue.challengeId);
 
       logger.debug(`Existing resources: ${resources}`);
-      
+
       logger.debug(`Getting the topcoder member ID for copilot name : ${event.copilot.topcoderUsername}`);
       // get copilot tc user id
       const copilotTopcoderUserId = await topcoderApiHelper.getTopcoderMemberId(event.copilot.topcoderUsername);
