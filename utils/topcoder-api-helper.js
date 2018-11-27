@@ -352,6 +352,24 @@ async function getResourcesFromChallenge(id) {
   }
 }
 
+async function roleAlreadySet(id, role){
+  if (!_.isNumber(id)) {
+    throw new Error('The challenge id must valid number');
+  }
+  var result = false;
+  const apiKey = await getAccessToken();
+  try {
+    var resources = await this.getResourcesFromChallenge(id);
+    resources.forEach(function(resource){
+      if(resource['role']==role){
+        result=true;
+      }
+    });
+  } catch (err) {
+    throw errors.convertTopcoderApiError(err, 'Failed to fetch resource from the challenge.');
+  }
+  return result;
+}
 /**
  * unregister user from topcoder challenge
  * @param {Number} id the challenge id
@@ -465,6 +483,7 @@ module.exports = {
   getTopcoderMemberId,
   addResourceToChallenge,
   getResourcesFromChallenge,
+  roleAlreadySet,
   unregisterUserFromChallenge,
   cancelPrivateContent,
   assignUserAsRegistrant,

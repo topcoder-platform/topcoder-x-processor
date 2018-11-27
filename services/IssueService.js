@@ -56,32 +56,6 @@ function parsePrizes(issue) {
 }
 
 /**
- * Check challenge data and challenge resources
- * @param {Object} event the event
- * @param {Object} challenge the challenge
- * @param {Object} challengeResources the challenge resources
- * @returns {boolean} true if the challenge and challenge resources is valid; or false otherwise
- * @private
- */
-function checkChallenge(event, challenge, challengeResources) {
-  // check prize
-  const validPrize = _.isEqual(challenge.prize.sort(), event.dbIssue.prizes.sort());
-
-  // check copilot
-  const copilot = _.find(challengeResources, { role: 'Copilot' });
-  const validCopilot = copilot ? copilot.properties.Handle === event.copilot.topcoderUsername : false;
-
-  // check assignee
-  const assignee = _.find(challengeResources, { role: 'Submitter' });
-  const validAssignee = assignee ? assignee.properties.Handle === event.assigneeMember.topcoderUsername : false;
-
-  // check status
-  const validStatus = challenge.currentStatus.toLowerCase() === 'active';
-
-  return validPrize && validCopilot && validAssignee && validStatus;
-}
-
-/**
  * Check the error object contains some error messages
  * @param {Object} err the error object
  * @param {Array} validErrorMessages the valid error messages
@@ -108,13 +82,6 @@ async function handleEventGracefully(event, issue, err) {
       newEvent.retryCount += 1;
 
       const validErrorMessages = ['Failed to create challenge.', 'Failed to activate challenge.'];
-
-      if (newEvent.event === 'issue.closed' && checkErrorMessages(err, validErrorMessages)) {
-        const challenge = await topcoderApiHelper.getChallengeById(newEvent.dbIssue.challengeId);
-        const challengeResources = await topcoderApiHelper.getResourcesFromChallenge(newEvent.dbIssue.challengeId);
-
-        newEvent.challengeValid = checkChallenge(newEvent, challenge, challengeResources);
-      }
 
       delete newEvent.copilot;
       setTimeout(async () => {
@@ -383,10 +350,17 @@ async function handleIssueClose(event, issue) {
         comment += ' please reopen it, add the ```' + config.FIX_ACCEPTED_ISSUE_LABEL + '``` label, and then close it again';// eslint-disable-line
         await gitHelper.createComment(event, issue.number, comment);
         closeChallenge = true;
-        return;
       }
       if (issue.prizes[0] === 0) {
         closeChallenge = true;
+      }
+      
+      if (closeChallenge) {
+        logger.debug(`The associated challenge ${dbIssue.challengeId} is being scheduled for cancellation since no payment will be given`);
+        setTimeout(async () => {
+          await topcoderApiHelper.cancelPrivateContent(dbIssue.challengeId);
+          logger.debug(`The challenge ${dbIssue.challengeId} is deleted`);
+        }, config.CANCEL_CHALLENGE_INTERVAL); //eslint-disable-line
         return;
       }
 
@@ -399,6 +373,13 @@ async function handleIssueClose(event, issue) {
       // if issue has paid label don't process further
       if (_.includes(event.data.issue.labels, config.PAID_ISSUE_LABEL)) {
         logger.debug(`This issue ${issue.number} is already paid with challenge ${dbIssue.challengeId}`);
+        return;
+      }
+      logger.debug(`Getting the challenge meta-data for challenge ID : ${dbIssue.challengeId}`);
+
+      const challenge = await topcoderApiHelper.getChallengeById(dbIssue.challengeId);
+      if(challenge['currentStatus']=='Completed'){
+        logger.debug('Challenge is already complete, so no point in trying to do anything further');
         return;
       }
 
@@ -418,7 +399,7 @@ async function handleIssueClose(event, issue) {
       logger.debug(`Getting the billing account ID for project ID: ${project.tcDirectId}`);
       const accountId = await topcoderApiHelper.getProjectBillingAccountId(project.tcDirectId);
 
-      logger.debug(`assigning the billing account id ${accountId} to challenge`);
+      logger.debug(`Assigning the billing account id ${accountId} to challenge`);
 
       // adding assignees as well if it is missed/failed during update
       // prize needs to be again set after adding billing account otherwise it won't let activate
@@ -428,43 +409,46 @@ async function handleIssueClose(event, issue) {
       };
       await topcoderApiHelper.updateChallenge(dbIssue.challengeId, updateBody);
 
-      logger.debug(`Getting the topcoder member ID for member name: ${assigneeMember.topcoderUsername}`);
-      const winnerId = await topcoderApiHelper.getTopcoderMemberId(assigneeMember.topcoderUsername);
+      let copilotAlreadySet = await topcoderApiHelper.roleAlreadySet(dbIssue.challengeId, 'Copilot');
 
-      let resources = await topcoderApiHelper.getResourcesFromChallenge(dbIssue.challengeId);
+      if(!copilotAlreadySet){
+        logger.debug(`Getting the topcoder member ID for copilot name : ${event.copilot.topcoderUsername}`);
+        // get copilot tc user id
+        const copilotTopcoderUserId = await topcoderApiHelper.getTopcoderMemberId(event.copilot.topcoderUsername);
 
-      logger.debug(`Existing resources: ${resources}`);
+        // role id 14 for copilot
+        const copilotResourceBody = {
+          roleId: 14,
+          resourceUserId: copilotTopcoderUserId,
+          phaseId: 0,
+          addNotification: true,
+          addForumWatch: true
+        };
+        await topcoderApiHelper.addResourceToChallenge(dbIssue.challengeId, copilotResourceBody);
+      }
+      else{
+        logger.debug('Copilot is already set, so skipping');
+      }
 
-      logger.debug(`Getting the topcoder member ID for copilot name : ${event.copilot.topcoderUsername}`);
-      // get copilot tc user id
-      const copilotTopcoderUserId = await topcoderApiHelper.getTopcoderMemberId(event.copilot.topcoderUsername);
+      let assigneeAlreadySet = await topcoderApiHelper.roleAlreadySet(dbIssue.challengeId, 'Submitter');
 
-      // role id 14 for copilot
-      const copilotResourceBody = {
-        roleId: 14,
-        resourceUserId: copilotTopcoderUserId,
-        phaseId: 0,
-        addNotification: true,
-        addForumWatch: true
-      };
-      await topcoderApiHelper.addResourceToChallenge(dbIssue.challengeId, copilotResourceBody);
-      // adding reg
-      await topcoderApiHelper.assignUserAsRegistrant(winnerId, dbIssue.challengeId);
+      if(!assigneeAlreadySet){
+        // adding reg
+        logger.debug(`Getting the topcoder member ID for member name: ${assigneeMember.topcoderUsername}`);
+        const winnerId = await topcoderApiHelper.getTopcoderMemberId(assigneeMember.topcoderUsername);
 
+        await topcoderApiHelper.assignUserAsRegistrant(winnerId, dbIssue.challengeId);
+      }
+      else{
+        logger.debug('Assignee is already set, so skipping');
+      }
+      
       // activate challenge
-      if (!event.challengeValid) {
+      if(challenge['currentStatus']=='Draft'){
         await topcoderApiHelper.activateChallenge(dbIssue.challengeId);
       }
 
-      if (closeChallenge) {
-        logger.debug(`The associated challenge ${dbIssue.challengeId} is scheduled for cancel`);
-        setTimeout(async () => {
-          await topcoderApiHelper.cancelPrivateContent(dbIssue.challengeId);
-          logger.debug(`The challenge ${dbIssue.challengeId} is deleted`);
-        }, config.CANCEL_CHALLENGE_INTERVAL); //eslint-disable-line
-        return;
-      }
-      logger.debug(`close challenge with winner ${assigneeMember.topcoderUsername}(${winnerId})`);
+      logger.debug(`Closing challenge with winner ${assigneeMember.topcoderUsername}(${winnerId})`);
       await topcoderApiHelper.closeChallenge(dbIssue.challengeId, winnerId);
       event.paymentSuccessful = true;
     }
