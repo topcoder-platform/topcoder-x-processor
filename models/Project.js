@@ -8,11 +8,27 @@
  * @author TCSCODER
  * @version 1.0
  */
-const mongoose = require('mongoose');
+const dynamoose = require('dynamoose');
 
-const schema = new mongoose.Schema({
+const Schema = dynamoose.Schema;
+
+const schema = new Schema({
+  id: {
+    type: String,
+    hashKey: true,
+    required: true
+  },
   title: {type: String, required: true},
-  tcDirectId: {type: Number, required: true},
+  tcDirectId: {
+    type: Number,
+    required: true,
+    index: {
+      global: true,
+      rangeKey: 'id',
+      project: true,
+      name: 'TcDirectIdIndex'
+    }
+  },
   repoUrl: {type: String, required: true},
   rocketChatWebhook: {type: String, required: false},
   rocketChatChannelName: {type: String, required: false},
@@ -21,7 +37,5 @@ const schema = new mongoose.Schema({
   secretWebhookKey: {type: String, required: true},
   copilot: {type: String, required: true}
 });
-
-schema.index({tcDirectId: 1});
 
 module.exports = schema;

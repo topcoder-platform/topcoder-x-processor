@@ -24,7 +24,6 @@ module.exports = {
       passphrase: 'secret', // NOTE:* This configuration specifies the private key passphrase used while creating it.
     }
   },
-  MONGODB_URL: process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/topcoderx',
   TC_DEV_ENV: process.env.NODE_ENV === 'production' ? false : true,
   TC_AUTHN_URL: process.env.TC_AUTHN_URL || 'https://topcoder-dev.auth0.com/oauth/ro',
   TC_AUTHN_REQUEST_BODY: {
@@ -91,4 +90,10 @@ module.exports = {
   RETRY_COUNT: process.env.RETRY_COUNT || 2,
   RETRY_INTERVAL: process.env.RETRY_INTERVAL || 120000, // 2 minutes
   CANCEL_CHALLENGE_INTERVAL: process.env.CANCEL_CHALLENGE_INTERVAL || 24 * 60 * 60 * 1000, // 24 Hours
+  DYNAMODB: {
+    AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID || '',
+    AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY || '',
+    AWS_REGION: process.env.AWS_REGION || '',
+    IS_LOCAL: process.env.IS_LOCAL || '',
+  },
 };

@@ -2,7 +2,7 @@
 
 - Nodejs 8 is required
 - [Apache Kafka](https://kafka.apache.org/)
-- MongoDB 3.4
+- DynamoDB
 
 ## Install dependencies
 
@@ -29,7 +29,6 @@ The following config parameters are supported, they are defined in `config/defau
 | TOPIC                          | the kafka subscribe topic name             |  tc-x-events                    |
 | PARTITION                  | the kafka partition            |  0|
 | KAFKA_OPTIONS                  | the connection option for kafka            |  see below about KAFKA options                  |
-| MONGODB_URL  | the MongoDB URL which must be same as Topcoder x tool | mongodb://127.0.0.1:27017/topcoderx |
 |TC_DEV_ENV| the flag whether to use topcoder development api or production| false|
 | TC_AUTHN_URL | the Topcoder authentication url | https://topcoder-dev.auth0.com/oauth/ro |
 | TC_AUTHN_REQUEST_BODY | the Topcoder authentication request body. This makes use of some environment variables: `TC_USERNAME`, `TC_PASSWORD`, `TC_CLIENT_ID`, `CLIENT_V2CONNECTION` | see `default.js` |
@@ -49,6 +48,10 @@ The following config parameters are supported, they are defined in `config/defau
 |RETRY_COUNT| the number of times an event should be retried to process| 3|
 |RETRY_INTERVAL| the interval at which the event should be retried to process in milliseconds | 120000|
 |READY_FOR_REVIEW_ISSUE_LABEL| the label name for ready for review, should be one of the label configured in topcoder x ui|'tcx_ReadyForReview'|
+|AWS_ACCESS_KEY_ID | The Amazon certificate key to use when connecting. Use local dynamodb you can set fake value|FAKE_ACCESS_KEY_ID |
+|AWS_SECRET_ACCESS_KEY | The Amazon certificate access key to use when connecting. Use local dynamodb you can set fake value|FAKE_SECRET_ACCESS_KEY |
+|AWS_REGION | The Amazon certificate region to use when connecting. Use local dynamodb you can set fake value|FAKE_REGION |
+|IS_LOCAL | Use Amazon DynamoDB Local or server. |true |
 
 KAFKA_OPTIONS should be object as described in https://github.com/oleksiyk/kafka#ssl
 For using with SSL, the options should be as

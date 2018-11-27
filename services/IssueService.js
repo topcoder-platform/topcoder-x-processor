@@ -14,19 +14,19 @@ const _ = require('lodash');
 const Joi = require('joi');
 const MarkdownIt = require('markdown-it');
 const config = require('config');
-const models = require('../models');
 const logger = require('../utils/logger');
 const errors = require('../utils/errors');
 const constants = require('../constants');
 const topcoderApiHelper = require('../utils/topcoder-api-helper');
+const models = require('../models');
+const dbHelper = require('../utils/db-helper');
+const helper = require('../utils/helper');
 const gitHubService = require('./GithubService');
 const emailService = require('./EmailService');
 const userService = require('./UserService');
 const gitlabService = require('./GitlabService');
 const eventService = require('./EventService');
 
-
-const Issue = models.Issue;
 const md = new MarkdownIt();
 
 /**
@@ -63,26 +63,28 @@ function parsePrizes(issue) {
  * @private
  */
 async function ensureChallengeExists(event, issue) {
-  let dbIssue = await Issue.findOne({
+  let dbIssue = dbHelper.scanOne(models.Issue, {
     number: issue.number,
     provider: issue.provider,
     repositoryId: issue.repositoryId
   });
+
   if (dbIssue && dbIssue.status === 'challenge_creation_pending') {
     throw errors.internalDependencyError(`Challenge for the updated issue ${issue.number} is creating, rescheduling this event`);
   }
   if (dbIssue && dbIssue.status === 'challenge_creation_failed') {
     // remove issue from db
-    await Issue.remove({
+    await dbHelper.remove(models.Issue, {
       number: issue.number,
       provider: issue.provider,
       repositoryId: issue.repositoryId
     });
     dbIssue = null;
   }
+
   if (!dbIssue) {
     await handleIssueCreate(event, issue);
-    dbIssue = await Issue.findOne({
+    dbIssue = await dbHelper.scanOne(models.Issue, {
       number: issue.number,
       provider: issue.provider,
       repositoryId: issue.repositoryId
@@ -105,9 +107,10 @@ async function getProjectDetail(issue, event) {
   } else if (issue.provider === 'gitlab') {
     fullRepoUrl = `${config.GITLAB_API_BASE_URL}/${event.data.repository.full_name}`;
   }
-  const project = await models.Project.findOne({
+  const project = await dbHelper.scanOne(models.Project, {
     repoUrl: fullRepoUrl
   });
+
   return project;
 }
 
@@ -242,11 +245,12 @@ async function handleIssueAssignment(event, issue) {
       // Update the challenge
       logger.debug(`Assigning user to challenge: ${userMapping.topcoderUsername}`);
       topcoderApiHelper.assignUserAsRegistrant(topcoderUserId, dbIssue.challengeId);
-      dbIssue.set({
+      dbIssue = await dbHelper.update(models.Issue, dbIssue.id, {
         assignee: issue.assignee,
-        assignedAt: new Date()
+        assignedAt: new Date(),
+        updatedAt: new Date()
       });
-      await dbIssue.save();
+
       // remove open for pickup and add assigned
       const updateLabels = _(issue.labels)
         .filter((i) => i !== config.OPEN_FOR_PICKUP_ISSUE_LABEL)
@@ -337,14 +341,14 @@ async function handleIssueUpdate(event, issue) {
       prizes: issue.prizes
     });
     // Save
-    dbIssue.set({
+    await dbHelper.update(models.Issue, dbIssue.id, {
       title: issue.title,
       body: issue.body,
       prizes: issue.prizes,
       labels: issue.labels,
-      assignee: issue.assignee
+      assignee: issue.assignee,
+      updatedAt: new Date()
     });
-    await dbIssue.save();
   } catch (e) {
     await eventService.handleEventGracefully(event, issue, e);
     return;
@@ -469,11 +473,15 @@ async function handleIssueClose(event, issue) {
   }
   try {
     logger.debug('update issue as paid');
-    dbIssue.set({
-      labels: _(dbIssue.labels).filter((i) => i !== config.OPEN_FOR_PICKUP_ISSUE_LABEL && i !== config.ASSIGNED_ISSUE_LABEL)
-        .push(config.ASSIGNED_ISSUE_LABEL).value()
+    const labels = _(dbIssue.labels)
+      .filter((i) => i !== config.OPEN_FOR_PICKUP_ISSUE_LABEL && i !== config.ASSIGNED_ISSUE_LABEL)
+      .push(config.ASSIGNED_ISSUE_LABEL)
+      .value();
+    dbIssue = await dbHelper.update(models.Issue, dbIssue.id, {
+      labels,
+      updatedAt: new Date()
     });
-    await dbIssue.save();
+
     if (event.provider === 'github') {
       await gitHubService.markIssueAsPaid(event.copilot, event.data.repository.full_name, issue.number, dbIssue.challengeId, dbIssue.labels);
     } else {
@@ -502,7 +510,7 @@ async function handleIssueCreate(event, issue) {
   }// if existing found don't create a project
 
   // Check if duplicated
-  let dbIssue = await Issue.findOne({
+  let dbIssue = await dbHelper.scanOne(models.Issue, {
     number: issue.number,
     provider: issue.provider,
     repositoryId: issue.repositoryId
@@ -514,9 +522,11 @@ async function handleIssueCreate(event, issue) {
   }
 
   // create issue with challenge creation pending
-  dbIssue = await Issue.create(_.assign({}, issue, {
+  const issueObject = _.assign({}, issue, {
+    id: helper.generateIdentifier(),
     status: 'challenge_creation_pending'
-  }));
+  });
+  dbIssue = await dbHelper.create(models.Issue, issueObject);
 
   const projectId = project.tcDirectId;
   logger.debug(`existing project was found with id ${projectId} for repository ${event.data.repository.full_name}`);
@@ -532,12 +542,13 @@ async function handleIssueCreate(event, issue) {
 
     // Save
     // update db payment
-    await Issue.updateOne({_id: dbIssue.id}, {
+    await dbHelper.update(models.Issue, dbIssue.id, {
       challengeId: issue.challengeId,
-      status: 'challenge_creation_successful'
+      status: 'challenge_creation_successful',
+      updatedAt: new Date()
     });
   } catch (e) {
-    await Issue.remove({
+    await dbHelper.remove(models.Issue, {
       number: issue.number,
       provider: issue.provider,
       repositoryId: issue.repositoryId
@@ -580,10 +591,10 @@ async function handleIssueLabelUpdated(event, issue) {
     await eventService.handleEventGracefully(event, issue, e);
     return;
   }
-  dbIssue.set({
-    labels: issue.labels
+  await dbHelper.update(models.Issue, dbIssue.id, {
+    labels: issue.labels,
+    updatedAt: new Date()
   });
-  await dbIssue.save();
 }
 
 /**
@@ -635,11 +646,11 @@ async function handleIssueUnAssignment(event, issue) {
     await eventService.handleEventGracefully(event, issue, e);
     return;
   }
-  dbIssue.set({
+  await dbHelper.update(models.Issue, dbIssue.id, {
     assignee: null,
-    assignedAt: null
+    assignedAt: null,
+    updatedAt: new Date()
   });
-  await dbIssue.save();
 }
 
 /**
@@ -663,8 +674,7 @@ async function process(event) {
   } else if (event.provider === 'gitlab') {
     fullRepoUrl = `${config.GITLAB_API_BASE_URL}/${event.data.repository.full_name}`;
   }
-
-  const project = await models.Project.findOne({
+  const project = await dbHelper.scanOne(models.Project, {
     repoUrl: fullRepoUrl
   });
 

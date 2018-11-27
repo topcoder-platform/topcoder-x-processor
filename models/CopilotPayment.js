@@ -10,21 +10,67 @@
 
 'use strict';
 
-const mongoose = require('mongoose');
+const dynamoose = require('dynamoose');
 
-const schema = new mongoose.Schema({
-  project: {type: mongoose.Schema.Types.ObjectId, ref: 'Project'},
+const Schema = dynamoose.Schema;
+
+const schema = new Schema({
+  id: {
+    type: String,
+    hashKey: true,
+    required: true
+  },
+  project: {
+    type: String,
+    index: {
+      global: true,
+      rangeKey: 'id',
+      project: true,
+      name: 'ProjectIndex'
+    }
+  },
   amount: {type: Number, required: true},
   description: {type: String, required: true},
-  challengeId: {type: Number, required: false},
-  closed: {type: Boolean, required: true, default: false},
-  username: {type: String, required: true},
-  status: {type: String}
+  challengeId: {
+    type: Number,
+    required: false,
+    index: {
+      global: true,
+      rangeKey: 'id',
+      project: true,
+      name: 'ChallengeIdIndex'
+    }
+  },
+  closed: {
+    type: String,
+    required: true,
+    default: 'false',
+    index: {
+      global: true,
+      rangeKey: 'id',
+      project: true,
+      name: 'ClosedIndex'
+    }
+  },
+  username: {
+    type: String,
+    required: true,
+    index: {
+      global: true,
+      rangeKey: 'id',
+      project: true,
+      name: 'UsernameIndex'
+    }
+  },
+  status: {
+    type: String,
+    index: {
+      global: true,
+      rangeKey: 'id',
+      project: true,
+      name: 'StatusIndex'
+    }
+  }
 });
-
-schema.index({project: 1});
-schema.index({username: 1});
-schema.index({challengeId: 1});
-schema.index({closed: 1});
 
 module.exports = schema;

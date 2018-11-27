@@ -12,8 +12,9 @@
 const Joi = require('joi');
 const _ = require('lodash');
 const config = require('config');
-const models = require('../models');
 const logger = require('../utils/logger');
+const dbHelper = require('../utils/db-helper');
+const models = require('../models');
 
 /**
  * gets the tc handle for given git user id from a mapping captured by Topcoder x tool
@@ -38,8 +39,7 @@ async function getTCUserName(provider, gitUser) {
       criteria.gitlabUsername = gitUser;
     }
   }
-
-  return await models.UserMapping.findOne(criteria);
+  return await dbHelper.scanOne(models.UserMapping, criteria);
 }
 
 getTCUserName.schema = {
@@ -62,8 +62,7 @@ async function getRepositoryCopilot(provider, repoFullName) {
   } else if (provider === 'gitlab') {
     fullRepoUrl = `${config.GITLAB_API_BASE_URL}/${repoFullName}`;
   }
-
-  const project = await models.Project.findOne({
+  const project = await dbHelper.scanOne(models.Project, {
     repoUrl: fullRepoUrl
   });
 
@@ -71,16 +70,14 @@ async function getRepositoryCopilot(provider, repoFullName) {
     // throw this repo is not managed by Topcoder x tool
     throw new Error(`This repository '${repoFullName}' is not managed by Topcoder X tool.`);
   }
-
-  const userMapping = await models.UserMapping.findOne({
-    topcoderUsername: project.copilot.toLowerCase()
+  const userMapping = await dbHelper.scanOne(models.UserMapping, {
+    topcoderUsername: {eq: project.copilot.toLowerCase()}
   });
 
   if (!userMapping || (provider === 'github' && !userMapping.githubUserId) || (provider === 'gitlab' && !userMapping.gitlabUserId)) {
     throw new Error(`Couldn't find githost username for '${provider}' for this repository '${repoFullName}'.`);
   }
-
-  const copilot = await models.User.findOne({
+  const copilot = await dbHelper.scanOne(models.User, {
     username: provider === 'github' ? userMapping.githubUsername : userMapping.gitlabUsername,
     type: provider
   });

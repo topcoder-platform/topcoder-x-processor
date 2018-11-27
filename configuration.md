@@ -6,7 +6,6 @@ The following config parameters are supported, they are defined in `config/defau
 | :----------------------------- | :----------------------------------------: | :------------------------------: |
 | LOG_LEVEL                      | the log level                              |  debug                           |
 | PARTITION                  | The Kafka partition            |  0|
-| MONGODB_URI                            | The MongoDB URI.  This needs to be the same MongoDB used by topcoder-x-receiver, topcoder-x-processor, and topcoder-x-site                           | mongodb://127.0.0.1:27017/topcoderx |
 |TOPIC  | The Kafka topic where events are published.  This must be the same as the configured value for topcoder-x-processor| |
 |KAFKA_OPTIONS | Kafka connection options| |
 |KAFKA_HOST | The Kafka host to connect to| localhost:9092 |
@@ -34,6 +33,10 @@ The following config parameters are supported, they are defined in `config/defau
 |NOT_READY_ISSUE_LABEL| the label name for not ready, should be one of the label configured in topcoder x ui|
 'Not Ready'|
 |CANCEL_CHALLENGE_INTERVAL| the time in millisecond after which the challenge will be closed| '24*60*60*1000'|
+|AWS_ACCESS_KEY_ID | The Amazon certificate key to use when connecting. Use local dynamodb you can set fake value|FAKE_ACCESS_KEY_ID |
+|AWS_SECRET_ACCESS_KEY | The Amazon certificate access key to use when connecting. Use local dynamodb you can set fake value|FAKE_SECRET_ACCESS_KEY |
+|AWS_REGION | The Amazon certificate region to use when connecting. Use local dynamodb you can set fake value|FAKE_REGION |
+|IS_LOCAL | Use Amazon DynamoDB Local or server. |true |
 
 KAFKA_OPTIONS should be object as described in https://github.com/oleksiyk/kafka#ssl
 For using with SSL, the options should be as
