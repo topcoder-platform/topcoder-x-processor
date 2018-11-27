@@ -383,9 +383,11 @@ async function handleIssueClose(event, issue) {
         comment += ' please reopen it, add the ```' + config.FIX_ACCEPTED_ISSUE_LABEL + '``` label, and then close it again';// eslint-disable-line
         await gitHelper.createComment(event, issue.number, comment);
         closeChallenge = true;
+        return;
       }
       if (issue.prizes[0] === 0) {
         closeChallenge = true;
+        return;
       }
 
       // if issue is closed without assignee then do nothing
@@ -429,6 +431,10 @@ async function handleIssueClose(event, issue) {
       logger.debug(`Getting the topcoder member ID for member name: ${assigneeMember.topcoderUsername}`);
       const winnerId = await topcoderApiHelper.getTopcoderMemberId(assigneeMember.topcoderUsername);
 
+      resources = await topcoderApiHelper.getResourcesFromChallenge(dbIssue.challengeId)
+
+      logger.debug(`Existing resources: ${resources}`);
+      
       logger.debug(`Getting the topcoder member ID for copilot name : ${event.copilot.topcoderUsername}`);
       // get copilot tc user id
       const copilotTopcoderUserId = await topcoderApiHelper.getTopcoderMemberId(event.copilot.topcoderUsername);
@@ -442,7 +448,6 @@ async function handleIssueClose(event, issue) {
         addForumWatch: true
       };
       await topcoderApiHelper.addResourceToChallenge(dbIssue.challengeId, copilotResourceBody);
-
       // adding reg
       await topcoderApiHelper.assignUserAsRegistrant(winnerId, dbIssue.challengeId);
 
