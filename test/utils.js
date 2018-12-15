@@ -8,8 +8,8 @@
  * @author TCSCODER
  * @version 1.0
  */
-const _ = require('lodash');
 const config = require('config');
+const _ = require('lodash');
 const {assert} = require('chai');
 const axios = require('axios');
 const models = require('../models');

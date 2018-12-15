@@ -8,8 +8,8 @@
  * @author TCSCODER
  * @version 1.1
  */
-const _ = require('lodash');
 const config = require('config');
+const _ = require('lodash');
 const logger = require('../utils/logger');
 const gitHubService = require('./GithubService');
 const gitlabService = require('./GitlabService');

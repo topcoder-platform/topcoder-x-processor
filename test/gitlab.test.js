@@ -12,9 +12,9 @@
 
 process.env.NODE_ENV = 'test';
 
+const config = require('config');
 const _ = require('lodash');
 const {assert} = require('chai');
-const config = require('config');
 const {ProjectsBundle} = require('gitlab');
 const models = require('../models');
 const data = require('./data');

@@ -9,8 +9,8 @@
  * @version 1.0
  */
 /* eslint-env node, mocha */
-const {assert} = require('chai');
 const config = require('config');
+const {assert} = require('chai');
 const uuidv4 = require('uuid/v4');
 const Octokit = require('@octokit/rest');
 const utils = require('./utils');

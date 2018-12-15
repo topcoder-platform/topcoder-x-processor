@@ -9,9 +9,9 @@
  * @author TCSCODER
  * @version 1.0
  */
+const config = require('config');
 const _ = require('lodash');
 const Joi = require('joi');
-const config = require('config');
 const MarkdownIt = require('markdown-it');
 const moment = require('moment');
 const logger = require('../utils/logger');

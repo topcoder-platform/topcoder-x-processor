@@ -9,10 +9,10 @@
  * @version 1.0
  */
 
+const config = require('config');
 const _ = require('lodash');
 const Joi = require('joi');
 const GitHubApi = require('github');
-const config = require('config');
 const logger = require('../utils/logger');
 const errors = require('../utils/errors');
 const helper = require('../utils/helper');

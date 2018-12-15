@@ -9,9 +9,9 @@
  * @version 1.0
  */
 
+const config = require('config');
 const Joi = require('joi');
 const _ = require('lodash');
-const config = require('config');
 const logger = require('../utils/logger');
 const dbHelper = require('../utils/db-helper');
 const models = require('../models');

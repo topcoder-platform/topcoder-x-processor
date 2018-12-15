@@ -12,9 +12,9 @@
  */
 'use strict';
 
+const config = require('config');
 const jwtDecode = require('jwt-decode');
 const axios = require('axios');
-const config = require('config');
 const _ = require('lodash');
 const moment = require('moment');
 const circularJSON = require('circular-json');
@@ -242,7 +242,9 @@ async function getChallengeById(id) {
   logger.debug('Getting topcoder challenge details');
   try {
     const response = await axios.get(`${projectsClient.basePath}/challenges/${id}`, {
-      authorization: `Bearer ${apiKey}`,
+      headers: {
+        authorization: `Bearer ${apiKey}`
+      },
       'Content-Type': 'application/json'
     });
     const challenge = _.get(response, 'data.result.content');
@@ -250,8 +252,6 @@ async function getChallengeById(id) {
     loggerFile.info(`EndPoint: GET challenges/${id},  GET parameters: null, Status Code:${statusCode}, Response: ${circularJSON.stringify(response)}`);
     return challenge;
   } catch (err) {
-    loggerFile.info(`EndPoint: GET challenges/${id},  GET parameters: null, Status Code:null,
-    Error: 'Failed to get challenge details by Id', Details: ${circularJSON.stringify(err)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to get challenge details by Id');
   }
 }
@@ -369,6 +369,54 @@ async function addResourceToChallenge(id, resource) {
   }
 }
 
+/**
+ * Get challenge resources details by id
+ * @param {Number} id challenge ID
+ * @returns {Object} topcoder challenge resources
+ */
+async function getResourcesFromChallenge(id) {
+  if (!_.isNumber(id)) {
+    throw new Error('The challenge id must valid number');
+  }
+  const apiKey = await getAccessToken();
+  logger.debug(`fetch resource from challenge ${id}`);
+  try {
+    const response = await axios.get(`${projectsClient.basePath}/challenges/${id}/resources`, {
+      headers: {
+        authorization: `Bearer ${apiKey}`
+      },
+      'Content-Type': 'application/json'
+    });
+    const resources = _.get(response, 'data.result.content');
+    return resources;
+  } catch (err) {
+    throw errors.convertTopcoderApiError(err, 'Failed to fetch resource from the challenge.');
+  }
+}
+
+/**
+ * Check if role is already set
+ * @param {Number} id the challenge id
+ * @param {String} role the role to check
+ * @returns {Promise<Boolean>}
+ */
+async function roleAlreadySet(id, role) {
+  if (!_.isNumber(id)) {
+    throw new Error('The challenge id must valid number');
+  }
+  let result = false;
+  try {
+    const resources = await getResourcesFromChallenge(id);
+    resources.forEach((resource) => {
+      if (resource.role === role) {
+        result = true;
+      }
+    });
+  } catch (err) {
+    throw errors.convertTopcoderApiError(err, 'Failed to fetch resource from the challenge.');
+  }
+  return result;
+}
 /**
  * unregister user from topcoder challenge
  * @param {Number} id the challenge id
@@ -518,6 +566,8 @@ module.exports = {
   getProjectBillingAccountId,
   getTopcoderMemberId,
   addResourceToChallenge,
+  getResourcesFromChallenge,
+  roleAlreadySet,
   unregisterUserFromChallenge,
   cancelPrivateContent,
   assignUserAsRegistrant,

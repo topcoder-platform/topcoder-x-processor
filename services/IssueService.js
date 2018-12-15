@@ -10,21 +10,19 @@
  * @author TCSCODER
  * @version 1.1
  */
+const config = require('config');
 const _ = require('lodash');
 const Joi = require('joi');
 const MarkdownIt = require('markdown-it');
-const config = require('config');
 const logger = require('../utils/logger');
 const errors = require('../utils/errors');
-const constants = require('../constants');
 const topcoderApiHelper = require('../utils/topcoder-api-helper');
 const models = require('../models');
 const dbHelper = require('../utils/db-helper');
 const helper = require('../utils/helper');
-const gitHubService = require('./GithubService');
+const gitHelper = require('../utils/git-helper');
 const emailService = require('./EmailService');
 const userService = require('./UserService');
-const gitlabService = require('./GitlabService');
 const eventService = require('./EventService');
 
 const md = new MarkdownIt();
@@ -42,24 +40,26 @@ function getUrlForChallengeId(challengeId) {
 /**
  * Parse the prize from issue title.
  * @param {Object} issue the issue
+ * @returns {boolean} true if the prizes can be parsed; or false otherwise
  * @private
  */
 function parsePrizes(issue) {
   const matches = issue.title.match(/(\$[0-9]+)(?=.*\])/g);
 
   if (!matches || matches.length === 0) {
-    throw new Error(`Cannot parse prize from title: ${issue.title}`);
+    return false;
   }
 
   issue.prizes = _.map(matches, (match) => parseInt(match.replace('$', ''), 10));
   issue.title = issue.title.replace(/^(\[.*\])/, '').trim();
+  return true;
 }
 
 /**
  * check if challenge is exists for given issue in db/topcoder
  * @param {Object} event the event
  * @param {Object} issue the issue
- * @returns {Object} the found db issue if exists
+ * @returns {Promise<Object>} the found db issue if exists
  * @private
  */
 async function ensureChallengeExists(event, issue) {
@@ -95,18 +95,12 @@ async function ensureChallengeExists(event, issue) {
 
 /**
  * gets the project detail
- * @param {Object} issue the issue
  * @param {Object} event the event data
- * @returns {Object} the project detail
+ * @returns {Promise<Object>} the project detail
  * @private
  */
-async function getProjectDetail(issue, event) {
-  let fullRepoUrl;
-  if (issue.provider === 'github') {
-    fullRepoUrl = `https://github.com/${event.data.repository.full_name}`;
-  } else if (issue.provider === 'gitlab') {
-    fullRepoUrl = `${config.GITLAB_API_BASE_URL}/${event.data.repository.full_name}`;
-  }
+async function getProjectDetail(event) {
+  const fullRepoUrl = gitHelper.getFullRepoUrl(event);
   const project = await dbHelper.scanOne(models.Project, {
     repoUrl: fullRepoUrl
   });
@@ -125,27 +119,13 @@ async function getProjectDetail(issue, event) {
  * @private
  */
 async function rollbackAssignee(event, assigneeUserId, issue, reOpen = false, comment = null) {
-  let assigneeUsername;
-  if (event.provider === 'github') {
-    assigneeUsername = await gitHubService.getUsernameById(event.copilot, assigneeUserId);
-  } else {
-    assigneeUsername = await gitlabService.getUsernameById(event.copilot, assigneeUserId);
-  }
-
+  const assigneeUsername = await gitHelper.getUsernameById(event, assigneeUserId);
   if (!comment) {
     // comment on the git ticket for the user to self-sign up with the Topcoder x Self-Service tool
     comment = `@${assigneeUsername}, please sign-up with Topcoder X tool`;
   }
-
-  if (event.provider === 'github') {
-    await gitHubService.createComment(event.copilot, event.data.repository.full_name, issue.number, comment);
-    // un-assign the user from the ticket
-    await gitHubService.removeAssign(event.copilot, event.data.repository.full_name, issue.number, assigneeUsername);
-  } else {
-    await gitlabService.createComment(event.copilot, event.data.repository.id, issue.number, comment);
-    // un-assign the user from the ticket
-    await gitlabService.removeAssign(event.copilot, event.data.repository.id, issue.number, assigneeUserId);
-  }
+  await gitHelper.createComment(event, issue.number, comment);
+  await gitHelper.removeAssign(event, issue.number, assigneeUserId, assigneeUsername);
   if (reOpen) {
     await eventService.reOpenIssue(event, issue);
   }
@@ -213,20 +193,12 @@ async function handleIssueAssignment(event, issue) {
           const comment = `This ticket isn't quite ready to be worked on yet.Please wait until it has the ${config.OPEN_FOR_PICKUP_ISSUE_LABEL} label`;
 
           logger.debug(`Adding label ${config.NOT_READY_ISSUE_LABEL}`);
-          if (event.provider === constants.USER_TYPES.GITLAB) { // eslint-disable-line max-depth
-            await gitlabService.addLabels(event.copilot, event.data.repository.id, issue.number, issueLabels);
-          } else {
-            await gitHubService.addLabels(event.copilot, event.data.repository.full_name, issue.number, issueLabels);
-          }
+          await gitHelper.addLabels(event, issue.number, issueLabels);
 
           await rollbackAssignee(event, assigneeUserId, issue, false, comment);
         } else {
           logger.debug('Does not has Open for pickup but has assignee, remain labels');
-          if (event.provider === constants.USER_TYPES.GITLAB) { // eslint-disable-line max-depth
-            await gitlabService.addLabels(event.copilot, event.data.repository.id, issue.number, issue.labels);
-          } else {
-            await gitHubService.addLabels(event.copilot, event.data.repository.full_name, issue.number, issue.labels);
-          }
+          await gitHelper.addLabels(event, issue.number, issue.labels);
 
           if (!hasNotReadyLabel) { // eslint-disable-line max-depth
             const contestUrl = getUrlForChallengeId(dbIssue.challengeId);
@@ -257,22 +229,14 @@ async function handleIssueAssignment(event, issue) {
         .push(config.ASSIGNED_ISSUE_LABEL)
         .value();
 
-      if (event.provider === 'github') {
-        await gitHubService.addLabels(event.copilot, event.data.repository.full_name, issue.number, updateLabels);
-      } else {
-        await gitlabService.addLabels(event.copilot, event.data.repository.id, issue.number, updateLabels);
-      }
+      await gitHelper.addLabels(event, issue.number, updateLabels);
     } catch (err) {
       eventService.handleEventGracefully(event, issue, err);
       return;
     }
     const contestUrl = getUrlForChallengeId(dbIssue.challengeId);
     const comment = `Contest ${contestUrl} has been updated - it has been assigned to ${userMapping.topcoderUsername}.`;
-    if (event.provider === 'github') {
-      await gitHubService.createComment(event.copilot, event.data.repository.full_name, issue.number, comment);
-    } else {
-      await gitlabService.createComment(event.copilot, event.data.repository.id, issue.number, comment);
-    }
+    await gitHelper.createComment(event, issue.number, comment);
 
     logger.debug(`Member ${userMapping.topcoderUsername} is assigned to challenge with id ${dbIssue.challengeId}`);
   } else {
@@ -297,20 +261,11 @@ async function handleIssueComment(event, issue) {
     const newTitle = `[$${parsedComment.acceptedBidAmount}] ${issue.title}`;
     logger.debug(`updating issue: ${event.data.repository.name}/${issue.number}`);
 
-    if (event.provider === 'github') {
-      await gitHubService.updateIssue(event.copilot, event.data.repository.full_name, issue.number, newTitle);
-    } else {
-      await gitlabService.updateIssue(event.copilot, event.data.repository.id, issue.number, newTitle);
-    }
+    await gitHelper.updateIssue(event, issue.number, newTitle);
 
     // assign user
     logger.debug(`assigning user, ${parsedComment.assignedUser} to issue: ${event.data.repository.name}/${issue.number}`);
-    if (event.provider === 'github') {
-      await gitHubService.assignUser(event.copilot, event.data.repository.full_name, issue.number, parsedComment.assignedUser);
-    } else {
-      const userId = await gitlabService.getUserIdByLogin(event.copilot, parsedComment.assignedUser);
-      await gitlabService.assignUser(event.copilot, event.data.repository.id, issue.number, userId);
-    }
+    await gitHelper.assignUser(event, issue.number, parsedComment.assignedUser);
   }
 }
 
@@ -353,14 +308,6 @@ async function handleIssueUpdate(event, issue) {
     await eventService.handleEventGracefully(event, issue, e);
     return;
   }
-  // comment on the git ticket for the user to self-sign up with the Topcoder x Self-Service tool
-  const contestUrl = getUrlForChallengeId(dbIssue.challengeId);
-  const comment = `Contest ${contestUrl} has been updated - the new changes has been updated for this ticket.`;
-  if (event.provider === 'github') {
-    await gitHubService.createComment(event.copilot, event.data.repository.full_name, issue.number, comment);
-  } else {
-    await gitlabService.createComment(event.copilot, event.data.repository.id, issue.number, comment);
-  }
 
   logger.debug(`updated challenge ${dbIssue.challengeId} for for issue ${issue.number}`);
 }
@@ -376,6 +323,8 @@ async function handleIssueClose(event, issue) {
   let dbIssue;
   try {
     dbIssue = await ensureChallengeExists(event, issue);
+    event.dbIssue = dbIssue;
+
     if (!event.paymentSuccessful) {
       let closeChallenge = false;
       // if issue is closed without Fix accepted label
@@ -383,17 +332,22 @@ async function handleIssueClose(event, issue) {
         logger.debug(`This issue ${issue.number} is closed without fix accepted label.`);
         let comment = 'This ticket was not processed for payment. If you would like to process it for payment,';
         comment += ' please reopen it, add the ```' + config.FIX_ACCEPTED_ISSUE_LABEL + '``` label, and then close it again';// eslint-disable-line
-        if (event.provider === 'github') {
-          await gitHubService.createComment(event.copilot, event.data.repository.full_name, issue.number, comment);
-        } else {
-          await gitlabService.createComment(event.copilot, event.data.repository.id, issue.number, comment);
-        }
+        await gitHelper.createComment(event, issue.number, comment);
         closeChallenge = true;
       }
+
       if (issue.prizes[0] === 0) {
         closeChallenge = true;
       }
 
+      if (closeChallenge) {
+        logger.debug(`The associated challenge ${dbIssue.challengeId} is being scheduled for cancellation since no payment will be given`);
+        setTimeout(async () => {
+          await topcoderApiHelper.cancelPrivateContent(dbIssue.challengeId);
+          logger.debug(`The challenge ${dbIssue.challengeId} is deleted`);
+        }, config.CANCEL_CHALLENGE_INTERVAL); //eslint-disable-line
+        return;
+      }
 
       // if issue is closed without assignee then do nothing
       if (!event.data.assignee.id) {
@@ -406,9 +360,17 @@ async function handleIssueClose(event, issue) {
         logger.debug(`This issue ${issue.number} is already paid with challenge ${dbIssue.challengeId}`);
         return;
       }
+      logger.debug(`Getting the challenge meta-data for challenge ID : ${dbIssue.challengeId}`);
+
+      const challenge = await topcoderApiHelper.getChallengeById(dbIssue.challengeId);
+      if (challenge.currentStatus === 'Completed') {
+        logger.debug('Challenge is already complete, so no point in trying to do anything further');
+        return;
+      }
 
       logger.debug(`Looking up TC handle of git user: ${event.data.assignee.id}`);
       const assigneeMember = await userService.getTCUserName(event.provider, event.data.assignee.id);
+      event.assigneeMember = assigneeMember;
 
       // no mapping is found for current assignee remove assign, re-open issue and make comment
       // to assignee to login with Topcoder X
@@ -417,12 +379,12 @@ async function handleIssueClose(event, issue) {
       }
 
       // get project detail from db
-      const project = await getProjectDetail(issue, event);
+      const project = await getProjectDetail(event);
 
       logger.debug(`Getting the billing account ID for project ID: ${project.tcDirectId}`);
       const accountId = await topcoderApiHelper.getProjectBillingAccountId(project.tcDirectId);
 
-      logger.debug(`assigning the billing account id ${accountId} to challenge`);
+      logger.debug(`Assigning the billing account id ${accountId} to challenge`);
 
       // adding assignees as well if it is missed/failed during update
       // prize needs to be again set after adding billing account otherwise it won't let activate
@@ -432,43 +394,50 @@ async function handleIssueClose(event, issue) {
       };
       await topcoderApiHelper.updateChallenge(dbIssue.challengeId, updateBody);
 
+      const copilotAlreadySet = await topcoderApiHelper.roleAlreadySet(dbIssue.challengeId, 'Copilot');
+
+      if (!copilotAlreadySet) {
+        logger.debug(`Getting the topcoder member ID for copilot name : ${event.copilot.topcoderUsername}`);
+        // get copilot tc user id
+        const copilotTopcoderUserId = await topcoderApiHelper.getTopcoderMemberId(event.copilot.topcoderUsername);
+
+        // role id 14 for copilot
+        const copilotResourceBody = {
+          roleId: 14,
+          resourceUserId: copilotTopcoderUserId,
+          phaseId: 0,
+          addNotification: true,
+          addForumWatch: true
+        };
+        await topcoderApiHelper.addResourceToChallenge(dbIssue.challengeId, copilotResourceBody);
+      } else {
+        logger.debug('Copilot is already set, so skipping');
+      }
+
       logger.debug(`Getting the topcoder member ID for member name: ${assigneeMember.topcoderUsername}`);
       const winnerId = await topcoderApiHelper.getTopcoderMemberId(assigneeMember.topcoderUsername);
+      const assigneeAlreadySet = await topcoderApiHelper.roleAlreadySet(dbIssue.challengeId, 'Submitter');
 
-      logger.debug(`Getting the topcoder member ID for copilot name : ${event.copilot.topcoderUsername}`);
-      // get copilot tc user id
-      const copilotTopcoderUserId = await topcoderApiHelper.getTopcoderMemberId(event.copilot.topcoderUsername);
-
-      // role id 14 for copilot
-      const copilotResourceBody = {
-        roleId: 14,
-        resourceUserId: copilotTopcoderUserId,
-        phaseId: 0,
-        addNotification: true,
-        addForumWatch: true
-      };
-      await topcoderApiHelper.addResourceToChallenge(dbIssue.challengeId, copilotResourceBody);
-
-      // adding reg
-      await topcoderApiHelper.assignUserAsRegistrant(winnerId, dbIssue.challengeId);
+      if (!assigneeAlreadySet) {
+        // adding reg
+        logger.debug('Adding assignee because one was not set');
+        await topcoderApiHelper.assignUserAsRegistrant(winnerId, dbIssue.challengeId);
+      } else {
+        logger.debug('Assignee is already set, so skipping');
+      }
 
       // activate challenge
-      await topcoderApiHelper.activateChallenge(dbIssue.challengeId);
-      if (closeChallenge) {
-        logger.debug(`The associated challenge ${dbIssue.challengeId} is scheduled for cancel`);
-        setTimeout(async () => {
-          await topcoderApiHelper.cancelPrivateContent(dbIssue.challengeId);
-          logger.debug(`The challenge ${dbIssue.challengeId} is deleted`);
-        }, config.CANCEL_CHALLENGE_INTERVAL); //eslint-disable-line
-        return;
+      if (challenge.currentStatus === 'Draft') {
+        await topcoderApiHelper.activateChallenge(dbIssue.challengeId);
       }
-      logger.debug(`close challenge with winner ${assigneeMember.topcoderUsername}(${winnerId})`);
+
+      logger.debug(`Closing challenge with winner ${assigneeMember.topcoderUsername}(${winnerId})`);
       await topcoderApiHelper.closeChallenge(dbIssue.challengeId, winnerId);
       event.paymentSuccessful = true;
     }
   } catch (e) {
     event.paymentSuccessful = event.paymentSuccessful === true; // if once paid shouldn't be false
-    await eventService.handleEventGracefully(event, issue, e, event.paymentSuccessful);
+    await eventService.handleEventGracefully(event, issue, e);
     return;
   }
   try {
@@ -481,14 +450,9 @@ async function handleIssueClose(event, issue) {
       labels,
       updatedAt: new Date()
     });
-
-    if (event.provider === 'github') {
-      await gitHubService.markIssueAsPaid(event.copilot, event.data.repository.full_name, issue.number, dbIssue.challengeId, dbIssue.labels);
-    } else {
-      await gitlabService.markIssueAsPaid(event.copilot, event.data.repository.id, issue.number, dbIssue.challengeId, dbIssue.labels);
-    }
+    await gitHelper.markIssueAsPaid(event, issue.number, dbIssue.challengeId);
   } catch (e) {
-    await eventService.handleEventGracefully(event, issue, e, event.paymentSuccessful);
+    await eventService.handleEventGracefully(event, issue, e);
     return;
   }
 }
@@ -502,7 +466,7 @@ async function handleIssueClose(event, issue) {
  */
 async function handleIssueCreate(event, issue) {
   // check if project for such repository is already created
-  const project = await getProjectDetail(issue, event);
+  const project = await getProjectDetail(event);
 
   if (!project) {
     throw new Error(
@@ -559,11 +523,7 @@ async function handleIssueCreate(event, issue) {
 
   const contestUrl = getUrlForChallengeId(issue.challengeId);
   const comment = `Contest ${contestUrl} has been created for this ticket.`;
-  if (event.provider === 'github') {
-    await gitHubService.createComment(event.copilot, event.data.repository.full_name, issue.number, comment);
-  } else {
-    await gitlabService.createComment(event.copilot, event.data.repository.id, issue.number, comment);
-  }
+  await gitHelper.createComment(event, issue.number, comment);
   if (event.provider === 'gitlab') {
     // if assignee is added during issue create then assign as well
     if (event.data.issue.assignees && event.data.issue.assignees.length > 0 && event.data.issue.assignees[0].id) {
@@ -608,12 +568,7 @@ async function handleIssueUnAssignment(event, issue) {
   try {
     dbIssue = await ensureChallengeExists(event, issue);
     if (dbIssue.assignee) {
-      let assigneeUserId;
-      if (event.provider === constants.USER_TYPES.GITHUB) {
-        assigneeUserId = gitHubService.getUserIdByLogin(event.copilot, dbIssue.assignee);
-      } else {
-        assigneeUserId = await gitlabService.getUserIdByLogin(event.copilot, dbIssue.assignee);
-      }
+      const assigneeUserId = gitHelper.getUserIdByLogin(event, dbIssue.assignee);
       logger.debug(`Looking up TC handle of git user: ${assigneeUserId}`);
       const userMapping = await userService.getTCUserName(event.provider, assigneeUserId);
       if (userMapping && userMapping.topcoderUsername) {
@@ -632,13 +587,8 @@ async function handleIssueUnAssignment(event, issue) {
         });
         const contestUrl = getUrlForChallengeId(dbIssue.challengeId);
         const comment = `Contest ${contestUrl} has been updated - ${userMapping.topcoderUsername} has been unassigned.`;
-        if (event.provider === 'github') {
-          await gitHubService.createComment(event.copilot, event.data.repository.full_name, issue.number, comment);
-          await gitHubService.addLabels(event.copilot, event.data.repository.full_name, issue.number, updateLabels);
-        } else {
-          await gitlabService.createComment(event.copilot, event.data.repository.id, issue.number, comment);
-          await gitlabService.addLabels(event.copilot, event.data.repository.id, issue.number, updateLabels);
-        }
+        await gitHelper.createComment(event, issue.number, comment);
+        await gitHelper.addLabels(event, issue.number, updateLabels);
         logger.debug(`Member ${userMapping.topcoderUsername} is unassigned from challenge with id ${dbIssue.challengeId}`);
       }
     }
@@ -668,12 +618,7 @@ async function process(event) {
     repositoryId: event.data.repository.id,
     labels: event.data.issue.labels
   };
-  let fullRepoUrl;
-  if (event.provider === 'github') {
-    fullRepoUrl = `https://github.com/${event.data.repository.full_name}`;
-  } else if (event.provider === 'gitlab') {
-    fullRepoUrl = `${config.GITLAB_API_BASE_URL}/${event.data.repository.full_name}`;
-  }
+  const fullRepoUrl = gitHelper.getFullRepoUrl(event);
   const project = await dbHelper.scanOne(models.Project, {
     repoUrl: fullRepoUrl
   });
@@ -681,19 +626,18 @@ async function process(event) {
   issue.projectId = project.id;
 
   // Parse prize from title
-  parsePrizes(issue);
+  const hasPrizes = parsePrizes(issue);
+  // If the issue does not have prizes set, skip all processing
+  if (!hasPrizes) {
+    return;
+  }
   const copilot = await userService.getRepositoryCopilot(event.provider, event.data.repository.full_name);
   event.copilot = copilot;
 
   // Markdown the body
   issue.body = md.render(_.get(issue, 'body', ''));
-
   if (event.data.issue.assignees && event.data.issue.assignees.length > 0 && event.data.issue.assignees[0].id) {
-    if (event.provider === 'github') {
-      issue.assignee = await gitHubService.getUsernameById(copilot, event.data.issue.assignees[0].id);
-    } else if (event.provider === 'gitlab') {
-      issue.assignee = await gitlabService.getUsernameById(copilot, event.data.issue.assignees[0].id);
-    }
+    issue.assignee = await gitHelper.getUsernameById(event, event.data.issue.assignees[0].id);
   }
   if (event.event === 'issue.created') {
     await handleIssueCreate(event, issue);
@@ -747,7 +691,10 @@ process.schema = Joi.object().keys({
     labels: Joi.array().items(Joi.string())
   }).required(),
   retryCount: Joi.number().integer().default(0).optional(),
-  paymentSuccessful: Joi.boolean().default(false).optional()
+  paymentSuccessful: Joi.boolean().default(false).optional(),
+  challengeValid: Joi.boolean().default(false).optional(),
+  dbIssue: Joi.object().optional(),
+  assigneeMember: Joi.object().optional()
 });
 
 

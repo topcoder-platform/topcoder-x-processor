@@ -9,9 +9,9 @@
  * @version 1.0
  */
 
+const config = require('config');
 const _ = require('lodash');
 const Joi = require('joi');
-const config = require('config');
 const GitlabAPI = require('node-gitlab-api');
 const logger = require('../utils/logger');
 const errors = require('../utils/errors');
