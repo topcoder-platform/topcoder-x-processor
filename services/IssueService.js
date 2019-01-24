@@ -63,7 +63,7 @@ function parsePrizes(issue) {
  * @private
  */
 async function ensureChallengeExists(event, issue) {
-  let dbIssue = dbHelper.scanOne(models.Issue, {
+  let dbIssue = await dbHelper.scanOne(models.Issue, {
     number: issue.number,
     provider: issue.provider,
     repositoryId: issue.repositoryId
@@ -328,7 +328,7 @@ async function handleIssueClose(event, issue) {
     if (!event.paymentSuccessful) {
       let closeChallenge = false;
       // if issue is closed without Fix accepted label
-      if (!_.includes(event.data.issue.labels, config.FIX_ACCEPTED_ISSUE_LABEL)) {
+      if (!_.includes(event.data.issue.labels, config.FIX_ACCEPTED_ISSUE_LABEL) || _.includes(event.data.issue.labels, config.CANCELED_ISSUE_LABEL)) {
         logger.debug(`This issue ${issue.number} is closed without fix accepted label.`);
         let comment = 'This ticket was not processed for payment. If you would like to process it for payment,';
         comment += ' please reopen it, add the ```' + config.FIX_ACCEPTED_ISSUE_LABEL + '``` label, and then close it again';// eslint-disable-line
@@ -493,6 +493,14 @@ async function handleIssueCreate(event, issue) {
   dbIssue = await dbHelper.create(models.Issue, issueObject);
 
   const projectId = project.tcDirectId;
+
+  let fullRepoUrl;
+  if (issue.provider === 'github') {
+    fullRepoUrl = `https://github.com/${event.data.repository.full_name}`;
+  } else if (issue.provider === 'gitlab') {
+    fullRepoUrl = `${config.GITLAB_API_BASE_URL}/${event.data.repository.full_name}`;
+  }
+
   logger.debug(`existing project was found with id ${projectId} for repository ${event.data.repository.full_name}`);
   try {
     // Create a new challenge
@@ -501,7 +509,8 @@ async function handleIssueCreate(event, issue) {
       projectId,
       detailedRequirements: issue.body,
       prizes: issue.prizes,
-      task: true
+      task: true,
+      submissionGuidelines: `Git issue link: ${fullRepoUrl}/issues/${issue.number}`
     });
 
     // Save
@@ -631,7 +640,7 @@ async function process(event) {
   if (!hasPrizes) {
     return;
   }
-  const copilot = await userService.getRepositoryCopilot(event.provider, event.data.repository.full_name);
+  const copilot = await userService.getRepositoryCopilotOrOwner(event.provider, event.data.repository.full_name);
   event.copilot = copilot;
 
   // Markdown the body

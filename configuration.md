@@ -30,8 +30,8 @@ The following config parameters are supported, they are defined in `config/defau
 |RETRY_COUNT| the number of times an event should be retried to process| 3|
 |RETRY_INTERVAL| the interval at which the event should be retried to process in milliseconds | 120000|
 |READY_FOR_REVIEW_ISSUE_LABEL| the label name for ready for review, should be one of the label configured in topcoder x ui|'tcx_ReadyForReview'|
-|NOT_READY_ISSUE_LABEL| the label name for not ready, should be one of the label configured in topcoder x ui|
-'Not Ready'|
+|NOT_READY_ISSUE_LABEL| the label name for not ready, should be one of the label configured in topcoder x ui|'tcx_NotReady'|
+|CANCELED_ISSUE_LABEL| the label name for canceled, should be one of the label configured in topcoder x ui|'tcx_Canceled'|
 |CANCEL_CHALLENGE_INTERVAL| the time in millisecond after which the challenge will be closed| '24*60*60*1000'|
 |AWS_ACCESS_KEY_ID | The Amazon certificate key to use when connecting. Use local dynamodb you can set fake value|FAKE_ACCESS_KEY_ID |
 |AWS_SECRET_ACCESS_KEY | The Amazon certificate access key to use when connecting. Use local dynamodb you can set fake value|FAKE_SECRET_ACCESS_KEY |

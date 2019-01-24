@@ -66,8 +66,14 @@ async function handleEventGracefully(event, data, err) {
         clearTimeout(timeoutsToClear[i]);
       }
       let comment = `[${err.statusCode}]: ${err.message}`;
-      if (event.event === 'issue.closed' && event.paymentSuccessful === false) {
-        comment = `Payment failed: ${comment}`;
+      if (event.event === 'issue.closed') {
+        if (event.paymentSuccessful !== undefined && event.paymentSuccessful === false) { // eslint-disable-line no-undefined
+          comment = `Payment failed: ${comment}`;
+        }
+
+        if (event.cancelSuccessful !== undefined && event.cancelSuccessful === false) { // eslint-disable-line no-undefined
+          comment = `The challenge cancel failed: ${comment}`;
+        }
       } else if (event.event === 'issue.created') {
         // comment for challenge creation failed
         comment = 'The challenge creation on the Topcoder platform failed.  Please contact support to try again';
