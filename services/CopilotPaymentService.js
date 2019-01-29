@@ -260,8 +260,8 @@ async function handlePaymentDelete(event, payment) {
 async function handlePaymentUpdates(event) {
   const projectIds = await Project.find({
     $or: [
-      {owner: event.copilot.handle},
-      {copilot: event.copilot.handle}
+      {owner: event.data.copilot.handle},
+      {copilot: event.data.copilot.handle}
     ]
   }).select('_id');
 
