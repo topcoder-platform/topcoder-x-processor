@@ -141,6 +141,7 @@ async function createChallenge(challenge) {
     }, challenge)
   });
   try {
+    logger.debug('Challenge body:' + challengeBody);
     const challengeResponse = await new Promise((resolve, reject) => {
       challengesApiInstance.saveDraftContest(challengeBody, (err, res) => {
         if (err) {
@@ -153,6 +154,7 @@ async function createChallenge(challenge) {
 
     return _.get(challengeResponse, 'result.content.id');
   } catch (err) {
+    logger.debug('Response:' + res);
     throw errors.convertTopcoderApiError(err, 'Failed to create challenge.');
   }
 }
@@ -218,7 +220,7 @@ async function activateChallenge(id) {
  */
 async function getChallengeById(id) {
   if (!_.isNumber(id)) {
-    throw new Error('The challenge id must valid number');
+    throw new Error(`The challenge id must be a valid number, not ${id}`);
   }
   const apiKey = await getAccessToken();
   logger.debug('Getting topcoder challenge details');

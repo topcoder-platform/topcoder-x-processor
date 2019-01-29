@@ -183,10 +183,12 @@ async function handlePaymentAdd(event, payment) {
       const accountId = await topcoderApiHelper.getProjectBillingAccountId(project.tcDirectId);
 
       // use copilot id as the copilot of the challenge
+      logger.debug(`Getting the member ID for handle: ${copilot.handle}`);
       const topcoderMemberId = await topcoderApiHelper.getTopcoderMemberId(copilot.handle);
 
       const challengeRequirements = md.render(`$${payment.amount} - ${payment.description}  `);
       const challengeTitle = constructChallengeName(project);
+
       const newChallenge = {
         name: challengeTitle,
         projectId: project.tcDirectId,
@@ -198,6 +200,7 @@ async function handlePaymentAdd(event, payment) {
         copilotFee: 1
       };
 
+      logger.debug(`Creating the challenge`);
       // Create a new challenge
       const challengeId = await topcoderApiHelper.createChallenge(newChallenge);
 
