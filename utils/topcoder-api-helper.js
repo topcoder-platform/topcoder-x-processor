@@ -141,7 +141,7 @@ async function createChallenge(challenge) {
     }, challenge)
   });
   try {
-    logger.debug('Challenge body:' + challengeBody);
+    logger.debug(`Challenge body: ${challengeBody}`);
     const challengeResponse = await new Promise((resolve, reject) => {
       challengesApiInstance.saveDraftContest(challengeBody, (err, res) => {
         if (err) {
@@ -154,7 +154,7 @@ async function createChallenge(challenge) {
 
     return _.get(challengeResponse, 'result.content.id');
   } catch (err) {
-    logger.debug('Response:' + res);
+    logger.debug(`Response: ${err}`);
     throw errors.convertTopcoderApiError(err, 'Failed to create challenge.');
   }
 }
