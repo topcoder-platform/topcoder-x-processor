@@ -141,7 +141,7 @@ async function createChallenge(challenge) {
     }, challenge)
   });
   try {
-    logger.debug(`Challenge body: ${challengeBody}`);
+    logger.debug(`Challenge body: ${JSON.stringify(challengeBody, null, 2)}`);
     const challengeResponse = await new Promise((resolve, reject) => {
       challengesApiInstance.saveDraftContest(challengeBody, (err, res) => {
         if (err) {
