@@ -38,7 +38,10 @@ let cachedAccessToken;
 
 // Init the API instances
 const projectsClient = topcoderApiProjects.ApiClient.instance;
-const challengesClient = topcoderApiChallenges.ApiClient.instance;
+
+let challengesClient = topcoderApiChallenges.ApiClient.instance;
+challengesClient.timeout=240000;
+
 const bearer = projectsClient.authentications.bearer;
 bearer.apiKeyPrefix = 'Bearer';
 challengesClient.authentications.bearer = bearer;
