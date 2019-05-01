@@ -38,13 +38,14 @@ let cachedAccessToken;
 
 // Init the API instances
 const projectsClient = topcoderApiProjects.ApiClient.instance;
-
 let challengesClient = topcoderApiChallenges.ApiClient.instance;
-challengesClient.timeout=240000;
+challengesClient.timeout=480000;
 
 const bearer = projectsClient.authentications.bearer;
 bearer.apiKeyPrefix = 'Bearer';
 challengesClient.authentications.bearer = bearer;
+challengesClient.basePath =  = 'http://api.topcoder.com/v4'.replace(/\/+$/, '');
+
 const projectsApiInstance = new topcoderApiProjects.DefaultApi();
 const challengesApiInstance = new topcoderApiChallenges.DefaultApi();
 
