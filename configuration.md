@@ -8,13 +8,10 @@ The following config parameters are supported, they are defined in `config/defau
 | PARTITION                  | The Kafka partition            |  0|
 |TOPIC  | The Kafka topic where events are published.  This must be the same as the configured value for topcoder-x-processor| |
 |KAFKA_OPTIONS | Kafka connection options| |
-|KAFKA_HOST | The Kafka host to connect to| localhost:9092 |
+|KAFKA_URL | The Kafka host to connect to| localhost:9092 |
 |KAFKA_CLIENT_CERT | The Kafka SSL certificate to use when connecting| Read from kafka_client.cer file, but this can be set as a string like it is on Heroku |
 |KAFKA_CLIENT_CERT_KEY | The Kafka SSL certificate key to use when connecting| Read from kafka_client.key file, but this can be set as a string like it is on Heroku|
 |TC_DEV_ENV| the flag whether to use topcoder development api or production| false|
-| TC_AUTHN_URL | the Topcoder authentication url | https://topcoder-dev.auth0.com/oauth/ro |
-| TC_AUTHN_REQUEST_BODY | the Topcoder authentication request body. This makes use of some environment variables: `TC_USERNAME`, `TC_PASSWORD`, `TC_CLIENT_ID`, `CLIENT_V2CONNECTION` | see `default.js` |
-| TC_AUTHZ_URL | the Topcoder authorization url | https://api.topcoder-dev.com/v3/authorizations |
 | NEW_CHALLENGE_TEMPLATE | the body template for new challenge request. You can change the subTrack, reviewTypes, technologies, .. here | see `default.js` |
 | NEW_CHALLENGE_DURATION_IN_DAYS | the duration of new challenge | 5 |
 | NODE_MAILER_OPTIONS| the node mailer smtp options, see [here](https://nodemailer.com/smtp/ for more detail)| see `default.js` |
@@ -37,6 +34,11 @@ The following config parameters are supported, they are defined in `config/defau
 |AWS_SECRET_ACCESS_KEY | The Amazon certificate access key to use when connecting. Use local dynamodb you can set fake value|FAKE_SECRET_ACCESS_KEY |
 |AWS_REGION | The Amazon certificate region to use when connecting. Use local dynamodb you can set fake value|FAKE_REGION |
 |IS_LOCAL | Use Amazon DynamoDB Local or server. |'false' |
+|AUTH0_URL| The Auth0 URL for generating Machine-to-machine token |https://topcoder-dev.auth0.com/oauth/token|
+|AUTH0_AUDIENCE| The audience of Auth0 to generate M2M Token |https://m2m.topcoder-dev.com/|
+|TOKEN_CACHE_TIME| The machine-to-machine token cache validation time |43200|
+|AUTH0_CLIENT_ID| The Auth0 ClientID for generating Machine-to-machine token ||
+|AUTH0_CLIENT_SECRET| The Auth0 Client Secret for generating Machine-to-machine token ||
 
 KAFKA_OPTIONS should be object as described in https://github.com/oleksiyk/kafka#ssl
 For using with SSL, the options should be as

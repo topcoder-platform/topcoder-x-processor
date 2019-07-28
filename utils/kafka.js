@@ -14,6 +14,7 @@
 const config = require('config');
 const _ = require('lodash');
 const kafka = require('no-kafka');
+const healthcheck = require('topcoder-healthcheck-dropin');
 const IssueService = require('../services/IssueService');
 const CopilotPaymentService = require('../services/CopilotPaymentService');
 const logger = require('./logger');
@@ -28,6 +29,7 @@ class Kafka {
     }).catch((err) => {
       logger.error(`kafka producer is not connected. ${err.stack}`);
     });
+    this.check = this.check.bind(this);
   }
 
   messageHandler(messageSet) {
@@ -61,9 +63,23 @@ class Kafka {
     });
   }
 
+  // check if there is kafka connection alive
+  check() {
+    if (!this.consumer.client.initialBrokers && !this.consumer.client.initialBrokers.length) {
+      return false;
+    }
+    let connected = true;
+    this.consumer.client.initialBrokers.forEach((conn) => {
+      connected = conn.connected && connected;
+    });
+
+    return connected;
+  }
+
   run() {
     this.consumer.init().then(() => {
       logger.info('kafka consumer is ready');
+      healthcheck.init([this.check]);
       this.consumer.subscribe(config.TOPIC, {}, this.messageHandler);
     }).catch((err) => {
       logger.error(`kafka consumer is not connected. ${err.stack}`);

@@ -40,10 +40,12 @@
     "no-kafka": "^3.2.10",
     "node-gitlab-api": "^2.2.8",
     "nodemailer": "^4.6.7",
+    "tc-core-library-js": "appirio-tech/tc-core-library-js.git#feature/auth0-proxy-server",
     "topcoder-api-challenges": "^1.0.6",
     "topcoder-api-projects": "^1.0.1",
     "topcoder-dev-api-challenges": "^1.0.6",
     "topcoder-dev-api-projects": "^1.0.1",
+    "topcoder-healthcheck-dropin": "^1.0.3",
     "util": "^0.11.0",
     "winston": "^2.4.3"
   },
