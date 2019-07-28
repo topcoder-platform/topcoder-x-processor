@@ -30,11 +30,11 @@ dynamoose.setDefaults({
 
 /* eslint-disable global-require */
 const models = {
-  Issue: dynamoose.model('Issue', require('./Issue')),
-  Project: dynamoose.model('Project', require('./Project')),
-  User: dynamoose.model('User', require('./User')),
-  UserMapping: dynamoose.model('UserMapping', require('./UserMapping')),
-  CopilotPayment: dynamoose.model('CopilotPayment', require('./CopilotPayment'))
+  Issue: dynamoose.model('Topcoder_X.Issue', require('./Issue')),
+  Project: dynamoose.model('Topcoder_X.Project', require('./Project')),
+  User: dynamoose.model('Topcoder_X.User', require('./User')),
+  UserMapping: dynamoose.model('Topcoder_X.UserMapping', require('./UserMapping')),
+  CopilotPayment: dynamoose.model('Topcoder_X.CopilotPayment', require('./CopilotPayment'))
 };
 /* eslint-enable global-require */
 
