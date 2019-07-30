@@ -52,6 +52,7 @@ const challengesApiInstance = new topcoderApiChallenges.DefaultApi();
  * @returns {Promise} The promised token
  */
 async function getM2Mtoken() {
+  logger.debug(`Client ID: ${config.AUTH0_CLIENT_ID} and secret: ${config.AUTH0_CLIENT_SECRET} and endpoint: ${config.AUTH0_URL}`)
   return await m2m.getMachineToken(config.AUTH0_CLIENT_ID, config.AUTH0_CLIENT_SECRET);
 }
 
