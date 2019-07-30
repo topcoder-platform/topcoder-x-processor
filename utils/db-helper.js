@@ -137,8 +137,8 @@ async function remove(Model, queryParams) {
         }
 
         resolve(dbItem);
-      }
-    });
+      });
+    }
   });
 }
 
