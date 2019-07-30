@@ -521,6 +521,7 @@ async function handleIssueCreate(event, issue) {
       updatedAt: new Date()
     });
   } catch (e) {
+    logger.error(`Challenge creation failure: ${e}`);
     await dbHelper.remove(models.Issue, {
       number: issue.number,
       provider: issue.provider,
