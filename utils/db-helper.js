@@ -130,12 +130,14 @@ async function update(Model, id, data) {
 async function remove(Model, queryParams) {
   const dbItem = await scanOne(Model, queryParams);
   await new Promise((resolve, reject) => {
-    dbItem.delete((err) => {
-      if (err) {
-        reject(err);
-      }
+    if(dbItem != null){
+      dbItem.delete((err) => {
+        if (err) {
+          reject(err);
+        }
 
-      resolve(dbItem);
+        resolve(dbItem);
+      }
     });
   });
 }
