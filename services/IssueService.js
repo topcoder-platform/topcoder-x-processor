@@ -59,10 +59,11 @@ function parsePrizes(issue) {
  * check if challenge is exists for given issue in db/topcoder
  * @param {Object} event the event
  * @param {Object} issue the issue
+ * @param {Boolean} create create if not found
  * @returns {Promise<Object>} the found db issue if exists
  * @private
  */
-async function ensureChallengeExists(event, issue) {
+async function ensureChallengeExists(event, issue, create = true) {
   let dbIssue = await dbHelper.scanOne(models.Issue, {
     number: issue.number,
     provider: issue.provider,
@@ -82,7 +83,7 @@ async function ensureChallengeExists(event, issue) {
     dbIssue = null;
   }
 
-  if (!dbIssue) {
+  if (!dbIssue && create) {
     await handleIssueCreate(event, issue);
     dbIssue = await dbHelper.scanOne(models.Issue, {
       number: issue.number,
@@ -184,6 +185,19 @@ async function handleIssueAssignment(event, issue) {
     try {
       dbIssue = await ensureChallengeExists(event, issue);
 
+      // Handle multiple assignees. TC-X allows only one assignee.
+      if (event.data.issue.assignees && event.data.issue.assignees.length > 1) {
+        const comment = 'Topcoder-X only supports a single assignee on a ticket to avoid issues with payment';
+        await gitHelper.createComment(event, issue.number, comment);
+        return;
+      }
+
+      // The assignees is updated but the assignee has already registered.
+      if (dbIssue.assignee === issue.assignee) {
+        logger.debug(`${userMapping.topcoderUsername} Already registered as assignee`);
+        return;
+      }
+
       // ensure issue has open for pickup label
       const hasOpenForPickupLabel = _(issue.labels).includes(config.OPEN_FOR_PICKUP_ISSUE_LABEL); // eslint-disable-line lodash/chaining
       const hasNotReadyLabel = _(issue.labels).includes(config.NOT_READY_ISSUE_LABEL); // eslint-disable-line lodash/chaining
@@ -278,7 +292,7 @@ async function handleIssueComment(event, issue) {
 async function handleIssueUpdate(event, issue) {
   let dbIssue;
   try {
-    dbIssue = await ensureChallengeExists(event, issue);
+    dbIssue = await ensureChallengeExists(event, issue, false);
 
     if (dbIssue.title === issue.title &&
       dbIssue.body === issue.body &&
@@ -556,7 +570,7 @@ async function handleIssueCreate(event, issue) {
 async function handleIssueLabelUpdated(event, issue) {
   let dbIssue;
   try {
-    dbIssue = await ensureChallengeExists(event, issue);
+    dbIssue = await ensureChallengeExists(event, issue, false);
   } catch (e) {
     await eventService.handleEventGracefully(event, issue, e);
     return;
@@ -581,12 +595,24 @@ async function handleIssueUnAssignment(event, issue) {
       const assigneeUserId = gitHelper.getUserIdByLogin(event, dbIssue.assignee);
       logger.debug(`Looking up TC handle of git user: ${assigneeUserId}`);
       const userMapping = await userService.getTCUserName(event.provider, assigneeUserId);
+
+      // We still have assignee(s) left on the ticket.
+      if (event.data.issue.assignees && event.data.issue.assignees.length > 0) {
+        for (const assignee of event.data.issue.assignees) { // eslint-disable-line
+          assignee.username = await gitHelper.getUsernameById(event, assignee.id);
+        }
+        if (_.find(event.data.issue.assignees, {username: dbIssue.assignee})) {
+          return;
+        }
+      }
+
       if (userMapping && userMapping.topcoderUsername) {
         // remove assigned and add open for pickup
         const updateLabels = _(issue.labels)
           .filter((i) => i !== config.ASSIGNED_ISSUE_LABEL)
           .push(config.OPEN_FOR_PICKUP_ISSUE_LABEL)
           .value();
+        issue.labels = updateLabels;
         logger.debug(`Getting the topcoder member ID for member name: ${userMapping.topcoderUsername}`);
         const topcoderUserId = await topcoderApiHelper.getTopcoderMemberId(userMapping.topcoderUsername);
         // Update the challenge to remove the assignee
@@ -601,6 +627,20 @@ async function handleIssueUnAssignment(event, issue) {
         await gitHelper.addLabels(event, issue.number, updateLabels);
         logger.debug(`Member ${userMapping.topcoderUsername} is unassigned from challenge with id ${dbIssue.challengeId}`);
       }
+    } else {
+      // Handle multiple assignees. TC-X allows only one assignee.
+      if (event.data.issue.assignees && event.data.issue.assignees.length > 1) {
+        const comment = 'Topcoder-X only supports a single assignee on a ticket to avoid issues with payment';
+        await gitHelper.createComment(event, issue.number, comment);
+        return;
+      }
+
+      // There is one left assignee. Register it to the system.
+      if (event.data.issue.assignees && event.data.issue.assignees.length === 1) {
+        event.data.assignee = event.data.issue.assignees[0];
+        await handleIssueAssignment(event, issue);
+        return;
+      }
     }
   } catch (e) {
     await eventService.handleEventGracefully(event, issue, e);
@@ -611,6 +651,13 @@ async function handleIssueUnAssignment(event, issue) {
     assignedAt: null,
     updatedAt: new Date()
   });
+
+  // There is one left assignee. Register it to the system.
+  if (event.data.issue.assignees && event.data.issue.assignees.length === 1) {
+    event.data.assignee = event.data.issue.assignees[0];
+    await handleIssueAssignment(event, issue);
+    return;
+  }
 }
 
 /**
