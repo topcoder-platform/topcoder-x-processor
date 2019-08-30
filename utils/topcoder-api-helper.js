@@ -122,6 +122,8 @@ async function createChallenge(challenge) {
     Status Code:${statusCode}, Response: ${circularJSON.stringify(challengeResponse.result)}`);
     return _.get(challengeResponse, 'result.content.id');
   } catch (err) {
+    console.log(err);
+
     loggerFile.info(`EndPoint: POST /challenges,  POST parameters: ${circularJSON.stringify(challengeBody)}, Status Code:null,
     Error: 'Failed to create challenge.', Details: ${circularJSON.stringify(err)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to create challenge.');
@@ -203,7 +205,7 @@ async function getChallengeById(id) {
   const apiKey = await getM2Mtoken();
   logger.debug('Getting topcoder challenge details');
   try {
-    const response = await axios.get(`${projectsClient.basePath}/challenges/${id}`, {
+    const response = await axios.get(`${challengesClient.basePath}/challenges/${id}`, {
       headers: {
         authorization: `Bearer ${apiKey}`
       },
@@ -227,7 +229,7 @@ async function closeChallenge(id, winnerId) {
   const apiKey = await getM2Mtoken();
   logger.debug(`Closing challenge ${id}`);
   try {
-    const response = await axios.post(`${projectsClient.basePath}/challenges/${id}/close?winnerId=${winnerId}`, null, {
+    const response = await axios.post(`${challengesClient.basePath}/challenges/${id}/close?winnerId=${winnerId}`, null, {
       headers: {
         authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
@@ -344,7 +346,7 @@ async function getResourcesFromChallenge(id) {
   const apiKey = await getM2Mtoken();
   logger.debug(`fetch resource from challenge ${id}`);
   try {
-    const response = await axios.get(`${projectsClient.basePath}/challenges/${id}/resources`, {
+    const response = await axios.get(`${challengesClient.basePath}/challenges/${id}/resources`, {
       headers: {
         authorization: `Bearer ${apiKey}`
       },
@@ -504,7 +506,7 @@ async function getChallengeResources(id) {
   const apiKey = await getM2Mtoken();
   logger.debug(`getting resource from challenge ${id}`);
   try {
-    const response = await axios.get(`${projectsClient.basePath}/challenges/${id}/resources`, {
+    const response = await axios.get(`${challengesClient.basePath}/challenges/${id}/resources`, {
       headers: {Authorization: `bearer ${apiKey}`}
     });
     const statusCode = response.data ? response.data.result.status : null;

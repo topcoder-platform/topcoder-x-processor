@@ -47,7 +47,7 @@ class Kafka {
         return;
       }
 
-      if (event && _.includes(['issue.created', 'issue.updated', 'issue.closed',
+      if (event && _.includes(['issue.created', 'issue.updated', 'issue.closed', 'issue.recreated',
         'comment.created', 'comment.updated', 'issue.assigned', 'issue.labelUpdated', 'issue.unassigned']
         , event.event)) {
         IssueService

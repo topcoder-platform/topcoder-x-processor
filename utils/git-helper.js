@@ -119,12 +119,13 @@ class GitHelper {
    * @param {Object} event the event
    * @param {Number} issueNumber the issue Number
    * @param {Number} challengeId the challenge id
+   * @param {Array} existLabels the exist labels of the issue
    */
-  async markIssueAsPaid(event, issueNumber, challengeId) {
+  async markIssueAsPaid(event, issueNumber, challengeId, existLabels) {
     if (event.provider === 'github') {
-      await gitHubService.markIssueAsPaid(event.copilot, event.data.repository.full_name, issueNumber, challengeId);
+      await gitHubService.markIssueAsPaid(event.copilot, event.data.repository.full_name, issueNumber, challengeId, existLabels);
     } else {
-      await gitlabService.markIssueAsPaid(event.copilot, event.data.repository.id, issueNumber, challengeId);
+      await gitlabService.markIssueAsPaid(event.copilot, event.data.repository.id, issueNumber, challengeId, existLabels);
     }
   }
 

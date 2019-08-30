@@ -174,9 +174,10 @@ function parseComment(comment) {
  * handles the issue assignment
  * @param {Object} event the event
  * @param {Object} issue the issue
+ * @param {Boolean} force force to assign (if there is no OpenForPickup label)
  * @private
  */
-async function handleIssueAssignment(event, issue) {
+async function handleIssueAssignment(event, issue, force = false) {
   const assigneeUserId = event.data.assignee.id;
   logger.debug(`Looking up TC handle of git user: ${assigneeUserId}`);
   const userMapping = await userService.getTCUserName(event.provider, assigneeUserId);
@@ -201,7 +202,7 @@ async function handleIssueAssignment(event, issue) {
       // ensure issue has open for pickup label
       const hasOpenForPickupLabel = _(issue.labels).includes(config.OPEN_FOR_PICKUP_ISSUE_LABEL); // eslint-disable-line lodash/chaining
       const hasNotReadyLabel = _(issue.labels).includes(config.NOT_READY_ISSUE_LABEL); // eslint-disable-line lodash/chaining
-      if (!hasOpenForPickupLabel) {
+      if (!hasOpenForPickupLabel && !force) {
         if (!issue.assignee) {
           const issueLabels = _(issue.labels).push(config.NOT_READY_ISSUE_LABEL).value(); // eslint-disable-line lodash/chaining
           const comment = `This ticket isn't quite ready to be worked on yet.Please wait until it has the ${config.OPEN_FOR_PICKUP_ISSUE_LABEL} label`;
@@ -464,7 +465,7 @@ async function handleIssueClose(event, issue) {
       labels,
       updatedAt: new Date()
     });
-    await gitHelper.markIssueAsPaid(event, issue.number, dbIssue.challengeId);
+    await gitHelper.markIssueAsPaid(event, issue.number, dbIssue.challengeId, labels);
   } catch (e) {
     await eventService.handleEventGracefully(event, issue, e);
     return;
@@ -500,7 +501,7 @@ async function handleIssueCreate(event, issue) {
   }
 
   // create issue with challenge creation pending
-  const issueObject = _.assign({}, issue, {
+  const issueObject = _.assign({}, _.omit(issue, 'assignee'), {
     id: helper.generateIdentifier(),
     status: 'challenge_creation_pending'
   });
@@ -548,14 +549,13 @@ async function handleIssueCreate(event, issue) {
   const contestUrl = getUrlForChallengeId(issue.challengeId);
   const comment = `Contest ${contestUrl} has been created for this ticket.`;
   await gitHelper.createComment(event, issue.number, comment);
-  if (event.provider === 'gitlab') {
-    // if assignee is added during issue create then assign as well
-    if (event.data.issue.assignees && event.data.issue.assignees.length > 0 && event.data.issue.assignees[0].id) {
-      event.data.assignee = {
-        id: event.data.issue.assignees[0].id
-      };
-      await handleIssueAssignment(event, issue);
-    }
+
+  // if assignee is added during issue create then assign as well
+  if (event.data.issue.assignees && event.data.issue.assignees.length > 0 && event.data.issue.assignees[0].id) {
+    event.data.assignee = {
+      id: event.data.issue.assignees[0].id
+    };
+    await handleIssueAssignment(event, issue, true);
   }
 
   logger.debug(`new challenge created with id ${issue.challengeId} for issue ${issue.number}`);
@@ -661,6 +661,50 @@ async function handleIssueUnAssignment(event, issue) {
 }
 
 /**
+ * handles the issue recreate event
+ * @param {Object} event the event
+ * @param {Object} issue the issue
+ * @private
+ */
+async function handleIssueRecreate(event, issue) {
+  const dbIssue = await dbHelper.scanOne(models.Issue, {
+    number: issue.number,
+    provider: issue.provider,
+    repositoryId: issue.repositoryId
+  });
+  try {
+    const project = await getProjectDetail(event);
+
+    logger.debug(`Getting the billing account ID for project ID: ${project.tcDirectId}`);
+    const accountId = await topcoderApiHelper.getProjectBillingAccountId(project.tcDirectId);
+
+    logger.debug(`Assigning the billing account id ${accountId} to challenge`);
+
+    // adding assignees as well if it is missed/failed during update
+    // prize needs to be again set after adding billing account otherwise it won't let activate
+    const updateBody = {
+      billingAccountId: accountId,
+      prizes: dbIssue.prizes
+    };
+    await topcoderApiHelper.updateChallenge(dbIssue.challengeId, updateBody);
+
+    // Activate the challenge
+    await topcoderApiHelper.activateChallenge(dbIssue.challengeId);
+
+    // Cancel the challenge
+    await topcoderApiHelper.cancelPrivateContent(dbIssue.challengeId);
+
+    await dbIssue.delete();
+  } catch (err) {
+    // Just log the error, keep the process go on.
+    logger.error(`Error cleaning the old DB and its challenge.\n ${err}`);
+  }
+
+  await handleIssueCreate(event, issue);
+  // handleIssueLabelUpdated(event, issue);
+}
+
+/**
  * Process issue event.
  * @param {Object} event the event
  */
@@ -710,12 +754,14 @@ async function process(event) {
     await handleIssueLabelUpdated(event, issue);
   } else if (event.event === 'issue.unassigned') {
     await handleIssueUnAssignment(event, issue);
+  } else if (event.event === 'issue.recreated') {
+    await handleIssueRecreate(event, issue);
   }
 }
 
 process.schema = Joi.object().keys({
   event: Joi.string().valid('issue.created', 'issue.updated', 'issue.closed', 'comment.created', 'comment.updated', 'issue.assigned',
-    'issue.labelUpdated', 'issue.unassigned').required(),
+    'issue.labelUpdated', 'issue.unassigned', 'issue.recreated').required(),
   provider: Joi.string().valid('github', 'gitlab').required(),
   data: Joi.object().keys({
     issue: Joi.object().keys({
