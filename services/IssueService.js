@@ -477,9 +477,10 @@ async function handleIssueClose(event, issue) {
  * handles the issue create event
  * @param {Object} event the event
  * @param {Object} issue the issue
+ * @param {Boolean} recreate indicate that the process is to recreate an issue
  * @private
  */
-async function handleIssueCreate(event, issue) {
+async function handleIssueCreate(event, issue, recreate = false) {
   // check if project for such repository is already created
   const project = await getProjectDetail(event);
 
@@ -550,14 +551,15 @@ async function handleIssueCreate(event, issue) {
   const comment = `Contest ${contestUrl} has been created for this ticket.`;
   await gitHelper.createComment(event, issue.number, comment);
 
-  // if assignee is added during issue create then assign as well
-  if (event.data.issue.assignees && event.data.issue.assignees.length > 0 && event.data.issue.assignees[0].id) {
-    event.data.assignee = {
-      id: event.data.issue.assignees[0].id
-    };
-    await handleIssueAssignment(event, issue, true);
+  if (event.provider === 'gitlab' || recreate) {
+    // if assignee is added during issue create then assign as well
+    if (event.data.issue.assignees && event.data.issue.assignees.length > 0 && event.data.issue.assignees[0].id) {
+      event.data.assignee = {
+        id: event.data.issue.assignees[0].id
+      };
+      await handleIssueAssignment(event, issue, true);
+    }
   }
-
   logger.debug(`new challenge created with id ${issue.challengeId} for issue ${issue.number}`);
 }
 
@@ -700,7 +702,7 @@ async function handleIssueRecreate(event, issue) {
     logger.error(`Error cleaning the old DB and its challenge.\n ${err}`);
   }
 
-  await handleIssueCreate(event, issue);
+  await handleIssueCreate(event, issue, true);
   // handleIssueLabelUpdated(event, issue);
 }
 

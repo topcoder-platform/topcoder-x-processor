@@ -122,8 +122,6 @@ async function createChallenge(challenge) {
     Status Code:${statusCode}, Response: ${circularJSON.stringify(challengeResponse.result)}`);
     return _.get(challengeResponse, 'result.content.id');
   } catch (err) {
-    console.log(err);
-
     loggerFile.info(`EndPoint: POST /challenges,  POST parameters: ${circularJSON.stringify(challengeBody)}, Status Code:null,
     Error: 'Failed to create challenge.', Details: ${circularJSON.stringify(err)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to create challenge.');
