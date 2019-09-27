@@ -1,0 +1,7 @@
+version: '3'
+services:
+  topcoder-x-processor:
+    image: topcoder-x-processor:latest
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile
