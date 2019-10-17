@@ -674,28 +674,8 @@ async function handleIssueRecreate(event, issue) {
     provider: issue.provider,
     repositoryId: issue.repositoryId
   });
+
   try {
-    const project = await getProjectDetail(event);
-
-    logger.debug(`Getting the billing account ID for project ID: ${project.tcDirectId}`);
-    const accountId = await topcoderApiHelper.getProjectBillingAccountId(project.tcDirectId);
-
-    logger.debug(`Assigning the billing account id ${accountId} to challenge`);
-
-    // adding assignees as well if it is missed/failed during update
-    // prize needs to be again set after adding billing account otherwise it won't let activate
-    const updateBody = {
-      billingAccountId: accountId,
-      prizes: dbIssue.prizes
-    };
-    await topcoderApiHelper.updateChallenge(dbIssue.challengeId, updateBody);
-
-    // Activate the challenge
-    await topcoderApiHelper.activateChallenge(dbIssue.challengeId);
-
-    // Cancel the challenge
-    await topcoderApiHelper.cancelPrivateContent(dbIssue.challengeId);
-
     await dbIssue.delete();
   } catch (err) {
     // Just log the error, keep the process go on.
