@@ -23,10 +23,10 @@ const m2mAuth = require('tc-core-library-js').auth.m2m;
 const m2m = m2mAuth(_.pick(config, ['AUTH0_URL', 'AUTH0_AUDIENCE', 'TOKEN_CACHE_TIME', 'AUTH0_PROXY_SERVER_URL']));
 
 let topcoderApiProjects = require('topcoder-api-projects');
-let topcoderApiChallenges = require('topcoder-api-challenges');
+let topcoderApiChallenges = require('@topcoder-platform/topcoder-api-challenges-v4-wrapper');
 
 const topcoderDevApiProjects = require('topcoder-dev-api-projects');
-const topcoderDevApiChallenges = require('topcoder-dev-api-challenges');
+const topcoderDevApiChallenges = require('@topcoder-platform/topcoder-api-challenges-v4-wrapper-dev');
 
 const logger = require('./logger');
 const loggerFile = require('./logger-file');
