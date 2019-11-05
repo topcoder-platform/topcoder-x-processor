@@ -13,6 +13,8 @@ const _ = require('lodash');
 const logger = require('../utils/logger');
 const gitHubService = require('./GithubService');
 const gitlabService = require('./GitlabService');
+const models = require('../models');
+const dbHelper = require('../utils/db-helper');
 
 const timeoutMapper = {};
 
@@ -80,6 +82,11 @@ async function handleEventGracefully(event, data, err) {
       } else if (event.event === 'copilotPayment.add') {
         // comment for copilot payment challenge create failed
         comment = 'The copilot payment challenge creation on the Topcoder platform failed.  Please contact support to try again';
+        await dbHelper.remove(models.CopilotPayment, {
+          id: {eq: data.id}
+        });
+        // we dont need to put comment for copilot payment
+        return;
       }
       // notify error in git host
       if (event.provider === 'github') {
