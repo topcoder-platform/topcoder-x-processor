@@ -142,7 +142,8 @@ async function _checkAndReSchedule(event, payment) {
     // reschedule
     setTimeout(async () => {
       const kafka = require('../utils/kafka'); // eslint-disable-line
-      await kafka.send(JSON.stringify(event));
+      const eventToHandle = _.omit(event, ['project']);
+      await kafka.send(JSON.stringify(eventToHandle));
       logger.debug('The event is scheduled for retry');
     }, config.RETRY_INTERVAL);
     return true;
@@ -218,11 +219,11 @@ async function handlePaymentAdd(event, payment) {
 
       logger.debug(`challenge ${challengeId} has been activated!`);
     } catch (ex) {
-      await dbHelper.remove(models.CopilotPayment, {
-        id: {eq: payment.id}
+      await dbHelper.update(models.CopilotPayment, payment.id, {
+        status: 'challenge_creation_retried'
       });
-
-      await eventService.handleEventGracefully(event, payment, ex);
+      const eventToHandle = _.omit(event, ['project']);
+      await eventService.handleEventGracefully(eventToHandle, payment, ex);
     }
   }
 }
