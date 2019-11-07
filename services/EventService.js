@@ -11,10 +11,10 @@
 const config = require('config');
 const _ = require('lodash');
 const logger = require('../utils/logger');
-const gitHubService = require('./GithubService');
-const gitlabService = require('./GitlabService');
 const models = require('../models');
 const dbHelper = require('../utils/db-helper');
+const gitHubService = require('./GithubService');
+const gitlabService = require('./GitlabService');
 
 const timeoutMapper = {};
 
