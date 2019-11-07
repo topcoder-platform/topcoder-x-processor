@@ -9,17 +9,17 @@
  * @author TCSCODER
  * @version 1.0
  */
+const config = require('config');
 const _ = require('lodash');
 const Joi = require('joi');
-const config = require('config');
 const MarkdownIt = require('markdown-it');
 const moment = require('moment');
-const models = require('../models');
 const logger = require('../utils/logger');
 const topcoderApiHelper = require('../utils/topcoder-api-helper');
+const models = require('../models');
+const dbHelper = require('../utils/db-helper');
+const eventService = require('./EventService');
 
-const CopilotPayment = models.CopilotPayment;
-const Project = models.Project;
 const md = new MarkdownIt();
 
 
@@ -62,19 +62,17 @@ function updateChallengeDetails(payments) {
  */
 async function getExistingChallengeIdIfExists(event, dbPayment) {
   // check if there is existing active challenge associated with this project
-  const existingPayments = await CopilotPayment.findOne({
-    project: dbPayment.project,
-    username: event.project.copilot,
-    closed: false,
-    challengeId: {
-      $gt: 0
-    }
+  const existingPayments = await dbHelper.scanOne(models.CopilotPayment, {
+    project: {eq: dbPayment.project},
+    username: {eq: event.project.copilot},
+    closed: {eq: 'false'},
+    challengeId: {gt: 0}
   });
+
   // if no existing challenge found then it will be created by processor
   if (existingPayments) {
-    dbPayment.challengeId = existingPayments.challengeId;
     // update db payment
-    await CopilotPayment.updateOne({_id: dbPayment.id}, {
+    dbPayment = await dbHelper.update(models.CopilotPayment, dbPayment.id, {
       challengeId: existingPayments.challengeId
     });
   }
@@ -89,7 +87,7 @@ async function getExistingChallengeIdIfExists(event, dbPayment) {
  * @private
  */
 async function _updateChallenge(copilotUsername, projectId, challengeId) {
-  const project = await Project.findById(projectId);
+  const project = await dbHelper.getById(models.Project, projectId);
   if (!project) {
     throw new Error(
       'There is no project associated with this repository');
@@ -101,10 +99,10 @@ async function _updateChallenge(copilotUsername, projectId, challengeId) {
   }
 
   // get all unclosed payments for given project and user
-  const dbPayments = await CopilotPayment.find({
+  const dbPayments = await dbHelper.scan(models.CopilotPayment, {
     project: projectId,
     username: copilotUsername,
-    closed: false
+    closed: 'false'
   });
 
   if (dbPayments.length) {
@@ -133,17 +131,19 @@ async function _updateChallenge(copilotUsername, projectId, challengeId) {
  */
 async function _checkAndReSchedule(event, payment) {
   // get all unclosed payments for given project and user
-  const existingPending = await CopilotPayment.find({
+  const existingPending = await dbHelper.scan(models.CopilotPayment, {
     project: payment.project,
     username: event.project.copilot,
-    closed: false,
+    closed: 'false',
     status: 'challenge_creation_pending'
   });
+
   if (existingPending.length) {
     // reschedule
     setTimeout(async () => {
       const kafka = require('../utils/kafka'); // eslint-disable-line
-      await kafka.send(JSON.stringify(event));
+      const eventToHandle = _.omit(event, ['project']);
+      await kafka.send(JSON.stringify(eventToHandle));
       logger.debug('The event is scheduled for retry');
     }, config.RETRY_INTERVAL);
     return true;
@@ -169,11 +169,12 @@ async function handlePaymentAdd(event, payment) {
     }
     // update issue as challenge creation pending
     // update db payment
-    await CopilotPayment.updateOne({_id: payment.id}, {
+    payment = await dbHelper.update(models.CopilotPayment, payment.id, {
       status: 'challenge_creation_pending'
     });
+
     // check if project for such repository is already created
-    const project = await Project.findById(payment.project);
+    const project = await dbHelper.getById(models.Project, payment.project);
     if (!project) {
       throw new Error(
         'There is no project associated with this repository');
@@ -183,31 +184,29 @@ async function handlePaymentAdd(event, payment) {
       const accountId = await topcoderApiHelper.getProjectBillingAccountId(project.tcDirectId);
 
       // use copilot id as the copilot of the challenge
-      logger.debug(`Getting the member ID for handle: ${copilot.handle}`);
       const topcoderMemberId = await topcoderApiHelper.getTopcoderMemberId(copilot.handle);
 
       const challengeRequirements = md.render(`$${payment.amount} - ${payment.description}  `);
       const challengeTitle = constructChallengeName(project);
-
       const newChallenge = {
         name: challengeTitle,
         projectId: project.tcDirectId,
         detailedRequirements: challengeRequirements,
-        prizes: [payment.amount - 1],
+        prizes: [1],
         task: true,
         billingAccountId: accountId,
         copilotId: topcoderMemberId,
-        copilotFee: 1
+        copilotFee: payment.amount - 1,
+        reviewType: 'INTERNAL'
       };
 
-      logger.debug(`Creating the challenge`);
       // Create a new challenge
       const challengeId = await topcoderApiHelper.createChallenge(newChallenge);
 
       logger.debug(`updating database payment with new challenge id:${challengeId}`);
 
       // update db payment
-      await CopilotPayment.updateOne({_id: payment.id}, {
+      payment = dbHelper.update(models.CopilotPayment, payment.id, {
         challengeId,
         status: 'challenge_creation_successful'
       });
@@ -220,10 +219,11 @@ async function handlePaymentAdd(event, payment) {
 
       logger.debug(`challenge ${challengeId} has been activated!`);
     } catch (ex) {
-      await CopilotPayment.updateOne({_id: payment.id}, {
-        status: 'challenge_creation_failed'
+      await dbHelper.update(models.CopilotPayment, payment.id, {
+        status: 'challenge_creation_retried'
       });
-      throw ex;
+      const eventToHandle = _.omit(event, ['project']);
+      await eventService.handleEventGracefully(eventToHandle, payment, ex);
     }
   }
 }
@@ -258,29 +258,56 @@ async function handlePaymentDelete(event, payment) {
  * @param {Object} event the event
  */
 async function handlePaymentUpdates(event) {
-  const projectIds = await Project.find({
-    $or: [
-      {owner: event.data.copilot.handle},
-      {copilot: event.data.copilot.handle}
-    ]
-  }).select('_id');
-
-  // get all unclosed payments for current user
-  const dbPayments = await CopilotPayment.find({
-    project: {$in: projectIds},
-    closed: false
-  });
-  if (dbPayments) {
-    const challengeIds = _(dbPayments).map('challengeId').uniq().filter(_.isNumber)
-      .value();
-    for (let i = 0; i < challengeIds.length; i++) { // eslint-disable-line no-restricted-syntax
-      const challengeId = challengeIds[i];
-      const challengeDetail = await topcoderApiHelper.getChallengeById(challengeId);
-      if (challengeDetail && challengeDetail.currentStatus === 'Completed') {
-        await CopilotPayment.updateMany({challengeId, closed: false}, {closed: true});
-      }
+  const filterValues = {};
+  const filter = {
+    FilterExpression: '#owner= :handle or copilot = :handle',
+    ExpressionAttributeNames: {
+      '#owner': 'owner'
+    },
+    ExpressionAttributeValues: {
+      ':handle': event.data.copilot.handle
     }
-    logger.debug('Success updating payments status.');
+  };
+  const projects = await dbHelper.scan(models.Project, filter);
+  if (projects && projects.length > 0) {
+    // get all unclosed payments for current user
+    const filterProjectIds = _.join(projects.map((p, index) => {
+      const id = `:id${index}`;
+      filterValues[id] = p.id;
+      return id;
+    }), ',');
+
+    const FilterExpression = `#project in (${filterProjectIds}) AND closed = :status`;
+    filterValues[':status'] = 'false';
+
+    const dbPayments = await dbHelper.scan(models.CopilotPayment, {
+      FilterExpression,
+      ExpressionAttributeNames: {
+        '#project': 'project'
+      },
+      ExpressionAttributeValues: filterValues
+    });
+
+    if (dbPayments) {
+      const challengeIds = _(dbPayments).map('challengeId').uniq().filter(_.isNumber)
+        .value();
+      for (let i = 0; i < challengeIds.length; i++) { // eslint-disable-line no-restricted-syntax
+        const challengeId = challengeIds[i];
+        const challengeDetail = await topcoderApiHelper.getChallengeById(challengeId);
+        if (challengeDetail && challengeDetail.currentStatus === 'Completed') {
+          const dbChallenges = await dbHelper.scan(models.CopilotPayment, {
+            challengeId,
+            closed: 'false'
+          });
+          const updateChallenges = _.map(dbChallenges, (challenge) => {
+            challenge.closed = 'true';
+            return challenge;
+          });
+          await dbHelper.updateMany(models.CopilotPayment, updateChallenges);
+        }
+      }
+      logger.debug('Success updating payments status.');
+    }
   }
 }
 
@@ -292,7 +319,7 @@ async function process(event) {
   Joi.attempt(event, process.schema);
 
   const payment = event.data && event.data.payment ? {
-    id: event.data.payment._id,
+    id: event.data.payment.id,
     project: event.data.payment.project,
     amount: event.data.payment.amount,
     description: event.data.payment.description,
@@ -302,7 +329,11 @@ async function process(event) {
     delete payment.challengeId;
   }
   if (payment.project) {
-    event.project = await Project.findById(payment.project);
+    event.project = await dbHelper.getById(models.Project, payment.project);
+
+    if (_.isNil(event.project.copilot)) {
+      throw new Error('copilot cannot be empty for a project');
+    }
   }
   if (event.event === 'copilotPayment.add') {
     await handlePaymentAdd(event, payment);
@@ -319,20 +350,24 @@ process.schema = Joi.object().keys({
   event: Joi.string().valid('copilotPayment.add', 'copilotPayment.update', 'copilotPayment.delete', 'copilotPayment.checkUpdates').required(),
   data: Joi.object().keys({
     payment: Joi.object().keys({
-      _id: Joi.string().optional(),
+      id: Joi.string().optional(),
       project: Joi.string().optional(),
       amount: Joi.number().optional(),
       description: Joi.string().optional(),
       challengeId: Joi.number().optional().allow(null),
       username: Joi.string().optional(),
       closed: Joi.boolean().optional(),
-      status: Joi.string().optional()
+      status: Joi.string().optional(),
+      createdAt: Joi.date().optional(),
+      updatedAt: Joi.date().optional()
     }).optional(),
     copilot: Joi.object().keys({
       handle: Joi.string().optional(),
       roles: Joi.array().optional()
     }).optional().allow(null)
-  }).optional()
+  }).optional(),
+  retryCount: Joi.number().integer().default(0).optional(),
+  provider: Joi.string().default('copilotPayment').allow(null)
 });
 
 

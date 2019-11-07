@@ -9,11 +9,12 @@
  * @version 1.0
  */
 
+const config = require('config');
 const Joi = require('joi');
 const _ = require('lodash');
-const config = require('config');
-const models = require('../models');
 const logger = require('../utils/logger');
+const dbHelper = require('../utils/db-helper');
+const models = require('../models');
 
 /**
  * gets the tc handle for given git user id from a mapping captured by Topcoder x tool
@@ -38,8 +39,7 @@ async function getTCUserName(provider, gitUser) {
       criteria.gitlabUsername = gitUser;
     }
   }
-
-  return await models.UserMapping.findOne(criteria);
+  return await dbHelper.scanOne(models.UserMapping, criteria);
 }
 
 getTCUserName.schema = {
@@ -49,62 +49,64 @@ getTCUserName.schema = {
 
 
 /**
- * gets the access token of repository's copilot captured by Topcoder x tool
+ * gets the access token of repository's copilot/owner captured by Topcoder x tool
  * @param {String} provider the repo provider
  * @param {String} repoFullName the full name of repository
- * @returns {String} the copilot if exists
+ * @returns {String} the copilot/owner if exists
  */
-async function getRepositoryCopilot(provider, repoFullName) {
-  Joi.attempt({provider, repoFullName}, getRepositoryCopilot.schema);
+async function getRepositoryCopilotOrOwner(provider, repoFullName) {
+  Joi.attempt({provider, repoFullName}, getRepositoryCopilotOrOwner.schema);
   let fullRepoUrl;
   if (provider === 'github') {
     fullRepoUrl = `https://github.com/${repoFullName}`;
   } else if (provider === 'gitlab') {
     fullRepoUrl = `${config.GITLAB_API_BASE_URL}/${repoFullName}`;
   }
-
-  const project = await models.Project.findOne({
+  const project = await dbHelper.scanOne(models.Project, {
     repoUrl: fullRepoUrl
   });
 
-  if (!project || !project.owner || !project.copilot) {
+  const hasCopilot = project.copilot !== undefined; // eslint-disable-line no-undefined
+  if (!project || !project.owner) {
     // throw this repo is not managed by Topcoder x tool
     throw new Error(`This repository '${repoFullName}' is not managed by Topcoder X tool.`);
   }
 
-  const userMapping = await models.UserMapping.findOne({
-    topcoderUsername: project.copilot.toLowerCase()
+  const userMapping = await dbHelper.scanOne(models.UserMapping, {
+    topcoderUsername: {eq: hasCopilot ? project.copilot.toLowerCase() : project.owner.toLowerCase()}
   });
 
   if (!userMapping || (provider === 'github' && !userMapping.githubUserId) || (provider === 'gitlab' && !userMapping.gitlabUserId)) {
     throw new Error(`Couldn't find githost username for '${provider}' for this repository '${repoFullName}'.`);
   }
-
-  const copilot = await models.User.findOne({
+  const user = await dbHelper.scanOne(models.User, {
     username: provider === 'github' ? userMapping.githubUsername : userMapping.gitlabUsername,
     type: provider
   });
 
-  if (!copilot) {
+  if (!user && !hasCopilot) {
     // throw no copilot is configured
-    throw new Error(`No copilot is configured for the this repository: ${provider}`);
+    throw new Error(`No owner is configured for the this repository: ${provider}`);
+  } else if (!user) {
+    // is copilot not set, return null
+    return null;
   }
 
   return {
-    accessToken: copilot.accessToken,
-    userProviderId: copilot.userProviderId,
+    accessToken: user.accessToken,
+    userProviderId: user.userProviderId,
     topcoderUsername: userMapping.topcoderUsername
   };
 }
 
-getRepositoryCopilot.schema = {
+getRepositoryCopilotOrOwner.schema = {
   provider: Joi.string().valid('github', 'gitlab').required(),
   repoFullName: Joi.string().required()
 };
 
 module.exports = {
   getTCUserName,
-  getRepositoryCopilot
+  getRepositoryCopilotOrOwner
 };
 
 logger.buildService(module.exports);

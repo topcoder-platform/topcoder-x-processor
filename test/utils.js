@@ -8,12 +8,14 @@
  * @author TCSCODER
  * @version 1.0
  */
-
 const config = require('config');
+const _ = require('lodash');
 const {assert} = require('chai');
 const axios = require('axios');
 const models = require('../models');
+const topcoderApiHelper = require('../utils/topcoder-api-helper');
 const data = require('./data');
+
 
 const assign = Object.assign;
 const INVALID_USER_ID = 123;
@@ -152,6 +154,7 @@ async function getChallenge(challengeId) {
     if (response.status !== 200 || response.data.result.status !== 200) { // eslint-disable-line
       throw new Error(`error getting challenge from topcoder, status code ${response.status}`);
     }
+
     return response.data.result.content;
   } catch (err) {
     throw err;
@@ -245,7 +248,7 @@ async function ensureChallengeIsAssigned(challengeId, assignedUser) {
     assert.exists(challenge);
     assert.isArray(challenge.registrants);
     assert.lengthOf(challenge.registrants, 1);
-    assert.equal(challenge.registrants[0].handle, assignedUser);
+    assert.equal(challenge.registrants[0].handle.toLowerCase(), assignedUser.toLowerCase());
     assert.equal(challenge.numberOfRegistrants, 1);
   });
 }
@@ -264,6 +267,36 @@ async function ensureChallengeIsUnassigned(challengeId) {
   });
 }
 
+
+/**
+ * Ensures challenge with challengeId closed successfully
+ * @param {String} challengeId the challenge id of the challenge
+ */
+async function ensureChallengeCompleted(challengeId) {
+  await test(async () => {
+    const challenge = await getChallenge(challengeId);
+    assert.exists(challenge);
+    assert.equal(challenge.currentStatus, 'Completed');
+
+    const resources = await topcoderApiHelper.getChallengeResources(challengeId);
+    assert.isArray(resources);
+    const copilot = _.filter(resources, (r) => r.role === 'Copilot'); // eslint-disable-line lodash/matches-prop-shorthand
+    assert.lengthOf(copilot, 1);
+  });
+}
+
+/**
+ * Ensures challenge with challengeId active successfully
+ * @param {String} challengeId the challenge id of the challenge
+ */
+async function ensureChallengeActive(challengeId) {
+  await test(async () => {
+    const challenge = await getChallenge(challengeId);
+    assert.exists(challenge);
+    assert.equal(challenge.currentStatus, 'Active');
+  });
+}
+
 module.exports = {
   sleep,
   createUser,
@@ -279,5 +312,7 @@ module.exports = {
   ensureChallengeTitleIsUpdated,
   ensureChallengeDescriptionIsUpdated,
   ensureChallengeIsAssigned,
-  ensureChallengeIsUnassigned
+  ensureChallengeIsUnassigned,
+  ensureChallengeCompleted,
+  ensureChallengeActive
 };

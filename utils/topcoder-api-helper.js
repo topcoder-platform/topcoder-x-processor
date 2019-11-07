@@ -12,19 +12,24 @@
  */
 'use strict';
 
-const jwtDecode = require('jwt-decode');
-const axios = require('axios');
 const config = require('config');
+const axios = require('axios');
 const _ = require('lodash');
 const moment = require('moment');
+const circularJSON = require('circular-json');
+
+const m2mAuth = require('tc-core-library-js').auth.m2m;
+
+const m2m = m2mAuth(_.pick(config, ['AUTH0_URL', 'AUTH0_AUDIENCE', 'TOKEN_CACHE_TIME', 'AUTH0_PROXY_SERVER_URL']));
 
 let topcoderApiProjects = require('topcoder-api-projects');
-let topcoderApiChallenges = require('topcoder-api-challenges');
+let topcoderApiChallenges = require('@topcoder-platform/topcoder-api-challenges-v4-wrapper');
 
 const topcoderDevApiProjects = require('topcoder-dev-api-projects');
-const topcoderDevApiChallenges = require('topcoder-dev-api-challenges');
+const topcoderDevApiChallenges = require('@topcoder-platform/topcoder-api-challenges-v4-wrapper-dev');
 
 const logger = require('./logger');
+const loggerFile = require('./logger-file');
 const errors = require('./errors');
 
 
@@ -33,66 +38,21 @@ if (config.TC_DEV_ENV) {
   topcoderApiChallenges = topcoderDevApiChallenges;
 }
 
-// Cache the access token
-let cachedAccessToken;
-
 // Init the API instances
 const projectsClient = topcoderApiProjects.ApiClient.instance;
-let challengesClient = topcoderApiChallenges.ApiClient.instance;
-challengesClient.timeout=480000;
-
+const challengesClient = topcoderApiChallenges.ApiClient.instance;
 const bearer = projectsClient.authentications.bearer;
 bearer.apiKeyPrefix = 'Bearer';
 challengesClient.authentications.bearer = bearer;
-challengesClient.basePath =  = 'http://api.topcoder.com/v4'.replace(/\/+$/, '');
-
 const projectsApiInstance = new topcoderApiProjects.DefaultApi();
 const challengesApiInstance = new topcoderApiChallenges.DefaultApi();
 
 /**
- * Authenticate with Topcoder API and get the access token.
- * @returns {String} the access token issued by Topcoder
- * @private
+ * Function to get M2M token
+ * @returns {Promise} The promised token
  */
-async function getAccessToken() {
-  // Check the cached access token
-  if (cachedAccessToken) {
-    const decoded = jwtDecode(cachedAccessToken);
-    if (decoded.iat > new Date().getTime()) {
-      // Still not expired, just use it
-      return cachedAccessToken;
-    }
-  }
-
-  // Authenticate
-  const v2Response = await axios.post(config.TC_AUTHN_URL, config.TC_AUTHN_REQUEST_BODY);
-  const v2IdToken = _.get(v2Response, 'data.id_token');
-  const v2RefreshToken = _.get(v2Response, 'data.refresh_token');
-
-  if (!v2IdToken || !v2RefreshToken) {
-    throw new Error(`cannot authenticate with topcoder: ${config.TC_AUTHN_URL}`);
-  }
-
-  // Authorize
-  const v3Response = await axios.post(
-    config.TC_AUTHZ_URL, {
-      param: {
-        externalToken: v2IdToken,
-        refreshToken: v2RefreshToken
-      }
-    }, {
-      headers: {
-        authorization: `Bearer ${v2IdToken}`
-      }
-    });
-
-  cachedAccessToken = _.get(v3Response, 'data.result.content.token');
-
-  if (!cachedAccessToken) {
-    throw new Error(`cannot authorize with topcoder: ${config.TC_AUTHZ_URL}`);
-  }
-
-  return cachedAccessToken;
+async function getM2Mtoken() {
+  return await m2m.getMachineToken(config.AUTH0_CLIENT_ID, config.AUTH0_CLIENT_SECRET);
 }
 
 /**
@@ -101,8 +61,7 @@ async function getAccessToken() {
  * @returns {Number} the created project id
  */
 async function createProject(projectName) {
-  bearer.apiKey = await getAccessToken();
-
+  bearer.apiKey = await getM2Mtoken();
   // eslint-disable-next-line new-cap
   const projectBody = new topcoderApiProjects.ProjectRequestBody.constructFromObject({
     projectName
@@ -117,8 +76,13 @@ async function createProject(projectName) {
         }
       });
     });
+    const statusCode = projectResponse.result ? projectResponse.result.status : null;
+    loggerFile.info(`EndPoint: POST /direct/projects,  POST parameters: ${circularJSON.stringify(projectBody)},
+    Status Code:${statusCode}, Response: ${circularJSON.stringify(projectResponse)}`);
     return _.get(projectResponse, 'result.content.projectId');
   } catch (err) {
+    loggerFile.info(`EndPoint: POST /direct/projects, POST parameters: ${circularJSON.stringify(projectBody)},
+    Status Code:null, Error: 'Failed to create project.', Details: ${circularJSON.stringify(err)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to create project.');
   }
 }
@@ -129,8 +93,7 @@ async function createProject(projectName) {
  * @returns {Number} the created challenge id
  */
 async function createChallenge(challenge) {
-  bearer.apiKey = await getAccessToken();
-
+  bearer.apiKey = await getM2Mtoken();
   const start = new Date();
   const startTime = moment(start).toISOString();
   const end = moment(start).add(config.NEW_CHALLENGE_DURATION_IN_DAYS, 'days').toISOString();
@@ -145,7 +108,6 @@ async function createChallenge(challenge) {
     }, challenge)
   });
   try {
-    logger.debug(`Challenge body: ${JSON.stringify(challengeBody, null, 2)}`);
     const challengeResponse = await new Promise((resolve, reject) => {
       challengesApiInstance.saveDraftContest(challengeBody, (err, res) => {
         if (err) {
@@ -155,10 +117,13 @@ async function createChallenge(challenge) {
         }
       });
     });
-
+    const statusCode = challengeResponse.result ? challengeResponse.result.status : null;
+    loggerFile.info(`EndPoint: POST /challenges,  POST parameters: ${circularJSON.stringify(challengeBody)},
+    Status Code:${statusCode}, Response: ${circularJSON.stringify(challengeResponse.result)}`);
     return _.get(challengeResponse, 'result.content.id');
   } catch (err) {
-    logger.debug(`Response: ${err}`);
+    loggerFile.info(`EndPoint: POST /challenges,  POST parameters: ${circularJSON.stringify(challengeBody)}, Status Code:null,
+    Error: 'Failed to create challenge.', Details: ${circularJSON.stringify(err)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to create challenge.');
   }
 }
@@ -169,25 +134,29 @@ async function createChallenge(challenge) {
  * @param {Object} challenge the challenge to update
  */
 async function updateChallenge(id, challenge) {
-  bearer.apiKey = await getAccessToken();
-  logger.debug(`Updating challenge ${id} with ${JSON.stringify(challenge)}`);
+  bearer.apiKey = await getM2Mtoken();
+  logger.debug(`Updating challenge ${id} with ${circularJSON.stringify(challenge)}`);
   // eslint-disable-next-line new-cap
   const challengeBody = new topcoderApiChallenges.UpdateChallengeBodyParam.constructFromObject({
     param: challenge
   });
   try {
-    await new Promise((resolve, reject) => {
+    const response = await new Promise((resolve, reject) => {
       challengesApiInstance.challengesIdPut(id, challengeBody, (err, res) => {
         if (err) {
           logger.error(err);
-          logger.debug(JSON.stringify(err));
+          logger.debug(circularJSON.stringify(err));
           reject(err);
         } else {
           resolve(res);
         }
       });
     });
+    const statusCode = response.result ? response.result.status : null;
+    loggerFile.info(`EndPoint: PUT /challenges/${id},  PUT parameters: null, Status Code:${statusCode}, Response: ${circularJSON.stringify(response)}`);
   } catch (err) {
+    loggerFile.info(`EndPoint: PUT /challenges/${id},  PUT parameters: null, Status Code:null,
+    Error: 'Failed to update challenge.', Details: ${circularJSON.stringify(err)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to update challenge.');
   }
 }
@@ -197,22 +166,27 @@ async function updateChallenge(id, challenge) {
  * @param {Number} id the challenge id
  */
 async function activateChallenge(id) {
-  bearer.apiKey = await getAccessToken();
+  bearer.apiKey = await getM2Mtoken();
   logger.debug(`Activating challenge ${id}`);
   try {
-    await new Promise((resolve, reject) => {
+    const response = await new Promise((resolve, reject) => {
       challengesApiInstance.activateChallenge(id, (err, data) => {
         if (err) {
           logger.error(err);
-          logger.debug(JSON.stringify(err));
+          logger.debug(circularJSON.stringify(err));
           reject(err);
         } else {
           resolve(data);
         }
       });
     });
+    const statusCode = response.result ? response.result.status : null;
+    loggerFile.info(`EndPoint: POST /challenges/${id}/activate,
+    POST parameters: null, Status Code:${statusCode}, Response: ${circularJSON.stringify(response)}`);
     logger.debug(`Challenge ${id} is activated successfully.`);
   } catch (err) {
+    loggerFile.info(`EndPoint: POST /challenges/${id}/activate,  POST parameters: null, Status Code:null,
+    Error: 'Failed to activate challenge.', Details: ${circularJSON.stringify(err)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to activate challenge.');
   }
 }
@@ -224,18 +198,20 @@ async function activateChallenge(id) {
  */
 async function getChallengeById(id) {
   if (!_.isNumber(id)) {
-    throw new Error(`The challenge id must be a valid number, not ${id}`);
+    throw new Error('The challenge id must valid number');
   }
-  const apiKey = await getAccessToken();
+  const apiKey = await getM2Mtoken();
   logger.debug('Getting topcoder challenge details');
   try {
-    const response = await axios.get(`${projectsClient.basePath}/challenges/${id}`, {
+    const response = await axios.get(`${challengesClient.basePath}/challenges/${id}`, {
       headers: {
         authorization: `Bearer ${apiKey}`
       },
       'Content-Type': 'application/json'
     });
     const challenge = _.get(response, 'data.result.content');
+    const statusCode = response.result ? response.result.status : null;
+    loggerFile.info(`EndPoint: GET challenges/${id},  GET parameters: null, Status Code:${statusCode}, Response: ${circularJSON.stringify(response)}`);
     return challenge;
   } catch (err) {
     throw errors.convertTopcoderApiError(err, 'Failed to get challenge details by Id');
@@ -248,17 +224,21 @@ async function getChallengeById(id) {
  * @param {Number} winnerId the winner id
  */
 async function closeChallenge(id, winnerId) {
-  const apiKey = await getAccessToken();
+  const apiKey = await getM2Mtoken();
   logger.debug(`Closing challenge ${id}`);
   try {
-    await axios.post(`${projectsClient.basePath}/challenges/${id}/close?winnerId=${winnerId}`, null, {
+    const response = await axios.post(`${challengesClient.basePath}/challenges/${id}/close?winnerId=${winnerId}`, null, {
       headers: {
         authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
       }
     });
+    const statusCode = response ? response.status : null;
+    loggerFile.info(`EndPoint: POST /challenges/${id}/close,  POST parameters: null, Status Code:${statusCode}, Response:${circularJSON.stringify(response)}`);
     logger.debug(`Challenge ${id} is closed successfully.`);
   } catch (err) {
+    loggerFile.info(`EndPoint: POST /challenges/${id}/close, POST parameters: null, Status Code:null,
+    Error: 'Failed to close challenge.', Details: ${circularJSON.stringify(err)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to close challenge.');
   }
 }
@@ -269,7 +249,7 @@ async function closeChallenge(id, winnerId) {
  * @returns {Number} the billing account id
  */
 async function getProjectBillingAccountId(id) {
-  const apiKey = await getAccessToken();
+  const apiKey = await getM2Mtoken();
   logger.debug(`Getting project billing detail ${id}`);
   try {
     const response = await axios.get(`${projectsClient.basePath}/direct/projects/${id}`, {
@@ -277,13 +257,20 @@ async function getProjectBillingAccountId(id) {
         authorization: `Bearer ${apiKey}`
       }
     });
+
     const billingAccountId = _.get(response, 'data.result.content.billingAccountIds[0]');
     if (!billingAccountId) {
       _.set(response, 'data.result.content', `There is no billing account id associated with project ${id}`);
       throw new Error(response);
     }
+
+    const statusCode = response ? response.status : null;
+    loggerFile.info(`EndPoint: GET /direct/projects/${id},
+    GET parameters: null, Status Code:${statusCode}, Response:${circularJSON.stringify(response.data)}`);
     return billingAccountId;
   } catch (err) {
+    loggerFile.info(`EndPoint: GET /direct/projects/${id}, GET parameters: null, Status Code:null,
+    Error: 'Failed to get billing detail for the project.', Details: ${circularJSON.stringify(err)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to get billing detail for the project.');
   }
 }
@@ -294,11 +281,15 @@ async function getProjectBillingAccountId(id) {
  * @returns {Number} the user id
  */
 async function getTopcoderMemberId(handle) {
-  bearer.apiKey = await getAccessToken();
+  bearer.apiKey = await getM2Mtoken();
   try {
     const response = await axios.get(`${projectsClient.basePath}/members/${handle}`);
+    const statusCode = response ? response.status : null;
+    loggerFile.info(`EndPoint: GET members/${handle},  GET parameters: null, Status Code:${statusCode}, Response:${circularJSON.stringify(response.data)}`);
     return _.get(response, 'data.result.content.userId');
   } catch (err) {
+    loggerFile.info(`EndPoint: GET members/${handle}, GET parameters: null, Status Code:null,
+    Error: 'Failed to get topcoder member id.', Details: ${circularJSON.stringify(err)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to get topcoder member id.');
   }
 }
@@ -309,17 +300,17 @@ async function getTopcoderMemberId(handle) {
  * @param {Object} resource the resource resource to add
  */
 async function addResourceToChallenge(id, resource) {
-  bearer.apiKey = await getAccessToken();
+  bearer.apiKey = await getM2Mtoken();
   logger.debug(`adding resource to challenge ${id}`);
   try {
-    await new Promise((resolve, reject) => {
+    const response = await new Promise((resolve, reject) => {
       challengesApiInstance.challengesIdResourcesPost(id, resource, (err, res) => {
         if (err) {
           if (_.get(JSON.parse(_.get(err, 'response.text')), 'result.content')
             === `User ${resource.resourceUserId} with role ${resource.roleId} already exists`) {
             resolve();
           } else {
-            logger.error(JSON.stringify(err));
+            logger.error(circularJSON.stringify(err));
             reject(err);
           }
         } else {
@@ -328,7 +319,15 @@ async function addResourceToChallenge(id, resource) {
         }
       });
     });
+    let statusCode = null;
+    if (response && response.result) {
+      statusCode = response.result.status;
+    }
+    loggerFile.info(`EndPoint: POST /challenges/${id}/resources,
+    POST parameters: null, Status Code:${statusCode}, Response:${circularJSON.stringify(response)}`);
   } catch (err) {
+    loggerFile.info(`EndPoint: POST /challenges/${id}/resources, POST parameters: null, Status Code:null,
+    Error: 'Failed to add resource to the challenge.', Details: ${circularJSON.stringify(err)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to add resource to the challenge.');
   }
 }
@@ -342,10 +341,10 @@ async function getResourcesFromChallenge(id) {
   if (!_.isNumber(id)) {
     throw new Error('The challenge id must valid number');
   }
-  const apiKey = await getAccessToken();
+  const apiKey = await getM2Mtoken();
   logger.debug(`fetch resource from challenge ${id}`);
   try {
-    const response = await axios.get(`${projectsClient.basePath}/challenges/${id}/resources`, {
+    const response = await axios.get(`${challengesClient.basePath}/challenges/${id}/resources`, {
       headers: {
         authorization: `Bearer ${apiKey}`
       },
@@ -358,17 +357,22 @@ async function getResourcesFromChallenge(id) {
   }
 }
 
-async function roleAlreadySet(id, role){
+/**
+ * Check if role is already set
+ * @param {Number} id the challenge id
+ * @param {String} role the role to check
+ * @returns {Promise<Boolean>}
+ */
+async function roleAlreadySet(id, role) {
   if (!_.isNumber(id)) {
     throw new Error('The challenge id must valid number');
   }
-  var result = false;
-  const apiKey = await getAccessToken();
+  let result = false;
   try {
-    var resources = await this.getResourcesFromChallenge(id);
-    resources.forEach(function(resource){
-      if(resource['role']==role){
-        result=true;
+    const resources = await getResourcesFromChallenge(id);
+    resources.forEach((resource) => {
+      if (resource.role === role) {
+        result = true;
       }
     });
   } catch (err) {
@@ -382,10 +386,10 @@ async function roleAlreadySet(id, role){
  * @param {Object} resource the resource  resource to remove
  */
 async function unregisterUserFromChallenge(id) {
-  bearer.apiKey = await getAccessToken();
+  bearer.apiKey = await getM2Mtoken();
   logger.debug(`removing resource from challenge ${id}`);
   try {
-    await new Promise((resolve, reject) => {
+    const response = await new Promise((resolve, reject) => {
       challengesApiInstance.unregisterChallenge(id, (err, res) => {
         if (err) {
           // TODO:* Handle when a user tries to unregister a user twice.
@@ -393,7 +397,7 @@ async function unregisterUserFromChallenge(id) {
           //   === `User ${resource.resourceUserId} with role ${resource.roleId} already exist`) {
           //   resolve(res);
           // } else {
-          //   logger.error(JSON.stringify(err));
+          //   logger.error(circularJSON.stringify(err));
           //   reject(err);
           // }
           logger.debug(`Error - ${err}`);
@@ -404,7 +408,12 @@ async function unregisterUserFromChallenge(id) {
         }
       });
     });
+    const statusCode = response.result ? response.result.status : null;
+    loggerFile.info(`EndPoint: POST /challenges/${id}/unregister,
+    POST parameters: null, Status Code:${statusCode}, Response:${circularJSON.stringify(response)}`);
   } catch (err) {
+    loggerFile.info(`EndPoint: POST /challenges/${id}/unregister, POST parameters: null, Status Code:null,
+    Error: 'Failed to remove resource from the challenge', Details: ${circularJSON.stringify(err)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to remove resource from the challenge');
   }
 }
@@ -414,14 +423,14 @@ async function unregisterUserFromChallenge(id) {
  * @param {Number} id the challenge id
  */
 async function cancelPrivateContent(id) {
-  bearer.apiKey = await getAccessToken();
+  bearer.apiKey = await getM2Mtoken();
   logger.debug(`Cancelling challenge ${id}`);
   try {
-    await new Promise((resolve, reject) => {
+    const response = await new Promise((resolve, reject) => {
       challengesApiInstance.cancelPrivateContest(id, (err, data) => {
         if (err) {
           logger.error(err);
-          logger.debug(JSON.stringify(err));
+          logger.debug(circularJSON.stringify(err));
           reject(err);
         } else {
           resolve(data);
@@ -429,7 +438,11 @@ async function cancelPrivateContent(id) {
       });
     });
     logger.debug(`Challenge ${id} is cancelled successfully.`);
+    const statusCode = response.result ? response.result.status : null;
+    loggerFile.info(`EndPoint: POST /challenges/${id}/cancel,  POST parameters: null, Status Code:${statusCode}, Response:${circularJSON.stringify(response)}`);
   } catch (err) {
+    loggerFile.info(`EndPoint: POST /challenges/${id}/cancel, POST parameters: null, Status Code:null,
+    Error: 'Failed to cancel challenge.', Details: ${circularJSON.stringify(err)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to cancel challenge.');
   }
 }
@@ -458,13 +471,13 @@ async function assignUserAsRegistrant(topcoderUserId, challengeId) {
  * @param {Object} resource the resource resource to remove
  */
 async function removeResourceToChallenge(id, resource) {
-  bearer.apiKey = await getAccessToken();
+  bearer.apiKey = await getM2Mtoken();
   logger.debug(`removing resource from challenge ${id}`);
   try {
-    await new Promise((resolve, reject) => {
+    const response = await new Promise((resolve, reject) => {
       challengesApiInstance.challengesIdResourcesDelete(id, resource, (err, res) => {
         if (err) {
-          logger.error(JSON.stringify(err));
+          logger.error(circularJSON.stringify(err));
           reject(err);
         } else {
           logger.debug(`resource is removed from challenge ${id} successfully.`);
@@ -472,8 +485,36 @@ async function removeResourceToChallenge(id, resource) {
         }
       });
     });
+    const statusCode = response.result ? response.result.status : null;
+    loggerFile.info(`EndPoint: DELETE /challenges/${id}/resources,
+    DELETE parameters: null, Status Code:${statusCode}, Response:${circularJSON.stringify(response)}`);
   } catch (err) {
+    loggerFile.info(`EndPoint: DELETE /challenges/${id}/resources, DELETE parameters: null, Status Code:null,
+    Error: 'Failed to remove resource from the challenge.', Details: ${circularJSON.stringify(err)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to remove resource from the challenge.');
+  }
+}
+
+/**
+ * gets resources from the topcoder challenge
+ * @param {String} id the challenge id
+ * @returns {Array} the resources of challenge
+ */
+async function getChallengeResources(id) {
+  const apiKey = await getM2Mtoken();
+  logger.debug(`getting resource from challenge ${id}`);
+  try {
+    const response = await axios.get(`${challengesClient.basePath}/challenges/${id}/resources`, {
+      headers: {Authorization: `bearer ${apiKey}`}
+    });
+    const statusCode = response.data ? response.data.result.status : null;
+    loggerFile.info(`EndPoint: GET /challenges/${id}/resources,
+    GET parameters: null, Status Code:${statusCode}, Response:${circularJSON.stringify(response)}`);
+    return _.get(response, 'data.result.content');
+  } catch (err) {
+    loggerFile.info(`EndPoint: GET /challenges/${id}/resources, GET parameters: null, Status Code:null,
+    Error: 'Failed to get resource from the challenge.', Details: ${circularJSON.stringify(err)}`);
+    throw errors.convertTopcoderApiError(err, 'Failed to get resource from the challenge.');
   }
 }
 
@@ -493,5 +534,6 @@ module.exports = {
   unregisterUserFromChallenge,
   cancelPrivateContent,
   assignUserAsRegistrant,
-  removeResourceToChallenge
+  removeResourceToChallenge,
+  getChallengeResources
 };

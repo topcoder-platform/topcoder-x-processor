@@ -9,9 +9,8 @@
  * @version 1.0
  */
 /* eslint-env node, mocha */
-
-const {assert} = require('chai');
 const config = require('config');
+const {assert} = require('chai');
 const uuidv4 = require('uuid/v4');
 const Octokit = require('@octokit/rest');
 const utils = require('./utils');
@@ -46,6 +45,7 @@ describe('Topcoder X github tests', function test() {
   let user;
   let issue;
   let repo;
+  let issueNumber;
 
   before('create user, usermapping, repository, webhook', async () => {
     github = await _authenticate(config.GITHUB_ACCESS_TOKEN);
@@ -91,8 +91,18 @@ describe('Topcoder X github tests', function test() {
       tcDirectId: config.TC_DIRECT_ID,
       repoUrl: repo.html_url,
       username: config.TOPCODER_USER_NAME,
-      secretWebhookKey
+      secretWebhookKey,
+      copilot: config.TOPCODER_USER_NAME,
+      owner: user.login
     });
+    await Promise.all(config.LABELS.map(async (label) => {
+      await github.issues.createLabel({
+        owner: user.login,
+        repo: repo.name,
+        name: label.name,
+        color: label.color
+      });
+    }));
   });
 
   after('delete user, usermapping, repository, issue', async () => {
@@ -107,31 +117,37 @@ describe('Topcoder X github tests', function test() {
   });
 
   describe('Tests for creating a Github ticket', async () => {
-    before('create an issue', async () => {
+    before('create an issue in github', async () => {
       const {data: githubIssue} = await github.issues.create({
         owner: user.login,
         repo: repo.name,
         title: data.issueTitle,
-        body: data.issueDescription
+        body: data.issueDescription,
+        labels: data.issueLabels
       });
-      await utils.test(async () => {
-        issue = await utils.getIssue(repo.id, githubIssue.number, PROVIDER);
-      });
+      issueNumber = githubIssue.number;
+
+      await utils.sleep(config.WAIT_TIME / 2); // eslint-disable-line no-magic-numbers
     });
 
     it('ensures that the challenge is created properly in the Topcoder platform', async () => {
-      await utils.ensureChallengeIsCreated(issue.challengeId);
+      await utils.test(async () => {
+        /** Ensure that TC challenge correct **/
+        issue = await utils.getIssue(repo.id, issueNumber, PROVIDER);
+        await utils.ensureChallengeIsCreated(issue.challengeId);
 
-      const {data: comments} = await github.issues.getComments({
-        owner: user.login,
-        repo: repo.name,
-        number: issue.number
+        /** Ensure that comment correct **/
+        const {data: comments} = await github.issues.getComments({
+          owner: user.login,
+          repo: repo.name,
+          number: issue.number
+        });
+        assert.exists(comments);
+        assert.isArray(comments);
+        const contestUrl = data.getUrlForChallengeId(issue.challengeId);
+        const comment = data.prepareAutomatedComment(data.contestCreatedComment(contestUrl), config.TOPCODER_USER_NAME);
+        assert.strictEqual(comments[comments.length - LAST_ELEMENT_OFFSET].body, comment);
       });
-      assert.exists(comments);
-      assert.isArray(comments);
-      const contestUrl = data.getUrlForChallengeId(issue.challengeId);
-      const comment = data.contestCreatedComment(contestUrl);
-      assert.strictEqual(comments[comments.length - LAST_ELEMENT_OFFSET].body, comment);
     });
   });
 
@@ -140,36 +156,43 @@ describe('Topcoder X github tests', function test() {
       await github.issues.edit({
         owner: user.login,
         repo: repo.name,
-        number: issue.number,
+        number: issueNumber,
         title: data.updatedPrizeTitle
       });
+
+      await utils.sleep(config.WAIT_TIME / 2); // eslint-disable-line no-magic-numbers
     });
 
     it('ensures that the prize is updated properly in the Topcoder challenge', async () => {
-      await utils.ensureChallengePrizeIsUpdated(issue.challengeId);
-      const {data: comments} = await github.issues.getComments({
-        owner: user.login,
-        repo: repo.name,
-        number: issue.number
+      await utils.test(async () => {
+        /** Ensure that TC challenge correct **/
+        issue = await utils.getIssue(repo.id, issueNumber, PROVIDER);
+        await utils.ensureChallengePrizeIsUpdated(issue.challengeId);
+
+        /** Ensure that comment correct **/
+        const {data: comments} = await github.issues.getComments({
+          owner: user.login,
+          repo: repo.name,
+          number: issueNumber
+        });
+        assert.exists(comments);
+        assert.isArray(comments);
+        const contestUrl = data.getUrlForChallengeId(issue.challengeId);
+        const comment = data.prepareAutomatedComment(data.contestUpdatedComment(contestUrl), config.TOPCODER_USER_NAME);
+        assert.deepEqual(comments[comments.length - LAST_ELEMENT_OFFSET].body, comment);
+
+        /** Ensure that event correct **/
+        const {data: events} = await github.issues.getEvents({
+          owner: user.login,
+          repo: repo.name,
+          number: issueNumber
+        });
+        assert.exists(events);
+        assert.isArray(events);
+        assert.deepEqual(events[events.length - LAST_ELEMENT_OFFSET].event, 'renamed');
+        assert.exists(events[events.length - LAST_ELEMENT_OFFSET].rename);
+        assert.deepEqual(events[events.length - LAST_ELEMENT_OFFSET].rename, data.renamePrizeEvent);
       });
-
-      assert.exists(comments);
-      assert.isArray(comments);
-      const contestUrl = data.getUrlForChallengeId(issue.challengeId);
-      const comment = data.contestUpdatedComment(contestUrl);
-      assert.deepEqual(comments[comments.length - LAST_ELEMENT_OFFSET].body, comment);
-
-      const {data: events} = await github.issues.getEvents({
-        owner: user.login,
-        repo: repo.name,
-        number: issue.number
-      });
-
-      assert.exists(events);
-      assert.isArray(events);
-      assert.deepEqual(events[events.length - LAST_ELEMENT_OFFSET].event, 'renamed');
-      assert.exists(events[events.length - LAST_ELEMENT_OFFSET].rename);
-      assert.deepEqual(events[events.length - LAST_ELEMENT_OFFSET].rename, data.renamePrizeEvent);
     });
   });
 
@@ -178,34 +201,43 @@ describe('Topcoder X github tests', function test() {
       await github.issues.edit({
         owner: user.login,
         repo: repo.name,
-        number: issue.number,
+        number: issueNumber,
         title: data.updatedIssueTitle
       });
+
+      await utils.sleep(config.WAIT_TIME / 2); // eslint-disable-line no-magic-numbers
     });
 
     it('ensures that the title is updated properly in the Topcoder challenge', async () => {
-      await utils.ensureChallengeTitleIsUpdated(issue.challengeId);
-      const {data: comments} = await github.issues.getComments({
-        owner: user.login,
-        repo: repo.name,
-        number: issue.number
-      });
-      assert.exists(comments);
-      assert.isArray(comments);
-      const contestUrl = data.getUrlForChallengeId(issue.challengeId);
-      const comment = data.contestUpdatedComment(contestUrl);
-      assert.deepEqual(comments[comments.length - LAST_ELEMENT_OFFSET].body, comment);
+      await utils.test(async () => {
+        /** Ensure that TC challenge correct **/
+        issue = await utils.getIssue(repo.id, issueNumber, PROVIDER);
+        await utils.ensureChallengeTitleIsUpdated(issue.challengeId);
 
-      const {data: events} = await github.issues.getEvents({
-        owner: user.login,
-        repo: repo.name,
-        number: issue.number
+        /** Ensure that comment correct **/
+        const {data: comments} = await github.issues.getComments({
+          owner: user.login,
+          repo: repo.name,
+          number: issueNumber
+        });
+        assert.exists(comments);
+        assert.isArray(comments);
+        const contestUrl = data.getUrlForChallengeId(issue.challengeId);
+        const comment = data.prepareAutomatedComment(data.contestUpdatedComment(contestUrl), config.TOPCODER_USER_NAME);
+        assert.deepEqual(comments[comments.length - LAST_ELEMENT_OFFSET].body, comment);
+
+        /** Ensure that event correct **/
+        const {data: events} = await github.issues.getEvents({
+          owner: user.login,
+          repo: repo.name,
+          number: issueNumber
+        });
+        assert.exists(events);
+        assert.isArray(events);
+        assert.deepEqual(events[events.length - LAST_ELEMENT_OFFSET].event, 'renamed');
+        assert.exists(events[events.length - LAST_ELEMENT_OFFSET].rename);
+        assert.deepEqual(events[events.length - LAST_ELEMENT_OFFSET].rename, data.renameTitleEvent);
       });
-      assert.exists(events);
-      assert.isArray(events);
-      assert.deepEqual(events[events.length - LAST_ELEMENT_OFFSET].event, 'renamed');
-      assert.exists(events[events.length - LAST_ELEMENT_OFFSET].rename);
-      assert.deepEqual(events[events.length - LAST_ELEMENT_OFFSET].rename, data.renameTitleEvent);
     });
   });
 
@@ -214,24 +246,31 @@ describe('Topcoder X github tests', function test() {
       await github.issues.edit({
         owner: user.login,
         repo: repo.name,
-        number: issue.number,
+        number: issueNumber,
         body: data.updatedIssueDescription
       });
+
+      await utils.sleep(config.WAIT_TIME / 2); // eslint-disable-line no-magic-numbers
     });
 
     it('ensures that the description is updated properly in the Topcoder challenge', async () => {
-      await utils.ensureChallengeDescriptionIsUpdated(issue.challengeId);
+      await utils.test(async () => {
+        /** Ensure that TC challenge correct **/
+        issue = await utils.getIssue(repo.id, issueNumber, PROVIDER);
+        await utils.ensureChallengeDescriptionIsUpdated(issue.challengeId);
 
-      const {data: comments} = await github.issues.getComments({
-        owner: user.login,
-        repo: repo.name,
-        number: issue.number
+        /** Ensure that comment correct **/
+        const {data: comments} = await github.issues.getComments({
+          owner: user.login,
+          repo: repo.name,
+          number: issueNumber
+        });
+        assert.exists(comments);
+        assert.isArray(comments);
+        const contestUrl = data.getUrlForChallengeId(issue.challengeId);
+        const comment = data.prepareAutomatedComment(data.contestUpdatedComment(contestUrl), config.TOPCODER_USER_NAME);
+        assert.deepEqual(comments[comments.length - LAST_ELEMENT_OFFSET].body, comment);
       });
-      assert.exists(comments);
-      assert.isArray(comments);
-      const contestUrl = data.getUrlForChallengeId(issue.challengeId);
-      const comment = data.contestUpdatedComment(contestUrl);
-      assert.deepEqual(comments[comments.length - LAST_ELEMENT_OFFSET].body, comment);
     });
   });
 
@@ -240,38 +279,46 @@ describe('Topcoder X github tests', function test() {
       await github.issues.edit({
         owner: user.login,
         repo: repo.name,
-        number: issue.number,
+        number: issueNumber,
         assignees: [user.login]
       });
+
+      await utils.sleep(config.WAIT_TIME / 2); // eslint-disable-line no-magic-numbers
     });
 
     it('ensures that the TC member is added to the TC challenge as expected', async () => {
-      await utils.ensureChallengeIsAssigned(issue.challengeId, config.TOPCODER_USER_NAME);
+      await utils.test(async () => {
+        /** Ensure that TC challenge correct **/
+        issue = await utils.getIssue(repo.id, issueNumber, PROVIDER);
+        await utils.ensureChallengeIsAssigned(issue.challengeId, config.TOPCODER_USER_NAME);
 
-      const {data: comments} = await github.issues.getComments({
-        owner: user.login,
-        repo: repo.name,
-        number: issue.number
+        /** Ensure that comment correct **/
+        const {data: comments} = await github.issues.getComments({
+          owner: user.login,
+          repo: repo.name,
+          number: issueNumber
+        });
+        assert.exists(comments);
+        assert.isArray(comments);
+        const contestUrl = data.getUrlForChallengeId(issue.challengeId);
+        const comment = data.prepareAutomatedComment(data.contestAssignedComment(contestUrl, config.TOPCODER_USER_NAME), config.TOPCODER_USER_NAME);
+        assert.deepEqual(comments[comments.length - LAST_ELEMENT_OFFSET].body, comment);
+
+        /** Ensure that event correct **/
+        const {data: events} = await github.issues.getEvents({
+          owner: user.login,
+          repo: repo.name,
+          number: issueNumber
+        });
+        assert.exists(events);
+        assert.isArray(events);
+
+        assert.deepEqual(events[events.length - LAST_ELEMENT_OFFSET - 2].event, 'assigned');  // eslint-disable-line no-magic-numbers
+        assert.exists(events[events.length - LAST_ELEMENT_OFFSET - 2].assignee);  // eslint-disable-line no-magic-numbers
+        assert.deepEqual(events[events.length - LAST_ELEMENT_OFFSET - 2].assignee.login, user.login);  // eslint-disable-line no-magic-numbers
+        assert.exists(events[events.length - LAST_ELEMENT_OFFSET - 2].assigner);  // eslint-disable-line no-magic-numbers
+        assert.deepEqual(events[events.length - LAST_ELEMENT_OFFSET - 2].assigner.login, user.login);  // eslint-disable-line no-magic-numbers
       });
-      assert.exists(comments);
-      assert.isArray(comments);
-      const contestUrl = data.getUrlForChallengeId(issue.challengeId);
-      const comment = data.contestAssignedComment(contestUrl, config.TOPCODER_USER_NAME);
-      assert.deepEqual(comments[comments.length - LAST_ELEMENT_OFFSET].body, comment);
-
-      const {data: events} = await github.issues.getEvents({
-        owner: user.login,
-        repo: repo.name,
-        number: issue.number
-      });
-
-      assert.exists(events);
-      assert.isArray(events);
-      assert.deepEqual(events[events.length - LAST_ELEMENT_OFFSET].event, 'assigned');
-      assert.exists(events[events.length - LAST_ELEMENT_OFFSET].assignee);
-      assert.deepEqual(events[events.length - LAST_ELEMENT_OFFSET].assignee.login, user.login);
-      assert.exists(events[events.length - LAST_ELEMENT_OFFSET].assigner);
-      assert.deepEqual(events[events.length - LAST_ELEMENT_OFFSET].assigner.login, user.login);
     });
   });
 
@@ -280,45 +327,59 @@ describe('Topcoder X github tests', function test() {
       await github.issues.edit({
         owner: user.login,
         repo: repo.name,
-        number: issue.number,
+        number: issueNumber,
         assignees: []
       });
 
+      await utils.sleep(config.WAIT_TIME / 2); // eslint-disable-line no-magic-numbers
+
       await utils.removeUserMapping(user.id, PROVIDER);
+
+      await utils.sleep(config.WAIT_TIME / 2); // eslint-disable-line no-magic-numbers
 
       await github.issues.edit({
         owner: user.login,
         repo: repo.name,
-        number: issue.number,
+        number: issueNumber,
         assignees: [user.login]
       });
+
+      await utils.sleep(config.WAIT_TIME / 2); // eslint-disable-line no-magic-numbers
     });
 
     after('add back user mapping, reassign user', async () => {
       await utils.addBackUserMapping(user.id, PROVIDER);
+
+      await utils.sleep(config.WAIT_TIME / 2); // eslint-disable-line no-magic-numbers
+
       await github.issues.edit({
         owner: user.login,
         repo: repo.name,
-        number: issue.number,
+        number: issueNumber,
         assignees: [user.login]
       });
+
+      await utils.sleep(config.WAIT_TIME / 2); // eslint-disable-line no-magic-numbers
     });
 
     it('ensures that the TC member assignment is rolled back', async () => {
       await utils.test(async () => {
+        /** Ensure that comment correct **/
         const {data: comments} = await github.issues.getComments({
           owner: user.login,
           repo: repo.name,
-          number: issue.number
+          number: issueNumber
         });
         assert.exists(comments);
         assert.isArray(comments);
-        assert.deepEqual(comments[comments.length - LAST_ELEMENT_OFFSET].body, data.signUpComment(user.login));
+        const comment = data.prepareAutomatedComment(data.signUpComment(user.login), config.TOPCODER_USER_NAME);
+        assert.deepEqual(comments[comments.length - LAST_ELEMENT_OFFSET].body, comment);
 
+        /** Ensure that event correct **/
         const {data: events} = await github.issues.getEvents({
           owner: user.login,
           repo: repo.name,
-          number: issue.number
+          number: issueNumber
         });
         assert.exists(events);
         assert.isArray(events);
@@ -331,89 +392,141 @@ describe('Topcoder X github tests', function test() {
     });
   });
 
-  // THIS TEST WILL FAIL as the member is not removed as a registrant on TC challenge
   describe('Tests for unassigning a github ticket', () => {
     before('unassign an issue', async () => {
       await github.issues.edit({
         owner: user.login,
         repo: repo.name,
-        number: issue.number,
+        number: issueNumber,
         assignees: []
       });
+
+      await utils.sleep(config.WAIT_TIME / 2); // eslint-disable-line no-magic-numbers
     });
 
     after('reassign issue', async () => {
-      await github.issues.edit({
-        owner: user.login,
-        repo: repo.name,
-        number: issue.number,
-        assignees: [user.login]
+      await utils.test(async () => {
+        await github.issues.edit({
+          owner: user.login,
+          repo: repo.name,
+          number: issueNumber,
+          assignees: [user.login]
+        });
       });
+
+      await utils.sleep(config.WAIT_TIME / 2); // eslint-disable-line no-magic-numbers
     });
 
     it('ensures that the TC challenge goes back to unassigned and the existing assignee is removed', async () => {
-      await utils.ensureChallengeIsUnassigned(issue.challengeId);
+      await utils.test(async () => {
+        /** Ensure that TC challenge correct **/
+        issue = await utils.getIssue(repo.id, issueNumber, PROVIDER);
+        await utils.ensureChallengeIsUnassigned(issue.challengeId);
+        const {data: comments} = await github.issues.getComments({
+          owner: user.login,
+          repo: repo.name,
+          number: issueNumber
+        });
 
-      const {data: events} = await github.issues.getEvents({
-        owner: user.login,
-        repo: repo.name,
-        number: issue.number
+        /** Ensure that comment correct **/
+        const contestUrl = data.getUrlForChallengeId(issue.challengeId);
+        const comment = data.prepareAutomatedComment(data.contestUnAssignedComment(contestUrl, config.TOPCODER_USER_NAME), config.TOPCODER_USER_NAME);
+        assert.deepEqual(comments[comments.length - LAST_ELEMENT_OFFSET].body, comment);
+
+        /** Ensure that event correct **/
+        const {data: events} = await github.issues.getEvents({
+          owner: user.login,
+          repo: repo.name,
+          number: issueNumber
+        });
+        assert.exists(events);
+        assert.isArray(events);
+        assert.deepEqual(events[events.length - LAST_ELEMENT_OFFSET - 2].event, 'unassigned'); // eslint-disable-line no-magic-numbers
+        assert.exists(events[events.length - LAST_ELEMENT_OFFSET - 2].assignee); // eslint-disable-line no-magic-numbers
+        assert.deepEqual(events[events.length - LAST_ELEMENT_OFFSET - 2].assignee.login, user.login); // eslint-disable-line no-magic-numbers
+        assert.exists(events[events.length - LAST_ELEMENT_OFFSET - 2].assigner); // eslint-disable-line no-magic-numbers
+        assert.deepEqual(events[events.length - LAST_ELEMENT_OFFSET - 2].assigner.login, user.login); // eslint-disable-line no-magic-numbers
       });
-      assert.exists(events);
-      assert.isArray(events);
-      assert.deepEqual(events[events.length - LAST_ELEMENT_OFFSET].event, 'unassigned');
-      assert.exists(events[events.length - LAST_ELEMENT_OFFSET].assignee);
-      assert.deepEqual(events[events.length - LAST_ELEMENT_OFFSET].assignee.login, user.login);
-      assert.exists(events[events.length - LAST_ELEMENT_OFFSET].assigner);
-      assert.deepEqual(events[events.length - LAST_ELEMENT_OFFSET].assigner.login, user.login);
     });
   });
 
-  // THIS TEST WILL FAIL as the issue is not reopened if no assignee exists. It is ignored with a log message
+ // THIS TEST WILL FAIL as the issue is not reopened if no assignee exists. It is ignored with a log message
   describe('Tests for closing a github ticket - no assigne exists', () => {
     before('remove assignees, close an issue', async () => {
+      // add tcx_FixAccepted Label
+      await github.issues.addLabels({
+        owner: user.login,
+        repo: repo.name,
+        number: issueNumber,
+        labels: [config.FIX_ACCEPTED_ISSUE_LABEL]
+      });
+
+      await utils.sleep(config.WAIT_TIME / 2); // eslint-disable-line no-magic-numbers
+
+      // remove assignee
       await github.issues.edit({
         owner: user.login,
         repo: repo.name,
-        number: issue.number,
+        number: issueNumber,
         assignees: []
       });
+
+      await utils.sleep(config.WAIT_TIME / 2); // eslint-disable-line no-magic-numbers
+
+      // close ticket
       await github.issues.edit({
         owner: user.login,
         repo: repo.name,
-        number: issue.number,
+        number: issueNumber,
         state: 'closed'
       });
+
+      await utils.sleep(config.WAIT_TIME / 2); // eslint-disable-line no-magic-numbers
     });
 
     after('reassign issue, reopen issue', async () => {
+      // remove tcx_FixAccepted label
+      await github.issues.removeLabel({
+        owner: user.login,
+        repo: repo.name,
+        number: issueNumber,
+        name: config.FIX_ACCEPTED_ISSUE_LABEL
+      });
+
+      await utils.sleep(config.WAIT_TIME / 2); // eslint-disable-line no-magic-numbers
+
       await github.issues.edit({
         owner: user.login,
         repo: repo.name,
-        number: issue.number,
+        number: issueNumber,
         assignees: [user.login]
       });
+
+      await utils.sleep(config.WAIT_TIME / 2); // eslint-disable-line no-magic-numbers
+
       await github.issues.edit({
         owner: user.login,
         repo: repo.name,
-        number: issue.number,
+        number: issueNumber,
         state: 'open'
       });
     });
 
     it('ensures a comment is added to the Github ticket and the ticket is reopened', async () => {
       await utils.test(async () => {
+        /** Ensure that ticket state correct **/
         const {data: githubIssue} = await github.issues.get({
           owner: user.login,
           repo: repo.name,
-          number: issue.number
+          number: issueNumber
         });
         assert.deepEqual(githubIssue.state, 'open');
 
+        /** Ensure that comment correct **/
         const {data: comments} = await github.issues.getComments({
           owner: user.login,
           repo: repo.name,
-          number: issue.number
+          number: issueNumber
         });
         assert.exists(comments);
         assert.isArray(comments);
@@ -422,49 +535,127 @@ describe('Topcoder X github tests', function test() {
     });
   });
 
-  describe('Tests for closing a github ticket', () => {
-    before('add assignee, close an issue', async () => {
+  describe('Tests for closing a github ticket - without tcx_FixAccepted label', () => {
+    before('remove tcx_FixAccepted label, close an issue', async () => {
+      // close ticket
       await github.issues.edit({
         owner: user.login,
         repo: repo.name,
-        number: issue.number,
-        assignees: [user.login]
-      });
-      await github.issues.edit({
-        owner: user.login,
-        repo: repo.name,
-        number: issue.number,
+        number: issueNumber,
         state: 'closed'
       });
+
+      await utils.sleep(config.WAIT_TIME / 2); // eslint-disable-line no-magic-numbers
+    });
+
+    after('reassign issue, reopen issue', async () => {
+      await utils.test(async () => {
+        await github.issues.edit({
+          owner: user.login,
+          repo: repo.name,
+          number: issueNumber,
+          assignees: [user.login]
+        });
+
+        await utils.sleep(config.WAIT_TIME / 2); // eslint-disable-line no-magic-numbers
+
+        await github.issues.edit({
+          owner: user.login,
+          repo: repo.name,
+          number: issueNumber,
+          state: 'open'
+        });
+
+        await utils.sleep(config.WAIT_TIME / 2); // eslint-disable-line no-magic-numbers
+      });
+    });
+
+    it('ensures a comment is added to the Github ticket and the ticket is close', async () => {
+      await utils.test(async () => {
+        /** Ensure that TC challenge correct **/
+        issue = await utils.getIssue(repo.id, issueNumber, PROVIDER);
+        await utils.ensureChallengeActive(issue.challengeId);
+
+        /** Ensure that ticket state correct **/
+        const {data: githubIssue} = await github.issues.get({
+          owner: user.login,
+          repo: repo.name,
+          number: issueNumber
+        });
+        assert.deepEqual(githubIssue.state, 'closed');
+
+        /** Ensure that comment correct **/
+        const {data: comments} = await github.issues.getComments({
+          owner: user.login,
+          repo: repo.name,
+          number: issueNumber
+        });
+        assert.exists(comments);
+        assert.isArray(comments);
+        const comment = data.prepareAutomatedComment(data.noPaymentTaskComment(config.FIX_ACCEPTED_ISSUE_LABEL), config.TOPCODER_USER_NAME);
+        assert.deepEqual(comments[comments.length - LAST_ELEMENT_OFFSET].body, comment);
+      });
+    });
+  });
+
+  describe('Tests for closing a github ticket', () => {
+    before('add assignee, close an issue', async () => {
+      // add FIX_ACCEPTED Label
+      await github.issues.addLabels({
+        owner: user.login,
+        repo: repo.name,
+        number: issueNumber,
+        labels: [config.FIX_ACCEPTED_ISSUE_LABEL]
+      });
+
+      await utils.sleep(config.WAIT_TIME / 2); // eslint-disable-line no-magic-numbers
+
+      await github.issues.edit({
+        owner: user.login,
+        repo: repo.name,
+        number: issueNumber,
+        state: 'closed'
+      });
+
+      await utils.sleep(config.WAIT_TIME / 2); // eslint-disable-line no-magic-numbers
     });
 
     it('ensures that the copilot is assigned and the challenge is closed', async () => {
       await utils.test(async () => {
+        /** Ensure that TC challenge correct **/
+        issue = await utils.getIssue(repo.id, issueNumber, PROVIDER);
+        await utils.ensureChallengeCompleted(issue.challengeId);
+
+        /** Ensure that issue state correct **/
         const {data: githubIssue} = await github.issues.get({
           owner: user.login,
           repo: repo.name,
-          number: issue.number
+          number: issueNumber
         });
         assert.deepEqual(githubIssue.state, 'closed');
 
+        /** Ensure that TC comment correct **/
         const {data: comments} = await github.issues.getComments({
           owner: user.login,
           repo: repo.name,
-          number: issue.number
+          number: issueNumber
         });
         assert.exists(comments);
         assert.isArray(comments);
-        assert.deepEqual(comments[comments.length - LAST_ELEMENT_OFFSET].body, data.paymentTaskComment(issue.challengeId));
+        const comment = data.prepareAutomatedComment(data.paymentTaskComment(issue.challengeId), config.TOPCODER_USER_NAME);
+        assert.deepEqual(comments[comments.length - LAST_ELEMENT_OFFSET].body, comment);
 
-        const {data: labels} = await github.issues.getLabels({
+
+        /** Ensure that labels correct **/
+        const {data: labels} = await github.issues.getIssueLabels({
           owner: user.login,
           repo: repo.name,
-          number: issue.number
+          number: issueNumber
         });
         assert.exists(labels);
         assert.isArray(labels);
-        assert.deepEqual(labels[0].name, data.fixAcceptedLabel);
-        assert.deepEqual(labels[1].name, data.paidLabel);
+        assert.deepEqual(labels[1].name, data.fixAcceptedLabel);
+        assert.deepEqual(labels[2].name, data.paidLabel); // eslint-disable-line no-magic-numbers
       });
     });
   });

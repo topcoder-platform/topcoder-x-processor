@@ -9,6 +9,7 @@
  * @version 1.0
  */
 'use strict';
+const uuid = require('uuid/v4');
 
 /**
  * prepares the comment body with automated footer note
@@ -22,7 +23,17 @@ function prepareAutomatedComment(body, copilot) {
   return body;
 }
 
+/**
+ * Generate an unique identifier
+ *
+ * @returns {String} the generated id
+ */
+function generateIdentifier() {
+  return `${uuid()}-${new Date().getTime()}`;
+}
+
 module.exports = {
-  prepareAutomatedComment
+  prepareAutomatedComment,
+  generateIdentifier
 };
 

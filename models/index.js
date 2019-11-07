@@ -11,18 +11,28 @@
  * @version 1.1
  */
 const config = require('config');
-const mongoose = require('mongoose');
+const dynamoose = require('dynamoose');
 
-mongoose.Promise = global.Promise;
-const connection = mongoose.createConnection(config.MONGODB_URL);
+dynamoose.AWS.config.update({
+  region: config.DYNAMODB.AWS_REGION
+});
+
+if (config.DYNAMODB.IS_LOCAL === 'true') {
+  dynamoose.local();
+}
+
+dynamoose.setDefaults({
+  create: false,
+  update: false
+});
 
 /* eslint-disable global-require */
 const models = {
-  Issue: connection.model('Issue', require('./Issue')),
-  Project: connection.model('Project', require('./Project')),
-  User: connection.model('User', require('./User')),
-  UserMapping: connection.model('UserMapping', require('./UserMapping')),
-  CopilotPayment: connection.model('CopilotPayment', require('./CopilotPayment'))
+  Issue: dynamoose.model('Topcoder_X.Issue', require('./Issue')),
+  Project: dynamoose.model('Topcoder_X.Project', require('./Project')),
+  User: dynamoose.model('Topcoder_X.User', require('./User')),
+  UserMapping: dynamoose.model('Topcoder_X.UserMapping', require('./UserMapping')),
+  CopilotPayment: dynamoose.model('Topcoder_X.CopilotPayment', require('./CopilotPayment'))
 };
 /* eslint-enable global-require */
 

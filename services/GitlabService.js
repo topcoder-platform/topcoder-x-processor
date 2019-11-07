@@ -9,9 +9,9 @@
  * @version 1.0
  */
 
+const config = require('config');
 const _ = require('lodash');
 const Joi = require('joi');
-const config = require('config');
 const GitlabAPI = require('node-gitlab-api');
 const logger = require('../utils/logger');
 const errors = require('../utils/errors');
@@ -198,12 +198,15 @@ getUserIdByLogin.schema = {
  * @param {Number} projectId the project id
  * @param {Number} issueId the issue number
  * @param {Number} challengeId the challenge id
+ * @param {Array} existLabels the issue labels
  */
-async function markIssueAsPaid(copilot, projectId, issueId, challengeId) {
+async function markIssueAsPaid(copilot, projectId, issueId, challengeId, existLabels) {
   Joi.attempt({copilot, projectId, issueId, challengeId}, markIssueAsPaid.schema);
   const gitlab = await _authenticate(copilot.accessToken);
+  const labels = _(existLabels).filter((i) => i !== config.FIX_ACCEPTED_ISSUE_LABEL)
+    .push(config.FIX_ACCEPTED_ISSUE_LABEL, config.PAID_ISSUE_LABEL).value();
   try {
-    await gitlab.projects.issues.edit(projectId, issueId, {labels: `${config.PAID_ISSUE_LABEL},${config.FIX_ACCEPTED_ISSUE_LABEL}`});
+    await gitlab.projects.issues.edit(projectId, issueId, {labels: labels.join(',')});
     const body = helper.prepareAutomatedComment(`Payment task has been updated: ${config.TC_OR_DETAIL_LINK}${challengeId}`, copilot);
     await gitlab.projects.issues.notes.create(projectId, issueId, {body});
   } catch (err) {

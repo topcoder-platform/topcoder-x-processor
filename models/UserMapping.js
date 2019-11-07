@@ -3,18 +3,30 @@
  */
 'use strict';
 
-const mongoose = require('mongoose');
+const dynamoose = require('dynamoose');
 
-const Schema = mongoose.Schema;
+const Schema = dynamoose.Schema;
 
 const schema = new Schema({
-  topcoderUsername: {type: String, required: true, unique: true},
+  id: {
+    type: String,
+    required: true,
+    hashKey: true
+  },
+  topcoderUsername: {
+    type: String,
+    required: true,
+    index: {
+      global: true,
+      project: true,
+      rangKey: 'id',
+      name: 'TopcoderUsernameIndex'
+    }
+  },
   githubUsername: String,
   gitlabUsername: String,
   githubUserId: Number,
   gitlabUserId: Number
 });
-
-schema.index({topcoderUsername: 1}, {unique: true});
 
 module.exports = schema;

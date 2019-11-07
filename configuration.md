@@ -6,16 +6,12 @@ The following config parameters are supported, they are defined in `config/defau
 | :----------------------------- | :----------------------------------------: | :------------------------------: |
 | LOG_LEVEL                      | the log level                              |  debug                           |
 | PARTITION                  | The Kafka partition            |  0|
-| MONGODB_URI                            | The MongoDB URI.  This needs to be the same MongoDB used by topcoder-x-receiver, topcoder-x-processor, and topcoder-x-site                           | mongodb://127.0.0.1:27017/topcoderx |
 |TOPIC  | The Kafka topic where events are published.  This must be the same as the configured value for topcoder-x-processor| |
 |KAFKA_OPTIONS | Kafka connection options| |
-|KAFKA_HOST | The Kafka host to connect to| localhost:9092 |
+|KAFKA_URL | The Kafka host to connect to| localhost:9092 |
 |KAFKA_CLIENT_CERT | The Kafka SSL certificate to use when connecting| Read from kafka_client.cer file, but this can be set as a string like it is on Heroku |
 |KAFKA_CLIENT_CERT_KEY | The Kafka SSL certificate key to use when connecting| Read from kafka_client.key file, but this can be set as a string like it is on Heroku|
 |TC_DEV_ENV| the flag whether to use topcoder development api or production| false|
-| TC_AUTHN_URL | the Topcoder authentication url | https://topcoder-dev.auth0.com/oauth/ro |
-| TC_AUTHN_REQUEST_BODY | the Topcoder authentication request body. This makes use of some environment variables: `TC_USERNAME`, `TC_PASSWORD`, `TC_CLIENT_ID`, `CLIENT_V2CONNECTION` | see `default.js` |
-| TC_AUTHZ_URL | the Topcoder authorization url | https://api.topcoder-dev.com/v3/authorizations |
 | NEW_CHALLENGE_TEMPLATE | the body template for new challenge request. You can change the subTrack, reviewTypes, technologies, .. here | see `default.js` |
 | NEW_CHALLENGE_DURATION_IN_DAYS | the duration of new challenge | 5 |
 | NODE_MAILER_OPTIONS| the node mailer smtp options, see [here](https://nodemailer.com/smtp/ for more detail)| see `default.js` |
@@ -31,7 +27,18 @@ The following config parameters are supported, they are defined in `config/defau
 |RETRY_COUNT| the number of times an event should be retried to process| 3|
 |RETRY_INTERVAL| the interval at which the event should be retried to process in milliseconds | 120000|
 |READY_FOR_REVIEW_ISSUE_LABEL| the label name for ready for review, should be one of the label configured in topcoder x ui|'tcx_ReadyForReview'|
+|NOT_READY_ISSUE_LABEL| the label name for not ready, should be one of the label configured in topcoder x ui|'tcx_NotReady'|
+|CANCELED_ISSUE_LABEL| the label name for canceled, should be one of the label configured in topcoder x ui|'tcx_Canceled'|
 |CANCEL_CHALLENGE_INTERVAL| the time in millisecond after which the challenge will be closed| '24*60*60*1000'|
+|AWS_ACCESS_KEY_ID | The Amazon certificate key to use when connecting. Use local dynamodb you can set fake value|FAKE_ACCESS_KEY_ID |
+|AWS_SECRET_ACCESS_KEY | The Amazon certificate access key to use when connecting. Use local dynamodb you can set fake value|FAKE_SECRET_ACCESS_KEY |
+|AWS_REGION | The Amazon certificate region to use when connecting. Use local dynamodb you can set fake value|FAKE_REGION |
+|IS_LOCAL | Use Amazon DynamoDB Local or server. |'false' |
+|AUTH0_URL| The Auth0 URL for generating Machine-to-machine token |https://topcoder-dev.auth0.com/oauth/token|
+|AUTH0_AUDIENCE| The audience of Auth0 to generate M2M Token |https://m2m.topcoder-dev.com/|
+|TOKEN_CACHE_TIME| The machine-to-machine token cache validation time |43200|
+|AUTH0_CLIENT_ID| The Auth0 ClientID for generating Machine-to-machine token ||
+|AUTH0_CLIENT_SECRET| The Auth0 Client Secret for generating Machine-to-machine token ||
 
 KAFKA_OPTIONS should be object as described in https://github.com/oleksiyk/kafka#ssl
 For using with SSL, the options should be as
@@ -47,20 +54,21 @@ For using with SSL, the options should be as
 
 The following config paramaters are supported in the test environment defined in `config/test.js` and can be configured in the system environment. Note that the test config inherits all config options present in the default config and adds/overrides some config options.
 
-| Name                           | Description                                | Default                          |
-| :----------------------------- | :----------------------------------------: | :------------------------------: |                             |
-| TC_URL                          | the topcoder development url             |  https://www.topcoder-dev.com                    |
-| TC_DEV_API_URL                  | the topcoder development api url            |  https://api.topcoder-dev.com/v3|
-| MAX_RETRY_COUNT                  | the maximum number of times to re-test before concluding that test failed            |  https://api.topcoder-dev.com/v3|
-| WAIT_TIME                  | the amount of time in milliseconds to wait before running a re-test            |  30000                  |
-| TC_DIRECT_ID                  | the topcoder direct id of the repository which is set up with a valid billing account            |  7377                  |
-| TOPCODER_USER_NAME                  | a valid username for topcoder dev platform            |  mess                  |
-| HOOK_BASE_URL                  | the webhook url of topcoder-x-receiver            |                    |
-| GITHUB_ACCESS_TOKEN                  | github personal access token            |                    |
-| GITHUB_REPOSITORY_NAME                  | the name of the repository to create for testing (should not already exist)            |                    |
-| GITLAB_USERNAME                  | gitlab username            |                    |
-| GITLAB_PASSWORD                  | gitlab password            |                    |
-| GITLAB_REPOSITORY_NAME                  | the name of the repository to create for testing (should not already exist)            |                    |
+| Name | Description | Default |
+|:--|:--|:--|
+| TC_URL | the topcoder development url |https://www.topcoder-dev.com |
+| TC_DEV_API_URL | the topcoder development api url |https://api.topcoder-dev.com/v3|
+| MAX_RETRY_COUNT | the maximum number of times to re-test before concluding that test failed | 17 |
+| WAIT_TIME | the amount of time in milliseconds to wait before running a re-test | 60000 |
+| TC_DIRECT_ID | the topcoder direct id of the repository which is set up with a valid billing account | 7377 |
+| TOPCODER_USER_NAME | a valid username for topcoder dev platform | mess |
+| HOOK_BASE_URL | the webhook url of topcoder-x-receiver | |
+| GITHUB_ACCESS_TOKEN | github personal access token | |
+| GITHUB_REPOSITORY_NAME | the name of the repository to create for testing (should not already exist) | |
+| GITLAB_USERNAME | gitlab username | |
+| GITLAB_PASSWORD | gitlab password | |
+| GITLAB_REPOSITORY_NAME | the name of the repository to create for testing (should already exist) | |
+| GITLAB_REPO_URL | the URL of the repository to create for testing (should already exist) | |
 
 ## Github Verification
 
@@ -71,7 +79,7 @@ Configure a Github project with a webhook with a format like this: https://<rece
 #### Smoke test
 - Create an issue in the repo, you can see the logs in `receiver`, the `issue.created` event is generated.  You should then see the processor receive the event and process it accordingly.  It's important to validate that the issue.created event is seen by the receiver *and* the processor.  This ensures that the Kafka communication between the two services is working properly.
 
-You can test other events, but just validating that an issue.created event is generated in Kafka is enough to smoke test the receiver is set up properly.  
+You can test other events, but just validating that an issue.created event is generated in Kafka is enough to smoke test the receiver is set up properly.
 
 ## Github Verification
 
