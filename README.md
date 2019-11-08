@@ -60,6 +60,7 @@ For using with SSL, the options should be as
 ```
  {
     connectionString: '<server>',
+    groupId: <groupid>,
     ssl: {
       cert: '<certificate>',
       key:  '<key>'
