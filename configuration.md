@@ -9,6 +9,7 @@ The following config parameters are supported, they are defined in `config/defau
 |TOPIC  | The Kafka topic where events are published.  This must be the same as the configured value for topcoder-x-processor| |
 |KAFKA_OPTIONS | Kafka connection options| |
 |KAFKA_URL | The Kafka host to connect to| localhost:9092 |
+|KAFKA_GROUP_ID | The Kafka group id name| topcoder-x-processor |
 |KAFKA_CLIENT_CERT | The Kafka SSL certificate to use when connecting| Read from kafka_client.cer file, but this can be set as a string like it is on Heroku |
 |KAFKA_CLIENT_CERT_KEY | The Kafka SSL certificate key to use when connecting| Read from kafka_client.key file, but this can be set as a string like it is on Heroku|
 |TC_DEV_ENV| the flag whether to use topcoder development api or production| false|
