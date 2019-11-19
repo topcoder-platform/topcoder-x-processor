@@ -32,9 +32,6 @@ The following config parameters are supported, they are defined in `config/defau
 |TC_DEV_ENV| the flag whether to use topcoder development api or production| false|
 | NEW_CHALLENGE_TEMPLATE | the body template for new challenge request. You can change the subTrack, reviewTypes, technologies, .. here | see `default.js` |
 | NEW_CHALLENGE_DURATION_IN_DAYS | the duration of new challenge | 5 |
-| NODE_MAILER_OPTIONS| the node mailer smtp options, see [here](https://nodemailer.com/smtp/ for more detail)| see `default.js` |
-|EMAIL_SENDER_ADDRESS| the email sender email address||
-|ISSUE_BID_EMAIL_RECEIVER| the email receiver about bid email||
 |TC_URL| the base URL of topcoder to get the challenge URL| defaults to `https://www.topcoder-dev.com`|
 |GITLAB_API_BASE_URL| the URL for gitlab host| defaults to `https://gitlab.com`|
 |PAID_ISSUE_LABEL|the label name for paid, should be one of the label configured in topcoder x ui|'tcx_Paid'|
@@ -60,6 +57,7 @@ For using with SSL, the options should be as
 ```
  {
     connectionString: '<server>',
+    groupId: <groupid>,
     ssl: {
       cert: '<certificate>',
       key:  '<key>'

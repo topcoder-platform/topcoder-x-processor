@@ -18,6 +18,7 @@ module.exports = {
   TOPIC: process.env.TOPIC || 'tc-x-events',
   KAFKA_OPTIONS: {
     connectionString: process.env.KAFKA_URL || 'localhost:9092',
+    groupId: process.env.KAFKA_GROUP_ID || 'topcoder-x-processor',
     ssl: {
       cert: process.env.KAFKA_CLIENT_CERT || fs.readFileSync('./kafka_client.cer'), // eslint-disable-line no-sync
       key: process.env.KAFKA_CLIENT_CERT_KEY || fs.readFileSync('./kafka_client.key'), // eslint-disable-line no-sync
@@ -53,18 +54,6 @@ module.exports = {
   // NOTE: if subTrack is FIRST_2_FINISH,
   // this config has no effect since the ***EndsAt will be set automatically by TC APIs
   NEW_CHALLENGE_DURATION_IN_DAYS: process.env.NEW_CHALLENGE_DURATION_IN_DAYS || 5,
-  // node mailer option
-  NODE_MAILER_OPTIONS: {
-    host: process.env.SMTP_HOST || process.env.MAILGUN_SMTP_SERVER || 'smtp.gmail.com',
-    port: process.env.SMTP_PORT || process.env.MAILGUN_SMTP_POR || 465,
-    secure: process.env.SMTP_IS_SECURE || true,
-    auth: {
-      user: process.env.SMTP_USERNAME || process.env.MAILGUN_SMTP_LOGIN || '',
-      pass: process.env.SMTP_PASSWORD || process.env.MAILGUN_SMTP_PASSWORD || ''
-    }
-  },
-  EMAIL_SENDER_ADDRESS: process.env.EMAIL_SENDER_ADDRESS || '',
-  ISSUE_BID_EMAIL_RECEIVER: process.env.ISSUE_BID_EMAIL_RECEIVER || '',
   TC_URL: process.env.TC_URL || 'https://www.topcoder-dev.com',
   GITLAB_API_BASE_URL: process.env.GITLAB_API_BASE_URL || 'https://gitlab.com',
   PAID_ISSUE_LABEL: process.env.PAID_ISSUE_LABEL || 'tcx_Paid',

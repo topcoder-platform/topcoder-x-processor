@@ -21,7 +21,6 @@ const models = require('../models');
 const dbHelper = require('../utils/db-helper');
 const helper = require('../utils/helper');
 const gitHelper = require('../utils/git-helper');
-const emailService = require('./EmailService');
 const userService = require('./UserService');
 const eventService = require('./EventService');
 
@@ -269,7 +268,6 @@ async function handleIssueComment(event, issue) {
   const parsedComment = parseComment(event.data.comment);
   if (parsedComment.isBid) {
     logger.debug(`New bid is received with amount ${parsedComment.bidAmount}.`);
-    await emailService.sendNewBidEmail(event.data, parsedComment.bidAmount);
   }
   if (parsedComment.isAcceptBid) {
     logger.debug(`Bid by ${parsedComment.assignedUser} is accepted with amount ${parsedComment.bidAmount} `);
