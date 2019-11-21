@@ -37,6 +37,8 @@ if (config.TC_DEV_ENV) {
   topcoderApiProjects = topcoderDevApiProjects;
   topcoderApiChallenges = topcoderDevApiChallenges;
 }
+//Timeout increase to 5 minutes
+topcoderApiChallenges.ApiClient.timeout=300000;
 
 // Init the API instances
 const projectsClient = topcoderApiProjects.ApiClient.instance;
