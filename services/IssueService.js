@@ -68,7 +68,9 @@ async function ensureChallengeExists(event, issue, create = true) {
     provider: issue.provider,
     repositoryId: issue.repositoryId
   });
-
+  logger.debug(`DB Issue number: ${issue.number}`);
+  logger.debug(`DB Issue provider: ${issue.provider}`);
+  logger.debug(`DB Issue repository: ${issue.repositoryId}`);
   if (dbIssue && dbIssue.status === 'challenge_creation_pending') {
     throw errors.internalDependencyError(`Challenge for the updated issue ${issue.number} is creating, rescheduling this event`);
   }
