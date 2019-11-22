@@ -2,6 +2,7 @@
  * Copyright (c) 2018 TopCoder, Inc. All rights reserved.
  */
 'use strict';
+const logger = require('./logger');
 
 /**
  * This module contains the database helper methods.
@@ -52,11 +53,16 @@ async function scan(model, scanParams) {
  * @returns {Promise<void>}
  */
 async function scanOne(model, scanParams) {
+  logger.debug('Enter scanOne.');
+
   return await new Promise((resolve, reject) => {
     model.scan(scanParams).exec((err, result) => {
       if (err) {
+        logger.debug(`scanOne. Error. ${err}`);
         reject(err);
       }
+      logger.debug(`scanOne. Result.`);
+      logger.debug(result);
 
       return resolve(result.count === 0 ? null : result[0]);
     });
