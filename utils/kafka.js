@@ -21,7 +21,7 @@ const logger = require('./logger');
 
 class Kafka {
   constructor() {
-    this.consumer = new kafka.GroupConsumer(config.KAFKA_OPTIONS);
+    this.consumer = new kafka.SimpleConsumer(config.KAFKA_OPTIONS);
 
     this.producer = new kafka.Producer(config.KAFKA_OPTIONS);
     this.producer.init().then(() => {
@@ -77,12 +77,10 @@ class Kafka {
   }
 
   run() {
-    this.consumer.init([{
-      subscriptions: [config.TOPIC],
-      handler: this.messageHandler
-    }]).then(() => {
+    this.consumer.init().then(() => {
       logger.info('kafka consumer is ready');
       healthcheck.init([this.check]);
+      this.consumer.subscribe(config.TOPIC, {}, this.messageHandler);
     }).catch((err) => {
       logger.error(`kafka consumer is not connected. ${err.stack}`);
     });
