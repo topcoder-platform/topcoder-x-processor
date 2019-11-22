@@ -63,6 +63,11 @@ function parsePrizes(issue) {
  * @private
  */
 async function ensureChallengeExists(event, issue, create = true) {
+  logger.debug('Enter ensureChallengeExists to scan an issue record');
+  logger.debug(`Enter ensureChallengeExists. Number: ${issue.number}`);
+  logger.debug(`Enter ensureChallengeExists. provider: ${issue.provider}`);
+  logger.debug(`Enter ensureChallengeExists. repositoryId: ${issue.repositoryId}`);
+
   let dbIssue = await dbHelper.scanOne(models.Issue, {
     number: issue.number,
     provider: issue.provider,
@@ -70,6 +75,7 @@ async function ensureChallengeExists(event, issue, create = true) {
   });
 
   if (dbIssue && dbIssue.status === 'challenge_creation_pending') {
+    logger.debug('dbIssue is PENDING');
     throw errors.internalDependencyError(`Challenge for the updated issue ${issue.number} is creating, rescheduling this event`);
   }
   if (dbIssue && dbIssue.status === 'challenge_creation_failed') {
@@ -83,12 +89,15 @@ async function ensureChallengeExists(event, issue, create = true) {
   }
 
   if (!dbIssue && create) {
+    logger.debug('dbIssue is NULL, process to create new record and challenge');
+
     await handleIssueCreate(event, issue);
     dbIssue = await dbHelper.scanOne(models.Issue, {
       number: issue.number,
       provider: issue.provider,
       repositoryId: issue.repositoryId
     });
+    logger.debug(`dbIssue is CREATED ${dbIssue ? 'Succesfully' : 'Failed'}`);
   }
   return dbIssue;
 }
