@@ -347,6 +347,16 @@ async function handleIssueClose(event, issue) {
     dbIssue = await ensureChallengeExists(event, issue);
     event.dbIssue = dbIssue;
 
+    // if the issue has payment success or payment pending status, we'll ignore this process.
+    if (dbIssue && dbIssue.status === 'challenge_payment_successful') {
+      logger.debug(`Ignoring close issue processing. The issue has challenge_payment_successful.`);
+      return;
+    }
+    if (dbIssue && dbIssue.status === 'challenge_payment_pending') {
+      logger.debug(`Ignoring close issue processing. The issue has challenge_payment_pending.`);
+      return;
+    }
+
     if (!event.paymentSuccessful) {
       let closeChallenge = false;
       // if issue is closed without Fix accepted label
@@ -389,6 +399,12 @@ async function handleIssueClose(event, issue) {
         logger.debug('Challenge is already complete, so no point in trying to do anything further');
         return;
       }
+
+      // update the issue status to payment pending to prevent double processing.
+      await dbHelper.update(models.Issue, dbIssue.id, {
+        status: 'challenge_payment_pending',
+        updatedAt: new Date()
+      });
 
       logger.debug(`Looking up TC handle of git user: ${event.data.assignee.id}`);
       const assigneeMember = await userService.getTCUserName(event.provider, event.data.assignee.id);
@@ -459,23 +475,34 @@ async function handleIssueClose(event, issue) {
     }
   } catch (e) {
     event.paymentSuccessful = event.paymentSuccessful === true; // if once paid shouldn't be false
+    // update the issue status to payment failed
+    if (!event.paymentSuccessful) {
+      await dbHelper.update(models.Issue, dbIssue.id, {
+        status: 'challenge_payment_failed',
+        updatedAt: new Date()
+      });
+    }
     await eventService.handleEventGracefully(event, issue, e);
     return;
   }
-  try {
-    logger.debug('update issue as paid');
-    const labels = _(dbIssue.labels)
-      .filter((i) => i !== config.OPEN_FOR_PICKUP_ISSUE_LABEL && i !== config.ASSIGNED_ISSUE_LABEL)
-      .push(config.ASSIGNED_ISSUE_LABEL)
-      .value();
-    dbIssue = await dbHelper.update(models.Issue, dbIssue.id, {
-      labels,
-      updatedAt: new Date()
-    });
-    await gitHelper.markIssueAsPaid(event, issue.number, dbIssue.challengeId, labels);
-  } catch (e) {
-    await eventService.handleEventGracefully(event, issue, e);
-    return;
+  // Only update the label to paid if the payment successfully processed.
+  if (event.paymentSuccessful) {
+    try {
+      logger.debug('update issue as paid');
+      const labels = _(dbIssue.labels)
+        .filter((i) => i !== config.OPEN_FOR_PICKUP_ISSUE_LABEL && i !== config.ASSIGNED_ISSUE_LABEL)
+        .push(config.ASSIGNED_ISSUE_LABEL)
+        .value();
+      dbIssue = await dbHelper.update(models.Issue, dbIssue.id, {
+        labels,
+        status: 'challenge_payment_successful',
+        updatedAt: new Date()
+      });
+      await gitHelper.markIssueAsPaid(event, issue.number, dbIssue.challengeId, labels);
+    } catch (e) {
+      await eventService.handleEventGracefully(event, issue, e);
+      return;
+    }
   }
 }
 
