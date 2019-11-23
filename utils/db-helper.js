@@ -20,7 +20,7 @@ async function getById(model, id) {
   return await new Promise((resolve, reject) => {
     model.query('id').eq(id).exec((err, result) => {
       if (err) {
-        reject(err);
+        return reject(err);
       }
 
       return resolve(result[0]);
@@ -38,7 +38,7 @@ async function scan(model, scanParams) {
   return await new Promise((resolve, reject) => {
     model.scan(scanParams).exec((err, result) => {
       if (err) {
-        reject(err);
+        return reject(err);
       }
 
       return resolve(result.count === 0 ? [] : result);
@@ -59,9 +59,9 @@ async function scanOne(model, scanParams) {
     model.scan(scanParams).exec((err, result) => {
       if (err) {
         logger.debug(`scanOne. Error. ${err}`);
-        reject(err);
+        return reject(err);
       }
-      logger.debug(`scanOne. Result.`);
+      logger.debug('scanOne. Result.');
       logger.debug(result);
 
       return resolve(result.count === 0 ? null : result[0]);
@@ -78,7 +78,7 @@ async function updateMany(model, collection) {
   await new Promise((resolve, reject) => {
     model.batchPut(collection, (err, result) => {
       if (err) {
-        reject(err);
+        return reject(err);
       }
 
       resolve(result);
@@ -97,7 +97,7 @@ async function create(Model, data) {
     const dbItem = new Model(data);
     dbItem.save((err) => {
       if (err) {
-        reject(err);
+        return reject(err);
       }
 
       return resolve(dbItem);
@@ -120,7 +120,7 @@ async function update(Model, id, data) {
   return await new Promise((resolve, reject) => {
     dbItem.save((err) => {
       if (err) {
-        reject(err);
+        return reject(err);
       }
 
       return resolve(dbItem);
@@ -139,7 +139,7 @@ async function remove(Model, queryParams) {
     if (dbItem != null) {
       dbItem.delete((err) => {
         if (err) {
-          reject(err);
+          return reject(err);
         }
 
         resolve(dbItem);
