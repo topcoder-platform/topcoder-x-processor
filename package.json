@@ -29,7 +29,7 @@
     "axios": "^0.19.0",
     "circular-json": "^0.5.7",
     "config": "^1.30.0",
-    "dynamoose": "^1.1.0",
+    "dynamoose": "^1.11.1",
     "fs-extra": "^7.0.0",
     "get-parameter-names": "^0.3.0",
     "github": "^12.1.0",
