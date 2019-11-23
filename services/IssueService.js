@@ -611,6 +611,12 @@ async function handleIssueLabelUpdated(event, issue) {
     await eventService.handleEventGracefully(event, issue, e);
     return;
   }
+  // Sometimes Github send label updated event before issue created event.
+  // This process will be ignored. The label will be processed (stored) at hanleIssueCreated.
+  if (!dbIssue) {
+    logger.debug(`DB record not found. Issue label update ignored.`);
+    return;
+  }
   await dbHelper.update(models.Issue, dbIssue.id, {
     labels: issue.labels,
     updatedAt: new Date()
