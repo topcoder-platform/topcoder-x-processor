@@ -37,12 +37,13 @@ if (config.TC_DEV_ENV) {
   topcoderApiProjects = topcoderDevApiProjects;
   topcoderApiChallenges = topcoderDevApiChallenges;
 }
-// Timeout increase to 5 minutes
-topcoderApiChallenges.ApiClient.timeout = 300000;
-
 // Init the API instances
 const projectsClient = topcoderApiProjects.ApiClient.instance;
 const challengesClient = topcoderApiChallenges.ApiClient.instance;
+
+//Timeout increase to 5 minutes
+challengesClient.timeout=300000;
+
 const bearer = projectsClient.authentications.bearer;
 bearer.apiKeyPrefix = 'Bearer';
 challengesClient.authentications.bearer = bearer;
