@@ -37,12 +37,13 @@ if (config.TC_DEV_ENV) {
   topcoderApiProjects = topcoderDevApiProjects;
   topcoderApiChallenges = topcoderDevApiChallenges;
 }
-//Timeout increase to 5 minutes
-topcoderApiChallenges.ApiClient.timeout=300000;
-
 // Init the API instances
 const projectsClient = topcoderApiProjects.ApiClient.instance;
 const challengesClient = topcoderApiChallenges.ApiClient.instance;
+
+//Timeout increase to 5 minutes
+challengesClient.timeout=300000;
+
 const bearer = projectsClient.authentications.bearer;
 bearer.apiKeyPrefix = 'Bearer';
 challengesClient.authentications.bearer = bearer;
@@ -157,6 +158,12 @@ async function updateChallenge(id, challenge) {
     const statusCode = response.result ? response.result.status : null;
     loggerFile.info(`EndPoint: PUT /challenges/${id},  PUT parameters: null, Status Code:${statusCode}, Response: ${circularJSON.stringify(response)}`);
   } catch (err) {
+    logger.error('updateChallenge ERROR.');
+    logger.error(`EndPoint: PUT /challenges/${id}`);
+    logger.error(`${err.message}`);
+    logger.error(`Request: ${JSON.stringify(err.config)}`);
+    logger.error(`Response Data: ${err.response.data}`);
+
     loggerFile.info(`EndPoint: PUT /challenges/${id},  PUT parameters: null, Status Code:null,
     Error: 'Failed to update challenge.', Details: ${circularJSON.stringify(err)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to update challenge.');
@@ -187,6 +194,12 @@ async function activateChallenge(id) {
     POST parameters: null, Status Code:${statusCode}, Response: ${circularJSON.stringify(response)}`);
     logger.debug(`Challenge ${id} is activated successfully.`);
   } catch (err) {
+    logger.error('activateChallenge ERROR.');
+    logger.error(`EndPoint: POST /challenges/${id}/activate`);
+    logger.error(`${err.message}`);
+    logger.error(`Request: ${JSON.stringify(err.config)}`);
+    logger.error(`Response Data: ${err.response.data}`);
+
     loggerFile.info(`EndPoint: POST /challenges/${id}/activate,  POST parameters: null, Status Code:null,
     Error: 'Failed to activate challenge.', Details: ${circularJSON.stringify(err)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to activate challenge.');
@@ -216,6 +229,13 @@ async function getChallengeById(id) {
     loggerFile.info(`EndPoint: GET challenges/${id},  GET parameters: null, Status Code:${statusCode}, Response: ${circularJSON.stringify(response)}`);
     return challenge;
   } catch (err) {
+    logger.error('getChallengeById ERROR.');
+    logger.error(`EndPoint: GET challenges/${id}`);
+    logger.error(`${err.message}`);
+    logger.error(`Request: ${JSON.stringify(err.config)}`);
+    logger.error(`Response Data: ${err.response.data}`);
+
+    logger.error(JSON.stringify(err));
     throw errors.convertTopcoderApiError(err, 'Failed to get challenge details by Id');
   }
 }
@@ -239,6 +259,11 @@ async function closeChallenge(id, winnerId) {
     loggerFile.info(`EndPoint: POST /challenges/${id}/close,  POST parameters: null, Status Code:${statusCode}, Response:${circularJSON.stringify(response)}`);
     logger.debug(`Challenge ${id} is closed successfully.`);
   } catch (err) {
+    logger.error('Closing challenge ERROR.');
+    logger.error(`EndPoint: POST /challenges/${id}/close`);
+    logger.error(`${err.message}`);
+    logger.error(`Request: ${JSON.stringify(err.config)}`);
+    logger.error(`Response Data: ${err.response.data}`);
     loggerFile.info(`EndPoint: POST /challenges/${id}/close, POST parameters: null, Status Code:null,
     Error: 'Failed to close challenge.', Details: ${circularJSON.stringify(err)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to close challenge.');
