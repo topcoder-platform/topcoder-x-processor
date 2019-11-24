@@ -194,6 +194,14 @@ async function handleIssueAssignment(event, issue, force = false) {
     try {
       dbIssue = await ensureChallengeExists(event, issue);
 
+      if (!dbIssue) {
+        const err = errors.internalDependencyError(`Can't find the issue in DB. It's not found or not accessible`);
+        // The dbissue is not found, the db is not accessible, or the issue is still in creation process.
+        // Handle it for rescheduling.
+        await eventService.handleEventGracefully(event, issue, err);
+        return;
+      }
+  
       // Handle multiple assignees. TC-X allows only one assignee.
       if (event.data.issue.assignees && event.data.issue.assignees.length > 1) {
         const comment = 'Topcoder-X only supports a single assignee on a ticket to avoid issues with payment';
@@ -302,6 +310,14 @@ async function handleIssueUpdate(event, issue) {
   try {
     dbIssue = await ensureChallengeExists(event, issue, false);
 
+    if (!dbIssue) {
+      const err = errors.internalDependencyError(`Can't find the issue in DB. It's not found or not accessible`);
+      // The dbissue is not found, the db is not accessible, or the issue is still in creation process.
+      // Handle it for rescheduling.
+      await eventService.handleEventGracefully(event, issue, err);
+      return;
+    }
+
     if (dbIssue.title === issue.title &&
       dbIssue.body === issue.body &&
       dbIssue.prizes.length === issue.prizes.length &&
@@ -345,6 +361,15 @@ async function handleIssueClose(event, issue) {
   let dbIssue;
   try {
     dbIssue = await ensureChallengeExists(event, issue);
+    
+    if (!dbIssue) {
+      const err = errors.internalDependencyError(`Can't find the issue in DB. It's not found or not accessible`);
+      // The dbissue is not found, the db is not accessible, or the issue is still in creation process.
+      // Handle it for rescheduling.
+      await eventService.handleEventGracefully(event, issue, err);
+      return;
+    }
+
     event.dbIssue = dbIssue;
 
     // if the issue has payment success or payment pending status, we'll ignore this process.
@@ -633,6 +658,15 @@ async function handleIssueUnAssignment(event, issue) {
   let dbIssue;
   try {
     dbIssue = await ensureChallengeExists(event, issue);
+
+    if (!dbIssue) {
+      const err = errors.internalDependencyError(`Can't find the issue in DB. It's not found or not accessible`);
+      // The dbissue is not found, the db is not accessible, or the issue is still in creation process.
+      // Handle it for rescheduling.
+      await eventService.handleEventGracefully(event, issue, err);
+      return;
+    }
+
     if (dbIssue.assignee) {
       const assigneeUserId = gitHelper.getUserIdByLogin(event, dbIssue.assignee);
       logger.debug(`Looking up TC handle of git user: ${assigneeUserId}`);
