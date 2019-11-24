@@ -162,7 +162,7 @@ async function updateChallenge(id, challenge) {
     logger.error(`EndPoint: PUT /challenges/${id}`);
     logger.error(`${err.message}`);
     logger.error(`Request: ${JSON.stringify(err.config)}`);
-    logger.error(`Response Data: ${err.response.data}`);
+    logger.error(`Response Data: ${JSON.stringify(err.response.data)}`);
 
     loggerFile.info(`EndPoint: PUT /challenges/${id},  PUT parameters: null, Status Code:null,
     Error: 'Failed to update challenge.', Details: ${circularJSON.stringify(err)}`);
@@ -198,7 +198,7 @@ async function activateChallenge(id) {
     logger.error(`EndPoint: POST /challenges/${id}/activate`);
     logger.error(`${err.message}`);
     logger.error(`Request: ${JSON.stringify(err.config)}`);
-    logger.error(`Response Data: ${err.response.data}`);
+    logger.error(`Response Data: ${JSON.stringify(err.response.data)}`);
 
     loggerFile.info(`EndPoint: POST /challenges/${id}/activate,  POST parameters: null, Status Code:null,
     Error: 'Failed to activate challenge.', Details: ${circularJSON.stringify(err)}`);
@@ -233,7 +233,7 @@ async function getChallengeById(id) {
     logger.error(`EndPoint: GET challenges/${id}`);
     logger.error(`${err.message}`);
     logger.error(`Request: ${JSON.stringify(err.config)}`);
-    logger.error(`Response Data: ${err.response.data}`);
+    logger.error(`Response Data: ${JSON.stringify(err.response.data)}`);
 
     logger.error(JSON.stringify(err));
     throw errors.convertTopcoderApiError(err, 'Failed to get challenge details by Id');
@@ -263,7 +263,7 @@ async function closeChallenge(id, winnerId) {
     logger.error(`EndPoint: POST /challenges/${id}/close`);
     logger.error(`${err.message}`);
     logger.error(`Request: ${JSON.stringify(err.config)}`);
-    logger.error(`Response Data: ${err.response.data}`);
+    logger.error(`Response Data: ${JSON.stringify(err.response.data)}`);
     loggerFile.info(`EndPoint: POST /challenges/${id}/close, POST parameters: null, Status Code:null,
     Error: 'Failed to close challenge.', Details: ${circularJSON.stringify(err)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to close challenge.');
