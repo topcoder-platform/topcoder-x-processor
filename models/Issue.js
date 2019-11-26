@@ -49,7 +49,7 @@ const schema = new Schema({
     }
   },
   labels: {
-    type: [String],
+    type: Array,
     required: false
   },
   assignee: {type: String, required: false},
