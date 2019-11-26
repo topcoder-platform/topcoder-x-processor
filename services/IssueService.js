@@ -68,11 +68,7 @@ async function ensureChallengeExists(event, issue, create = true) {
   logger.debug(`Enter ensureChallengeExists. provider: ${issue.provider}`);
   logger.debug(`Enter ensureChallengeExists. repositoryId: ${issue.repositoryId}`);
 
-  let dbIssue = await dbHelper.queryOne(models.Issue, {
-    number: issue.number,
-    provider: issue.provider,
-    repositoryId: issue.repositoryId
-  });
+  let dbIssue = await dbHelper.queryOneIssue(models.Issue, issue.repositoryId, issue.number, issue.provider);
   logger.debug(`DB Issue number: ${issue.number}`);
   logger.debug(`DB Issue provider: ${issue.provider}`);
   logger.debug(`DB Issue repository: ${issue.repositoryId}`);
@@ -82,11 +78,7 @@ async function ensureChallengeExists(event, issue, create = true) {
   }
   if (dbIssue && dbIssue.status === 'challenge_creation_failed') {
     // remove issue from db
-    await dbHelper.remove(models.Issue, {
-      number: issue.number,
-      provider: issue.provider,
-      repositoryId: issue.repositoryId
-    }, true);
+    await dbHelper.removeIssue(models.Issue, issue.repositoryId, issue.number, issue.provider);
     dbIssue = null;
   }
 
@@ -94,11 +86,7 @@ async function ensureChallengeExists(event, issue, create = true) {
     logger.debug('dbIssue is NULL, process to create new record and challenge');
 
     await handleIssueCreate(event, issue);
-    dbIssue = await dbHelper.queryOne(models.Issue, {
-      number: issue.number,
-      provider: issue.provider,
-      repositoryId: issue.repositoryId
-    });
+    dbIssue = await dbHelper.queryOneIssue(models.Issue, issue.repositoryId, issue.number, issue.provider);
     logger.debug(`dbIssue is CREATED ${dbIssue ? 'Succesfully' : 'Failed'}`);
   }
   return dbIssue;
@@ -551,11 +539,7 @@ async function handleIssueCreate(event, issue, recreate = false) {
   }// if existing found don't create a project
 
   // Check if duplicated
-  let dbIssue = await dbHelper.queryOne(models.Issue, {
-    number: issue.number,
-    provider: issue.provider,
-    repositoryId: issue.repositoryId
-  });
+  let dbIssue = await dbHelper.queryOneIssue(models.Issue, issue.repositoryId, issue.number, issue.provider);
 
   if (dbIssue) {
     throw new Error(
@@ -599,11 +583,7 @@ async function handleIssueCreate(event, issue, recreate = false) {
     });
   } catch (e) {
     logger.error(`Challenge creation failure: ${e}`);
-    await dbHelper.remove(models.Issue, {
-      number: issue.number,
-      provider: issue.provider,
-      repositoryId: issue.repositoryId
-    }, true);
+    await dbHelper.removeIssue(models.Issue, issue.repositoryId, issue.number, issue.provider);
     await eventService.handleEventGracefully(event, issue, e);
     return;
   }
@@ -745,11 +725,7 @@ async function handleIssueUnAssignment(event, issue) {
  * @private
  */
 async function handleIssueRecreate(event, issue) {
-  const dbIssue = await dbHelper.queryOne(models.Issue, {
-    number: issue.number,
-    provider: issue.provider,
-    repositoryId: issue.repositoryId
-  });
+  const dbIssue = await dbHelper.queryOneIssue(models.Issue, issue.repositoryId, issue.number, issue.provider);
 
   try {
     await dbIssue.delete();

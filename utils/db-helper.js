@@ -2,7 +2,6 @@
  * Copyright (c) 2018 TopCoder, Inc. All rights reserved.
  */
 'use strict';
-const _ = require('lodash');
 const logger = require('./logger');
 
 /**
@@ -50,21 +49,25 @@ async function scan(model, scanParams) {
 /**
  * Get single data by query parameters
  * @param {Object} model The dynamoose model to query
- * @param {Object} params The parameters object
+ * @param {String} repositoryId The repository id to query
+ * @param {Number} number The number id to query
+ * @param {String} provider The provider id to query
  * @returns {Promise<void>}
  */
-async function queryOne(model, params) {
+async function queryOneIssue(model, repositoryId, number, provider) {
   logger.debug('Enter queryOne.');
 
   return await new Promise((resolve, reject) => {
-    const queryParams = {};
-
-    _.forOwn(params, (value, key) => {
-      queryParams[key] = {eq: value};
-    });
-
-    logger.debug(`${JSON.stringify(queryParams)}`);
-    model.queryOne(queryParams).exec((err, result) => {
+    logger.debug(`repositoryId : ${repositoryId}`);
+    logger.debug(`number : ${number}`);
+    logger.debug(`provider : ${provider}`);
+    model.query('repositoryId').eq(repositoryId)
+    .filter('number')
+    .eq(number)
+    .filter('provider')
+    .eq(provider)
+    .all()
+    .exec((err, result) => {
       if (err) {
         logger.debug(`queryOne. Error. ${err}`);
         return reject(err);
@@ -72,7 +75,7 @@ async function queryOne(model, params) {
       logger.debug('queryOne. Result.');
       logger.debug(result);
 
-      return resolve(result);
+      return resolve(result.count === 0 ? null : result[0]);
     });
   });
 }
@@ -163,15 +166,31 @@ async function update(Model, id, data) {
  * Delete item in database
  * @param {Object} Model The dynamoose model to delete
  * @param {Object} queryParams The query parameters object
- * @param {Boolean} withQuery Find the object with query instead of scan
  */
-async function remove(Model, queryParams, withQuery = false) {
-  let dbItem;
-  if (withQuery) {
-    dbItem = await queryOne(Model, queryParams);
-  } else {
-    dbItem = await scanOne(Model, queryParams);
-  }
+async function remove(Model, queryParams) {
+  const dbItem = await scanOne(Model, queryParams);
+  await new Promise((resolve, reject) => {
+    if (dbItem != null) {
+      dbItem.delete((err) => {
+        if (err) {
+          return reject(err);
+        }
+
+        return resolve(dbItem);
+      });
+    }
+  });
+}
+
+/**
+ * Delete issue item in database
+ * @param {Object} Model The dynamoose model to delete
+ * @param {String} repositoryId The repository id to delete
+ * @param {Number} number The number id to delete
+ * @param {String} provider The provider id to delete
+ */
+async function removeIssue(Model, repositoryId, number, provider) {
+  const dbItem = await queryOneIssue(Model, repositoryId, number, provider);
   await new Promise((resolve, reject) => {
     if (dbItem != null) {
       dbItem.delete((err) => {
@@ -193,5 +212,6 @@ module.exports = {
   create,
   update,
   remove,
-  queryOne
+  queryOneIssue,
+  removeIssue
 };
