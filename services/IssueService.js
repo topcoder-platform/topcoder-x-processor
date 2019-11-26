@@ -197,13 +197,13 @@ async function handleIssueAssignment(event, issue, force = false) {
       dbIssue = await ensureChallengeExists(event, issue);
 
       if (!dbIssue) {
-        const err = errors.internalDependencyError(`Can't find the issue in DB. It's not found or not accessible`);
+        const err = errors.internalDependencyError('Can\'t find the issue in DB. It\'s not found or not accessible');
         // The dbissue is not found, the db is not accessible, or the issue is still in creation process.
         // Handle it for rescheduling.
         await eventService.handleEventGracefully(event, issue, err);
         return;
       }
-  
+
       // Handle multiple assignees. TC-X allows only one assignee.
       if (event.data.issue.assignees && event.data.issue.assignees.length > 1) {
         const comment = 'Topcoder-X only supports a single assignee on a ticket to avoid issues with payment';
@@ -313,7 +313,7 @@ async function handleIssueUpdate(event, issue) {
     dbIssue = await ensureChallengeExists(event, issue, false);
 
     if (!dbIssue) {
-      const err = errors.internalDependencyError(`Can't find the issue in DB. It's not found or not accessible`);
+      const err = errors.internalDependencyError('Can\'t find the issue in DB. It\'s not found or not accessible');
       // The dbissue is not found, the db is not accessible, or the issue is still in creation process.
       // Handle it for rescheduling.
       await eventService.handleEventGracefully(event, issue, err);
@@ -363,9 +363,9 @@ async function handleIssueClose(event, issue) {
   let dbIssue;
   try {
     dbIssue = await ensureChallengeExists(event, issue);
-    
+
     if (!dbIssue) {
-      const err = errors.internalDependencyError(`Can't find the issue in DB. It's not found or not accessible`);
+      const err = errors.internalDependencyError('Can\'t find the issue in DB. It\'s not found or not accessible');
       // The dbissue is not found, the db is not accessible, or the issue is still in creation process.
       // Handle it for rescheduling.
       await eventService.handleEventGracefully(event, issue, err);
@@ -376,11 +376,11 @@ async function handleIssueClose(event, issue) {
 
     // if the issue has payment success or payment pending status, we'll ignore this process.
     if (dbIssue && dbIssue.status === 'challenge_payment_successful') {
-      logger.debug(`Ignoring close issue processing. The issue has challenge_payment_successful.`);
+      logger.debug('Ignoring close issue processing. The issue has challenge_payment_successful.');
       return;
     }
     if (dbIssue && dbIssue.status === 'challenge_payment_pending') {
-      logger.debug(`Ignoring close issue processing. The issue has challenge_payment_pending.`);
+      logger.debug('Ignoring close issue processing. The issue has challenge_payment_pending.');
       return;
     }
 
@@ -641,7 +641,7 @@ async function handleIssueLabelUpdated(event, issue) {
   // Sometimes Github send label updated event before issue created event.
   // This process will be ignored. The label will be processed (stored) at hanleIssueCreated.
   if (!dbIssue) {
-    logger.debug(`DB record not found. Issue label update ignored.`);
+    logger.debug('DB record not found. Issue label update ignored.');
     return;
   }
   await dbHelper.update(models.Issue, dbIssue.id, {
@@ -662,7 +662,7 @@ async function handleIssueUnAssignment(event, issue) {
     dbIssue = await ensureChallengeExists(event, issue);
 
     if (!dbIssue) {
-      const err = errors.internalDependencyError(`Can't find the issue in DB. It's not found or not accessible`);
+      const err = errors.internalDependencyError('Can\'t find the issue in DB. It\'s not found or not accessible');
       // The dbissue is not found, the db is not accessible, or the issue is still in creation process.
       // Handle it for rescheduling.
       await eventService.handleEventGracefully(event, issue, err);

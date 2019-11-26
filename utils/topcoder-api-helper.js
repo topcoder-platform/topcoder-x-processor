@@ -13,17 +13,18 @@
 'use strict';
 
 const config = require('config');
+const jwtDecode = require('jwt-decode');
 const axios = require('axios');
 const _ = require('lodash');
 const moment = require('moment');
 const circularJSON = require('circular-json');
 
-const m2mAuth = require('tc-core-library-js').auth.m2m;
+// const m2mAuth = require('tc-core-library-js').auth.m2m;
 
-const m2m = m2mAuth(_.pick(config, ['AUTH0_URL', 'AUTH0_AUDIENCE', 'TOKEN_CACHE_TIME', 'AUTH0_PROXY_SERVER_URL']));
+// const m2m = m2mAuth(_.pick(config, ['AUTH0_URL', 'AUTH0_AUDIENCE', 'TOKEN_CACHE_TIME', 'AUTH0_PROXY_SERVER_URL']));
 
 let topcoderApiProjects = require('topcoder-api-projects');
-let topcoderApiChallenges = require('@topcoder-platform/topcoder-api-challenges-v4-wrapper');
+let topcoderApiChallenges = require('topcoder-api-challenges');
 
 const topcoderDevApiProjects = require('topcoder-dev-api-projects');
 const topcoderDevApiChallenges = require('@topcoder-platform/topcoder-api-challenges-v4-wrapper-dev');
@@ -37,12 +38,16 @@ if (config.TC_DEV_ENV) {
   topcoderApiProjects = topcoderDevApiProjects;
   topcoderApiChallenges = topcoderDevApiChallenges;
 }
+
+// Cache the access token
+let cachedAccessToken;
+
 // Init the API instances
 const projectsClient = topcoderApiProjects.ApiClient.instance;
 const challengesClient = topcoderApiChallenges.ApiClient.instance;
 
-//Timeout increase to 5 minutes
-challengesClient.timeout=300000;
+// Timeout increase to 5 minutes
+challengesClient.timeout = 300000;
 
 const bearer = projectsClient.authentications.bearer;
 bearer.apiKeyPrefix = 'Bearer';
@@ -51,12 +56,58 @@ const projectsApiInstance = new topcoderApiProjects.DefaultApi();
 const challengesApiInstance = new topcoderApiChallenges.DefaultApi();
 
 /**
- * Function to get M2M token
- * @returns {Promise} The promised token
+ * Authenticate with Topcoder API and get the access token.
+ * @returns {String} the access token issued by Topcoder
+ * @private
  */
-async function getM2Mtoken() {
-  return await m2m.getMachineToken(config.AUTH0_CLIENT_ID, config.AUTH0_CLIENT_SECRET);
+async function getAccessToken() {
+  // Check the cached access token
+  if (cachedAccessToken) {
+    const decoded = jwtDecode(cachedAccessToken);
+    if (decoded.iat > new Date().getTime()) {
+      // Still not expired, just use it
+      return cachedAccessToken;
+    }
+  }
+
+  // Authenticate
+  const v2Response = await axios.post(config.TC_AUTHN_URL, config.TC_AUTHN_REQUEST_BODY);
+  const v2IdToken = _.get(v2Response, 'data.id_token');
+  const v2RefreshToken = _.get(v2Response, 'data.refresh_token');
+
+  if (!v2IdToken || !v2RefreshToken) {
+    throw new Error(`cannot authenticate with topcoder: ${config.TC_AUTHN_URL}`);
+  }
+
+  // Authorize
+  const v3Response = await axios.post(
+    config.TC_AUTHZ_URL, {
+      param: {
+        externalToken: v2IdToken,
+        refreshToken: v2RefreshToken
+      }
+    }, {
+      headers: {
+        authorization: `Bearer ${v2IdToken}`
+      }
+    });
+
+  cachedAccessToken = _.get(v3Response, 'data.result.content.token');
+
+  if (!cachedAccessToken) {
+    throw new Error(`cannot authorize with topcoder: ${config.TC_AUTHZ_URL}`);
+  }
+
+  return cachedAccessToken;
 }
+
+// /**
+//  * Function to get M2M token
+//  * @returns {Promise} The promised token
+//  */
+// async function getM2Mtoken() {
+//   return await m2m.getMachineToken(config.AUTH0_CLIENT_ID, config.AUTH0_CLIENT_SECRET);
+// }
 
 /**
  * Create a new project.
@@ -64,7 +115,7 @@ async function getM2Mtoken() {
  * @returns {Number} the created project id
  */
 async function createProject(projectName) {
-  bearer.apiKey = await getM2Mtoken();
+  bearer.apiKey = await getAccessToken();
   // eslint-disable-next-line new-cap
   const projectBody = new topcoderApiProjects.ProjectRequestBody.constructFromObject({
     projectName
@@ -96,7 +147,7 @@ async function createProject(projectName) {
  * @returns {Number} the created challenge id
  */
 async function createChallenge(challenge) {
-  bearer.apiKey = await getM2Mtoken();
+  bearer.apiKey = await getAccessToken();
   const start = new Date();
   const startTime = moment(start).toISOString();
   const end = moment(start).add(config.NEW_CHALLENGE_DURATION_IN_DAYS, 'days').toISOString();
@@ -137,7 +188,7 @@ async function createChallenge(challenge) {
  * @param {Object} challenge the challenge to update
  */
 async function updateChallenge(id, challenge) {
-  bearer.apiKey = await getM2Mtoken();
+  bearer.apiKey = await getAccessToken();
   logger.debug(`Updating challenge ${id} with ${circularJSON.stringify(challenge)}`);
   // eslint-disable-next-line new-cap
   const challengeBody = new topcoderApiChallenges.UpdateChallengeBodyParam.constructFromObject({
@@ -175,7 +226,7 @@ async function updateChallenge(id, challenge) {
  * @param {Number} id the challenge id
  */
 async function activateChallenge(id) {
-  bearer.apiKey = await getM2Mtoken();
+  bearer.apiKey = await getAccessToken();
   logger.debug(`Activating challenge ${id}`);
   try {
     const response = await new Promise((resolve, reject) => {
@@ -215,7 +266,7 @@ async function getChallengeById(id) {
   if (!_.isNumber(id)) {
     throw new Error('The challenge id must valid number');
   }
-  const apiKey = await getM2Mtoken();
+  const apiKey = await getAccessToken();
   logger.debug('Getting topcoder challenge details');
   try {
     const response = await axios.get(`${challengesClient.basePath}/challenges/${id}`, {
@@ -246,7 +297,7 @@ async function getChallengeById(id) {
  * @param {Number} winnerId the winner id
  */
 async function closeChallenge(id, winnerId) {
-  const apiKey = await getM2Mtoken();
+  const apiKey = await getAccessToken();
   logger.debug(`Closing challenge ${id}`);
   try {
     const response = await axios.post(`${challengesClient.basePath}/challenges/${id}/close?winnerId=${winnerId}`, null, {
@@ -276,7 +327,7 @@ async function closeChallenge(id, winnerId) {
  * @returns {Number} the billing account id
  */
 async function getProjectBillingAccountId(id) {
-  const apiKey = await getM2Mtoken();
+  const apiKey = await getAccessToken();
   logger.debug(`Getting project billing detail ${id}`);
   try {
     const response = await axios.get(`${projectsClient.basePath}/direct/projects/${id}`, {
@@ -308,7 +359,7 @@ async function getProjectBillingAccountId(id) {
  * @returns {Number} the user id
  */
 async function getTopcoderMemberId(handle) {
-  bearer.apiKey = await getM2Mtoken();
+  bearer.apiKey = await getAccessToken();
   try {
     const response = await axios.get(`${projectsClient.basePath}/members/${handle}`);
     const statusCode = response ? response.status : null;
@@ -327,7 +378,7 @@ async function getTopcoderMemberId(handle) {
  * @param {Object} resource the resource resource to add
  */
 async function addResourceToChallenge(id, resource) {
-  bearer.apiKey = await getM2Mtoken();
+  bearer.apiKey = await getAccessToken();
   logger.debug(`adding resource to challenge ${id}`);
   try {
     const response = await new Promise((resolve, reject) => {
@@ -368,7 +419,7 @@ async function getResourcesFromChallenge(id) {
   if (!_.isNumber(id)) {
     throw new Error('The challenge id must valid number');
   }
-  const apiKey = await getM2Mtoken();
+  const apiKey = await getAccessToken();
   logger.debug(`fetch resource from challenge ${id}`);
   try {
     const response = await axios.get(`${challengesClient.basePath}/challenges/${id}/resources`, {
@@ -413,7 +464,7 @@ async function roleAlreadySet(id, role) {
  * @param {Object} resource the resource  resource to remove
  */
 async function unregisterUserFromChallenge(id) {
-  bearer.apiKey = await getM2Mtoken();
+  bearer.apiKey = await getAccessToken();
   logger.debug(`removing resource from challenge ${id}`);
   try {
     const response = await new Promise((resolve, reject) => {
@@ -450,7 +501,7 @@ async function unregisterUserFromChallenge(id) {
  * @param {Number} id the challenge id
  */
 async function cancelPrivateContent(id) {
-  bearer.apiKey = await getM2Mtoken();
+  bearer.apiKey = await getAccessToken();
   logger.debug(`Cancelling challenge ${id}`);
   try {
     const response = await new Promise((resolve, reject) => {
@@ -498,7 +549,7 @@ async function assignUserAsRegistrant(topcoderUserId, challengeId) {
  * @param {Object} resource the resource resource to remove
  */
 async function removeResourceToChallenge(id, resource) {
-  bearer.apiKey = await getM2Mtoken();
+  bearer.apiKey = await getAccessToken();
   logger.debug(`removing resource from challenge ${id}`);
   try {
     const response = await new Promise((resolve, reject) => {
@@ -528,7 +579,7 @@ async function removeResourceToChallenge(id, resource) {
  * @returns {Array} the resources of challenge
  */
 async function getChallengeResources(id) {
-  const apiKey = await getM2Mtoken();
+  const apiKey = await getAccessToken();
   logger.debug(`getting resource from challenge ${id}`);
   try {
     const response = await axios.get(`${challengesClient.basePath}/challenges/${id}/resources`, {

@@ -24,7 +24,6 @@
   },
   "homepage": "https://gitlab.com/luettich/processor#README",
   "dependencies": {
-    "@topcoder-platform/topcoder-api-challenges-v4-wrapper": "^1.0.5",
     "@topcoder-platform/topcoder-api-challenges-v4-wrapper-dev": "^1.0.5",
     "axios": "^0.19.0",
     "circular-json": "^0.5.7",
@@ -43,6 +42,7 @@
     "node-gitlab-api": "^2.2.8",
     "nodemailer": "^4.6.7",
     "tc-core-library-js": "appirio-tech/tc-core-library-js.git#v2.6.3",
+    "topcoder-api-challenges": "^1.0.6",
     "topcoder-api-projects": "^1.0.1",
     "topcoder-dev-api-projects": "^1.0.1",
     "topcoder-healthcheck-dropin": "^1.0.3",
