@@ -68,7 +68,7 @@ async function ensureChallengeExists(event, issue, create = true) {
   logger.debug(`Enter ensureChallengeExists. provider: ${issue.provider}`);
   logger.debug(`Enter ensureChallengeExists. repositoryId: ${issue.repositoryId}`);
 
-  let dbIssue = await dbHelper.scanOne(models.Issue, {
+  let dbIssue = await dbHelper.queryOne(models.Issue, {
     number: issue.number,
     provider: issue.provider,
     repositoryId: issue.repositoryId
@@ -86,7 +86,7 @@ async function ensureChallengeExists(event, issue, create = true) {
       number: issue.number,
       provider: issue.provider,
       repositoryId: issue.repositoryId
-    });
+    }, true);
     dbIssue = null;
   }
 
@@ -94,7 +94,7 @@ async function ensureChallengeExists(event, issue, create = true) {
     logger.debug('dbIssue is NULL, process to create new record and challenge');
 
     await handleIssueCreate(event, issue);
-    dbIssue = await dbHelper.scanOne(models.Issue, {
+    dbIssue = await dbHelper.queryOne(models.Issue, {
       number: issue.number,
       provider: issue.provider,
       repositoryId: issue.repositoryId
@@ -551,7 +551,7 @@ async function handleIssueCreate(event, issue, recreate = false) {
   }// if existing found don't create a project
 
   // Check if duplicated
-  let dbIssue = await dbHelper.scanOne(models.Issue, {
+  let dbIssue = await dbHelper.queryOne(models.Issue, {
     number: issue.number,
     provider: issue.provider,
     repositoryId: issue.repositoryId
@@ -603,7 +603,7 @@ async function handleIssueCreate(event, issue, recreate = false) {
       number: issue.number,
       provider: issue.provider,
       repositoryId: issue.repositoryId
-    });
+    }, true);
     await eventService.handleEventGracefully(event, issue, e);
     return;
   }
@@ -745,7 +745,7 @@ async function handleIssueUnAssignment(event, issue) {
  * @private
  */
 async function handleIssueRecreate(event, issue) {
-  const dbIssue = await dbHelper.scanOne(models.Issue, {
+  const dbIssue = await dbHelper.queryOne(models.Issue, {
     number: issue.number,
     provider: issue.provider,
     repositoryId: issue.repositoryId
