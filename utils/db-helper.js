@@ -81,7 +81,7 @@ async function updateMany(model, collection) {
         return reject(err);
       }
 
-      resolve(result);
+      return resolve(result);
     });
   });
 }
@@ -142,7 +142,7 @@ async function remove(Model, queryParams) {
           return reject(err);
         }
 
-        resolve(dbItem);
+        return resolve(dbItem);
       });
     }
   });

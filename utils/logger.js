@@ -9,8 +9,8 @@
  * @version 1.0
  */
 'use strict';
-const config = require('config');
 const util = require('util');
+const config = require('config');
 const _ = require('lodash');
 const winston = require('winston');
 const getParams = require('get-parameter-names');
