@@ -36,7 +36,7 @@ async function getById(model, id) {
  */
 async function scan(model, scanParams) {
   return await new Promise((resolve, reject) => {
-    model.scan(scanParams).consistent().exec((err, result) => {
+    model.scan(scanParams).consistent().all().exec((err, result) => {
       if (err) {
         return reject(err);
       }
@@ -90,7 +90,7 @@ async function scanOne(model, scanParams) {
   logger.debug('Enter scanOne.');
 
   return await new Promise((resolve, reject) => {
-    model.scan(scanParams).consistent().exec((err, result) => {
+    model.scan(scanParams).consistent().all().exec((err, result) => {
       if (err) {
         logger.debug(`scanOne. Error. ${err}`);
         return reject(err);
