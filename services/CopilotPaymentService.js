@@ -119,7 +119,9 @@ async function _updateChallenge(copilotUsername, projectId, challengeId) {
     await topcoderApiHelper.updateChallenge(challengeId, changedPayment);
     logger.debug(`challenge with id:${challengeId} was updated successfully.`);
   } else { // if there is no payment due to delete cancel the challenge as well
-    topcoderApiHelper.cancelPrivateContent(challengeId);
+    logger.debug(`challenge with id:${challengeId} is cancelled.`);
+    // Currently, there is no working API for closing challenge.
+    // The process is just ignored.
   }
 }
 

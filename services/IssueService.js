@@ -85,7 +85,7 @@ async function ensureChallengeExists(event, issue, create = true) {
   if (!dbIssue && create) {
     logger.debug('dbIssue is NULL, process to create new record and challenge');
 
-    await handleIssueCreate(event, issue);
+    await handleIssueCreate(event, issue, true);
     dbIssue = await dbHelper.queryOneIssue(models.Issue, issue.repositoryId, issue.number, issue.provider);
     logger.debug(`dbIssue is CREATED ${dbIssue ? 'Succesfully' : 'Failed'}`);
   }
@@ -188,7 +188,9 @@ async function handleIssueAssignment(event, issue, force = false) {
         const err = errors.internalDependencyError('Can\'t find the issue in DB. It\'s not found or not accessible');
         // The dbissue is not found, the db is not accessible, or the issue is still in creation process.
         // Handle it for rescheduling.
-        await eventService.handleEventGracefully(event, issue, err);
+        if (issue.tcxReady) {
+          await eventService.handleEventGracefully(event, issue, err);
+        }
         return;
       }
 
@@ -304,7 +306,9 @@ async function handleIssueUpdate(event, issue) {
       const err = errors.internalDependencyError('Can\'t find the issue in DB. It\'s not found or not accessible');
       // The dbissue is not found, the db is not accessible, or the issue is still in creation process.
       // Handle it for rescheduling.
-      await eventService.handleEventGracefully(event, issue, err);
+      if (issue.tcxReady) {
+        await eventService.handleEventGracefully(event, issue, err);
+      }
       return;
     }
 
@@ -347,7 +351,7 @@ async function handleIssueUpdate(event, issue) {
  * @param {Object} issue the issue
  * @private
  */
-async function handleIssueClose(event, issue) {
+async function handleIssueClose(event, issue) { // eslint-disable-line
   let dbIssue;
   try {
     dbIssue = await ensureChallengeExists(event, issue);
@@ -356,7 +360,9 @@ async function handleIssueClose(event, issue) {
       const err = errors.internalDependencyError('Can\'t find the issue in DB. It\'s not found or not accessible');
       // The dbissue is not found, the db is not accessible, or the issue is still in creation process.
       // Handle it for rescheduling.
-      await eventService.handleEventGracefully(event, issue, err);
+      if (issue.tcxReady) {
+        await eventService.handleEventGracefully(event, issue, err);
+      }
       return;
     }
 
@@ -389,10 +395,8 @@ async function handleIssueClose(event, issue) {
 
       if (closeChallenge) {
         logger.debug(`The associated challenge ${dbIssue.challengeId} is being scheduled for cancellation since no payment will be given`);
-        setTimeout(async () => {
-          await topcoderApiHelper.cancelPrivateContent(dbIssue.challengeId);
-          logger.debug(`The challenge ${dbIssue.challengeId} is deleted`);
-        }, config.CANCEL_CHALLENGE_INTERVAL); //eslint-disable-line
+        // Currently, there is no working API for closing challenge.
+        // The process is just ignored.
         return;
       }
 
@@ -526,10 +530,10 @@ async function handleIssueClose(event, issue) {
  * handles the issue create event
  * @param {Object} event the event
  * @param {Object} issue the issue
- * @param {Boolean} recreate indicate that the process is to recreate an issue
+ * @param {Boolean} forceAssign force the creation process to assign user
  * @private
  */
-async function handleIssueCreate(event, issue, recreate = false) {
+async function handleIssueCreate(event, issue, forceAssign = false) {
   // check if project for such repository is already created
   const project = await getProjectDetail(event);
 
@@ -544,6 +548,11 @@ async function handleIssueCreate(event, issue, recreate = false) {
   if (dbIssue) {
     throw new Error(
       `Issue ${issue.number} is already in ${dbIssue.status}`);
+  }
+
+  if (!issue.tcxReady) {
+    logger.debug('The issue doesn\'t have tcx_ labels. Creation ignored.');
+    return;
   }
 
   // create issue with challenge creation pending
@@ -592,7 +601,7 @@ async function handleIssueCreate(event, issue, recreate = false) {
   const comment = `Contest ${contestUrl} has been created for this ticket.`;
   await gitHelper.createComment(event, issue.number, comment);
 
-  if (event.provider === 'gitlab' || recreate) {
+  if (event.provider === 'gitlab' || forceAssign) {
     // if assignee is added during issue create then assign as well
     if (event.data.issue.assignees && event.data.issue.assignees.length > 0 && event.data.issue.assignees[0].id) {
       event.data.assignee = {
@@ -613,7 +622,7 @@ async function handleIssueCreate(event, issue, recreate = false) {
 async function handleIssueLabelUpdated(event, issue) {
   let dbIssue;
   try {
-    dbIssue = await ensureChallengeExists(event, issue, false);
+    dbIssue = await ensureChallengeExists(event, issue, true);
   } catch (e) {
     await eventService.handleEventGracefully(event, issue, e);
     return;
@@ -639,13 +648,11 @@ async function handleIssueLabelUpdated(event, issue) {
 async function handleIssueUnAssignment(event, issue) {
   let dbIssue;
   try {
-    dbIssue = await ensureChallengeExists(event, issue);
+    dbIssue = await ensureChallengeExists(event, issue, false);
 
     if (!dbIssue) {
-      const err = errors.internalDependencyError('Can\'t find the issue in DB. It\'s not found or not accessible');
       // The dbissue is not found, the db is not accessible, or the issue is still in creation process.
-      // Handle it for rescheduling.
-      await eventService.handleEventGracefully(event, issue, err);
+      // Ignore it.
       return;
     }
 
@@ -727,6 +734,23 @@ async function handleIssueUnAssignment(event, issue) {
 async function handleIssueRecreate(event, issue) {
   const dbIssue = await dbHelper.queryOneIssue(models.Issue, issue.repositoryId, issue.number, issue.provider);
 
+  // remove open for pickup and add assigned
+  const updateLabels = _(issue.labels) // eslint-disable-line lodash/chaining
+  .filter((i) => !i.startsWith(config.ISSUE_LABEL_PREFIX))
+  .value();
+
+  await gitHelper.addLabels(event, issue.number, updateLabels);
+
+  // Unassign the user.
+  if (event.data.issue.assignees && event.data.issue.assignees.length > 0 && event.data.issue.assignees[0].id) {
+    event.data.assignee = {
+      id: event.data.issue.assignees[0].id
+    };
+    const assigneeUserId = event.data.assignee.id;
+    const assigneeUsername = await gitHelper.getUsernameById(event, assigneeUserId);
+    await gitHelper.removeAssign(event, issue.number, assigneeUserId, assigneeUsername);
+  }
+
   try {
     await dbIssue.delete();
   } catch (err) {
@@ -734,8 +758,20 @@ async function handleIssueRecreate(event, issue) {
     logger.error(`Error cleaning the old DB and its challenge.\n ${err}`);
   }
 
-  await handleIssueCreate(event, issue, true);
-  // handleIssueLabelUpdated(event, issue);
+  const issueLabels = _(updateLabels).push(config.OPEN_FOR_PICKUP_ISSUE_LABEL).value(); // eslint-disable-line lodash/chaining
+  logger.debug(`Adding label ${config.OPEN_FOR_PICKUP_ISSUE_LABEL}`);
+  await gitHelper.addLabels(event, issue.number, issueLabels);
+
+  await handleIssueCreate(event, issue, false);
+
+  if (event.data.issue.assignees && event.data.issue.assignees.length > 0 && event.data.issue.assignees[0].id) {
+    event.data.assignee = {
+      id: event.data.issue.assignees[0].id
+    };
+    const assigneeUserId = event.data.assignee.id;
+    const assigneeUsername = await gitHelper.getUsernameById(event, assigneeUserId);
+    await gitHelper.assignUser(event, issue.number, assigneeUsername);
+  }
 }
 
 /**
@@ -751,7 +787,8 @@ async function process(event) {
     body: event.data.issue.body,
     provider: event.provider,
     repositoryId: event.data.repository.id,
-    labels: event.data.issue.labels
+    labels: event.data.issue.labels,
+    tcxReady: true
   };
   const fullRepoUrl = gitHelper.getFullRepoUrl(event);
   const project = await dbHelper.scanOne(models.Project, {
@@ -766,6 +803,15 @@ async function process(event) {
   if (!hasPrizes) {
     return;
   }
+
+  const tcxLabels = _(issue.labels) // eslint-disable-line lodash/chaining
+  .filter((i) => i.startsWith(config.ISSUE_LABEL_PREFIX))
+  .value();
+
+  if (!tcxLabels || tcxLabels.length === 0) {
+    issue.tcxReady = false;
+  }
+
   const copilot = await userService.getRepositoryCopilotOrOwner(event.provider, event.data.repository.full_name);
   event.copilot = copilot;
 
