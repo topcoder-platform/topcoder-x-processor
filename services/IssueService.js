@@ -300,7 +300,7 @@ async function handleIssueComment(event, issue) {
 async function handleIssueUpdate(event, issue) {
   let dbIssue;
   try {
-    dbIssue = await ensureChallengeExists(event, issue, false);
+    dbIssue = await ensureChallengeExists(event, issue, true);
 
     if (!dbIssue) {
       const err = errors.internalDependencyError('Can\'t find the issue in DB. It\'s not found or not accessible');
