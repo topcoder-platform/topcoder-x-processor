@@ -39,6 +39,9 @@ async function getTCUserName(provider, gitUser) {
       criteria.gitlabUsername = gitUser;
     }
   }
+  if (_.isEmpty(criteria)) {
+    throw new Error('Can\'t find the TCUserName. Invalid gitUser.');
+  }
   return await dbHelper.scanOne(models.UserMapping, criteria);
 }
 
