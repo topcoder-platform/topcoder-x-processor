@@ -658,6 +658,11 @@ async function handleIssueUnAssignment(event, issue) {
 
     if (dbIssue.assignee) {
       const assigneeUserId = gitHelper.getUserIdByLogin(event, dbIssue.assignee);
+      if (!assigneeUserId) {
+        // The assignement of this user was failed and broken.
+        // We don't need to handle the unassignment.
+        return;
+      }
       logger.debug(`Looking up TC handle of git user: ${assigneeUserId}`);
       const userMapping = await userService.getTCUserName(event.provider, assigneeUserId);
 
