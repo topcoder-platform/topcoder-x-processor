@@ -174,7 +174,7 @@ async function createChallenge(challenge) {
       });
     });
     const statusCode = challengeResponse.result ? challengeResponse.result.status : null;
-    loggerFile.info(`EndPoint: POST /challenges,  POST parameters: ${circularJSON.stringify(challengeBody)},
+    logger.debug(`EndPoint: POST /challenges,  POST parameters: ${circularJSON.stringify(challengeBody)},
     Status Code:${statusCode}, Response: ${circularJSON.stringify(challengeResponse.result)}`);
     return _.get(challengeResponse, 'result.content.id');
   } catch (err) {
