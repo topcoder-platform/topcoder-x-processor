@@ -297,7 +297,7 @@ async function getChallengeById(id) {
  * @param {Number} winnerId the winner id
  */
 async function closeChallenge(id, winnerId) {
-  const apiKey = await getM2Mtoken();
+  const apiKey = await getAccessToken();
   logger.debug(`Closing challenge ${id}`);
   try {
     let basePath = challengesClient.basePath;
