@@ -26,6 +26,10 @@ const eventService = require('./EventService');
 
 const md = new MarkdownIt();
 
+// A variable to store issue creation lock to prevent duplicate creation process.
+// The key is `${provider}-${repositoryId}-${number}`. The value is True.
+const issueCreationLock = {};
+
 /**
  * Generate the contest url, given the challenge id
  * @param {String} challengeId The id of the challenge in topcoder
@@ -555,6 +559,13 @@ async function handleIssueCreate(event, issue, forceAssign = false) {
     return;
   }
 
+  const creationLockKey = `${issue.provider}-${issue.repositoryId}-${issue.number}`;
+  if (issueCreationLock[creationLockKey]) {
+    throw new Error(
+      `Issue ${creationLockKey} is creating.`);
+  }
+  issueCreationLock[creationLockKey] = true;
+
   // create issue with challenge creation pending
   const issueObject = _.assign({}, _.omit(issue, 'assignee'), {
     id: helper.generateIdentifier(),
@@ -594,6 +605,7 @@ async function handleIssueCreate(event, issue, forceAssign = false) {
     logger.error(`Challenge creation failure: ${e}`);
     await dbHelper.removeIssue(models.Issue, issue.repositoryId, issue.number, issue.provider);
     await eventService.handleEventGracefully(event, issue, e);
+    delete issueCreationLock[creationLockKey];
     return;
   }
 
@@ -610,6 +622,7 @@ async function handleIssueCreate(event, issue, forceAssign = false) {
       await handleIssueAssignment(event, issue, true);
     }
   }
+  delete issueCreationLock[creationLockKey];
   logger.debug(`new challenge created with id ${issue.challengeId} for issue ${issue.number}`);
 }
 
