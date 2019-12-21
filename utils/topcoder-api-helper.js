@@ -25,6 +25,7 @@ const m2m = m2mAuth(_.pick(config, ['AUTH0_URL', 'AUTH0_AUDIENCE', 'TOKEN_CACHE_
 
 let topcoderApiProjects = require('topcoder-api-projects');
 let topcoderApiChallenges = require('@topcoder-platform/topcoder-api-challenges-v4-wrapper');
+let topcoderApiChallengesV3 = require('topcoder-api-challenges');
 
 const topcoderDevApiProjects = require('topcoder-dev-api-projects');
 const topcoderDevApiChallenges = require('@topcoder-platform/topcoder-api-challenges-v4-wrapper-dev');
@@ -45,6 +46,7 @@ let cachedAccessToken;
 // Init the API instances
 const projectsClient = topcoderApiProjects.ApiClient.instance;
 const challengesClient = topcoderApiChallenges.ApiClient.instance;
+const challengesClientV3 = topcoderApiChallengesV3.ApiClient.instance;
 
 // Timeout increase to 5 minutes
 challengesClient.timeout = 300000;
@@ -301,6 +303,9 @@ async function closeChallenge(id, winnerId) {
   logger.debug(`Closing challenge ${id}`);
   try {
     let basePath = challengesClient.basePath;
+    if (!config.TC_DEV_ENV) {
+      basePath = challengesClientV3.basePath;
+    }
     const response = await axios.post(`${basePath}/challenges/${id}/close?winnerId=${winnerId}`, null, {
       headers: {
         authorization: `Bearer ${apiKey}`,
