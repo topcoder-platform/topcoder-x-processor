@@ -149,7 +149,7 @@ class GitHelper {
    */
   async getUserIdByLogin(event, assignee) {
     if (event.provider === 'github') {
-      return gitHubService.getUserIdByLogin(event.copilot, assignee);
+      return await gitHubService.getUserIdByLogin(event.copilot, assignee);
     }
     return gitlabService.getUserIdByLogin(event.copilot, assignee);
   }
