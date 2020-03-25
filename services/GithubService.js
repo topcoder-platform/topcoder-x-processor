@@ -221,7 +221,7 @@ async function getUserIdByLogin(copilot, login) {
   Joi.attempt({copilot, login}, getUserIdByLogin.schema);
   const github = await _authenticate(copilot.accessToken);
   const user = await github.users.getForUser({username: login});
-  return user.length ? user.id : null;
+  return user.data ? user.data.id : null;
 }
 
 getUserIdByLogin.schema = {

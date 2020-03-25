@@ -211,6 +211,12 @@ async function handleIssueAssignment(event, issue, force = false) {
         return;
       }
 
+      // The issue has registered assignee. Ignore it.
+      // If there is assignee changes, it will be handled at handleIssueUnassignment and this func will be called again.
+      if (dbIssue.assignee) {
+        return;
+      }
+
       // ensure issue has open for pickup label
       const hasOpenForPickupLabel = _(issue.labels).includes(config.OPEN_FOR_PICKUP_ISSUE_LABEL); // eslint-disable-line lodash/chaining
       const hasNotReadyLabel = _(issue.labels).includes(config.NOT_READY_ISSUE_LABEL); // eslint-disable-line lodash/chaining
@@ -675,7 +681,7 @@ async function handleIssueUnAssignment(event, issue) {
     }
 
     if (dbIssue.assignee) {
-      const assigneeUserId = gitHelper.getUserIdByLogin(event, dbIssue.assignee);
+      const assigneeUserId = await gitHelper.getUserIdByLogin(event, dbIssue.assignee);
       if (!assigneeUserId) {
         // The assignement of this user was failed and broken.
         // We don't need to handle the unassignment.
