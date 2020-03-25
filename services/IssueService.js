@@ -590,7 +590,7 @@ async function handleIssueCreate(event, issue, forceAssign = false) {
     }
 
     logger.debug(`existing project was found with id ${projectId} for repository ${event.data.repository.full_name}`);
-    
+
     // Create a new challenge
     issue.challengeId = await topcoderApiHelper.createChallenge({
       name: issue.title,
@@ -631,7 +631,7 @@ async function handleIssueCreate(event, issue, forceAssign = false) {
     }
     delete issueCreationLock[creationLockKey];
   } catch (err) {
-    logger.error(`Comment creation failure: ${e}`);
+    logger.error(`Comment creation failure: ${err}`);
     delete issueCreationLock[creationLockKey];
     logger.debug(`new challenge created with id ${issue.challengeId} for issue ${issue.number}`);
   }
