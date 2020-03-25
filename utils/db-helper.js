@@ -2,6 +2,7 @@
  * Copyright (c) 2018 TopCoder, Inc. All rights reserved.
  */
 'use strict';
+const _ = require('lodash');
 const logger = require('./logger');
 
 /**
@@ -68,12 +69,12 @@ async function queryOneIssue(model, repositoryId, number, provider) {
     .eq(provider)
     .all()
     .exec((err, result) => {
-      if (err) {
+      if (err || !result) {
         logger.debug(`queryOne. Error. ${err}`);
         return reject(err);
       }
       logger.debug('queryOne. Result.');
-      logger.debug(result);
+      logger.debug(JSON.stringify(_.map(result, (o) => _.omit(o, ['$__', 'body']))));
 
       return resolve(result.count === 0 ? null : result[0]);
     });
@@ -91,12 +92,12 @@ async function scanOne(model, scanParams) {
 
   return await new Promise((resolve, reject) => {
     model.scan(scanParams).consistent().all().exec((err, result) => {
-      if (err) {
+      if (err || !result) {
         logger.debug(`scanOne. Error. ${err}`);
         return reject(err);
       }
       logger.debug('scanOne. Result.');
-      logger.debug(result);
+      logger.debug(JSON.stringify(_.map(result, (o) => _.omit(o, ['$__', 'body']))));
 
       return resolve(result.count === 0 ? null : result[0]);
     });
