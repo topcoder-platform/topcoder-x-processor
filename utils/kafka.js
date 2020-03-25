@@ -35,13 +35,13 @@ class Kafka {
   messageHandler(messageSet) {
     logger.debug(` topics ======= ${JSON.stringify(messageSet)}`);
     messageSet.forEach((item) => {
-      logger.debug(`received message from kafka: ${item.message.value.toString('utf8')}`);
-
       // The event should be a JSON object
       let event;
       try {
-        event = JSON.parse(item.message.value.toString('utf8'));
-        event = JSON.parse(event.payload.value);
+        const message = JSON.parse(item.message.value.toString('utf8'));
+        event = JSON.parse(message.payload.value);
+        message.payload.value = event;
+        logger.debug(`received message from kafka: ${JSON.stringify(_.omit(message, 'payload.value.data.issue.body'))}`);
       } catch (err) {
         logger.error(`"message" is not a valid JSON-formatted string: ${err.message}`);
         return;
