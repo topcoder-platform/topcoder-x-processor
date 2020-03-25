@@ -499,7 +499,7 @@ async function handleIssueClose(event, issue) { // eslint-disable-line
   } catch (e) {
     event.paymentSuccessful = event.paymentSuccessful === true; // if once paid shouldn't be false
     // update the issue status to payment failed
-    if (!event.paymentSuccessful) {
+    if (!event.paymentSuccessful && dbIssue && dbIssue.id) {
       await dbHelper.update(models.Issue, dbIssue.id, {
         status: 'challenge_payment_failed',
         updatedAt: new Date()
@@ -566,24 +566,25 @@ async function handleIssueCreate(event, issue, forceAssign = false) {
   }
   issueCreationLock[creationLockKey] = true;
 
-  // create issue with challenge creation pending
-  const issueObject = _.assign({}, _.omit(issue, 'assignee'), {
-    id: helper.generateIdentifier(),
-    status: 'challenge_creation_pending'
-  });
-  dbIssue = await dbHelper.create(models.Issue, issueObject);
-
-  const projectId = project.tcDirectId;
-
-  let fullRepoUrl;
-  if (issue.provider === 'github') {
-    fullRepoUrl = `https://github.com/${event.data.repository.full_name}`;
-  } else if (issue.provider === 'gitlab') {
-    fullRepoUrl = `${config.GITLAB_API_BASE_URL}/${event.data.repository.full_name}`;
-  }
-
-  logger.debug(`existing project was found with id ${projectId} for repository ${event.data.repository.full_name}`);
   try {
+    // create issue with challenge creation pending
+    const issueObject = _.assign({}, _.omit(issue, 'assignee'), {
+      id: helper.generateIdentifier(),
+      status: 'challenge_creation_pending'
+    });
+    dbIssue = await dbHelper.create(models.Issue, issueObject);
+
+    const projectId = project.tcDirectId;
+
+    let fullRepoUrl;
+    if (issue.provider === 'github') {
+      fullRepoUrl = `https://github.com/${event.data.repository.full_name}`;
+    } else if (issue.provider === 'gitlab') {
+      fullRepoUrl = `${config.GITLAB_API_BASE_URL}/${event.data.repository.full_name}`;
+    }
+
+    logger.debug(`existing project was found with id ${projectId} for repository ${event.data.repository.full_name}`);
+    
     // Create a new challenge
     issue.challengeId = await topcoderApiHelper.createChallenge({
       name: issue.title,
@@ -603,27 +604,31 @@ async function handleIssueCreate(event, issue, forceAssign = false) {
     });
   } catch (e) {
     logger.error(`Challenge creation failure: ${e}`);
+    delete issueCreationLock[creationLockKey];
     await dbHelper.removeIssue(models.Issue, issue.repositoryId, issue.number, issue.provider);
     await eventService.handleEventGracefully(event, issue, e);
-    delete issueCreationLock[creationLockKey];
     return;
   }
+  try {
+    const contestUrl = getUrlForChallengeId(issue.challengeId);
+    const comment = `Contest ${contestUrl} has been created for this ticket.`;
+    await gitHelper.createComment(event, issue.number, comment);
 
-  const contestUrl = getUrlForChallengeId(issue.challengeId);
-  const comment = `Contest ${contestUrl} has been created for this ticket.`;
-  await gitHelper.createComment(event, issue.number, comment);
-
-  if (event.provider === 'gitlab' || forceAssign) {
-    // if assignee is added during issue create then assign as well
-    if (event.data.issue.assignees && event.data.issue.assignees.length > 0 && event.data.issue.assignees[0].id) {
-      event.data.assignee = {
-        id: event.data.issue.assignees[0].id
-      };
-      await handleIssueAssignment(event, issue, true);
+    if (event.provider === 'gitlab' || forceAssign) {
+      // if assignee is added during issue create then assign as well
+      if (event.data.issue.assignees && event.data.issue.assignees.length > 0 && event.data.issue.assignees[0].id) {
+        event.data.assignee = {
+          id: event.data.issue.assignees[0].id
+        };
+        await handleIssueAssignment(event, issue, true);
+      }
     }
+    delete issueCreationLock[creationLockKey];
+  } catch (err) {
+    logger.error(`Comment creation failure: ${e}`);
+    delete issueCreationLock[creationLockKey];
+    logger.debug(`new challenge created with id ${issue.challengeId} for issue ${issue.number}`);
   }
-  delete issueCreationLock[creationLockKey];
-  logger.debug(`new challenge created with id ${issue.challengeId} for issue ${issue.number}`);
 }
 
 /**
@@ -780,6 +785,8 @@ async function handleIssueRecreate(event, issue) {
   logger.debug(`Adding label ${config.OPEN_FOR_PICKUP_ISSUE_LABEL}`);
   await gitHelper.addLabels(event, issue.number, issueLabels);
 
+  const creationLockKey = `${issue.provider}-${issue.repositoryId}-${issue.number}`;
+  delete issueCreationLock[creationLockKey];
   await handleIssueCreate(event, issue, false);
 
   if (event.data.issue.assignees && event.data.issue.assignees.length > 0 && event.data.issue.assignees[0].id) {
