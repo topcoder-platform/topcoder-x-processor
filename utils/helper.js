@@ -32,8 +32,22 @@ function generateIdentifier() {
   return `${uuid()}-${new Date().getTime()}`;
 }
 
+/**
+ * Generate simple hash of string
+ *
+ * @param {String} s the str
+ * @returns {String} the hash
+ */
+function hashCode(s) {
+  return s.split('').reduce((a, b) => {
+    a = ((a << 5) - a) + b.charCodeAt(0); // eslint-disable-line no-bitwise, no-magic-numbers
+    return a & a; // eslint-disable-line no-bitwise
+  }, 0);
+}
+
 module.exports = {
   prepareAutomatedComment,
-  generateIdentifier
+  generateIdentifier,
+  hashCode
 };
 

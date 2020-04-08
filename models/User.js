@@ -28,6 +28,10 @@ const schema = new Schema({
       name: 'UsesProviderIdIndex'
     }
   },
+  userProviderIdStr: {
+    type: String,
+    required: false
+  },
   username: {
     type: String,
     required: true,

@@ -25,8 +25,10 @@ const schema = new Schema({
   },
   githubUsername: String,
   gitlabUsername: String,
+  azureEmail: String,
   githubUserId: Number,
-  gitlabUserId: Number
+  gitlabUserId: Number,
+  azureUserId: String
 });
 
 module.exports = schema;

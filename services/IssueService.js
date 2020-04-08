@@ -587,6 +587,8 @@ async function handleIssueCreate(event, issue, forceAssign = false) {
       fullRepoUrl = `https://github.com/${event.data.repository.full_name}`;
     } else if (issue.provider === 'gitlab') {
       fullRepoUrl = `${config.GITLAB_API_BASE_URL}/${event.data.repository.full_name}`;
+    } else if (issue.provider === 'azure') {
+      fullRepoUrl = `${config.AZURE_DEVOPS_API_BASE_URL}/${event.data.repository.full_name}`;
     }
 
     logger.debug(`existing project was found with id ${projectId} for repository ${event.data.repository.full_name}`);
@@ -822,6 +824,7 @@ async function process(event) {
     tcxReady: true
   };
   const fullRepoUrl = gitHelper.getFullRepoUrl(event);
+
   const project = await dbHelper.scanOne(models.Project, {
     repoUrl: fullRepoUrl
   });
@@ -845,6 +848,12 @@ async function process(event) {
 
   const copilot = await userService.getRepositoryCopilotOrOwner(event.provider, event.data.repository.full_name);
   event.copilot = copilot;
+
+  // Some provider (azure) has non numeric repo id. we need to convert it to number by hashing it.
+  if (_.isString(issue.repositoryId)) {
+    issue.repositoryIdStr = issue.repositoryId;
+    issue.repositoryId = helper.hashCode(issue.repositoryId);
+  }
 
   // Markdown the body
   issue.body = md.render(_.get(issue, 'body', ''));
@@ -873,7 +882,7 @@ async function process(event) {
 process.schema = Joi.object().keys({
   event: Joi.string().valid('issue.created', 'issue.updated', 'issue.closed', 'comment.created', 'comment.updated', 'issue.assigned',
     'issue.labelUpdated', 'issue.unassigned', 'issue.recreated').required(),
-  provider: Joi.string().valid('github', 'gitlab').required(),
+  provider: Joi.string().valid('github', 'gitlab', 'azure').required(),
   data: Joi.object().keys({
     issue: Joi.object().keys({
       number: Joi.number().required(),
@@ -881,14 +890,14 @@ process.schema = Joi.object().keys({
       body: Joi.string().allow(''),
       labels: Joi.array().items(Joi.string()),
       assignees: Joi.array().items(Joi.object().keys({
-        id: Joi.number().required()
+        id: Joi.alternatives().try(Joi.string(), Joi.number()).required()
       })),
       owner: Joi.object().keys({
-        id: Joi.number().required()
+        id: Joi.alternatives().try(Joi.string(), Joi.number()).required()
       })
     }).required(),
     repository: Joi.object().keys({
-      id: Joi.number().required(),
+      id: Joi.alternatives().try(Joi.string(), Joi.number()).required(),
       name: Joi.string().required(),
       full_name: Joi.string().required()
     }).required(),
@@ -900,7 +909,7 @@ process.schema = Joi.object().keys({
       })
     }),
     assignee: Joi.object().keys({
-      id: Joi.number().required().allow(null)
+      id: Joi.alternatives().try(Joi.string(), Joi.number()).required().allow(null)
     }),
     labels: Joi.array().items(Joi.string())
   }).required(),

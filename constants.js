@@ -14,7 +14,8 @@
 // The user types
 const USER_TYPES = {
   GITHUB: 'github',
-  GITLAB: 'gitlab'
+  GITLAB: 'gitlab',
+  AZURE: 'azure'
 };
 
 // The user roles

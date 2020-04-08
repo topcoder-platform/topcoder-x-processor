@@ -69,6 +69,8 @@ module.exports = {
   NEW_CHALLENGE_DURATION_IN_DAYS: process.env.NEW_CHALLENGE_DURATION_IN_DAYS || 5,
   TC_URL: process.env.TC_URL || 'https://www.topcoder-dev.com',
   GITLAB_API_BASE_URL: process.env.GITLAB_API_BASE_URL || 'https://gitlab.com',
+  AZURE_API_BASE_URL: process.env.AZURE_API_BASE_URL || 'https://app.vssps.visualstudio.com',
+  AZURE_DEVOPS_API_BASE_URL: process.env.AZURE_DEVOPS_API_BASE_URL || 'https://dev.azure.com',
   ISSUE_LABEL_PREFIX: process.env.ISSUE_LABEL_PREFIX || 'tcx_',
   PAID_ISSUE_LABEL: process.env.PAID_ISSUE_LABEL || 'tcx_Paid',
   FIX_ACCEPTED_ISSUE_LABEL: process.env.FIX_ACCEPTED_ISSUE_LABEL || 'tcx_FixAccepted',
@@ -93,5 +95,15 @@ module.exports = {
   TOKEN_CACHE_TIME: process.env.TOKEN_CACHE_TIME || 43200,
   AUTH0_CLIENT_ID: process.env.AUTH0_CLIENT_ID,
   AUTH0_CLIENT_SECRET: process.env.AUTH0_CLIENT_SECRET,
-  AUTH0_PROXY_SERVER_URL: process.env.AUTH0_PROXY_SERVER_URL
+  AUTH0_PROXY_SERVER_URL: process.env.AUTH0_PROXY_SERVER_URL,
+
+  AZURE_ACCESS_TOKEN_DEFAULT_EXPIRATION: 3600 * 24 * 14,
+  AZURE_REFRESH_TOKEN_BEFORE_EXPIRATION: 300,
+  AZURE_OWNER_CALLBACK_URL: '/api/v1/azure/owneruser/callback',
+  AZURE_CLIENT_SECRET: process.env.AZURE_CLIENT_SECRET,
+
+  // used as base to construct various URLs
+  WEBSITE: process.env.WEBSITE || 'http://topcoderx.topcoder-dev.com',
+  WEBSITE_SECURE: process.env.WEBSITE_SECURE || 'https://topcoderx.topcoder-dev.com',
+
 };

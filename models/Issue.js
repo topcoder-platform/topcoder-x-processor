@@ -48,6 +48,7 @@ const schema = new Schema({
       name: 'RepositoryIdIndex'
     }
   },
+  repositoryIdStr: {type: String, required: false},
   labels: {
     type: Array,
     required: false
