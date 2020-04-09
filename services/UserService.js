@@ -11,6 +11,7 @@
 
 const config = require('config');
 const Joi = require('joi');
+const v = require('validator');
 const _ = require('lodash');
 const logger = require('../utils/logger');
 const dbHelper = require('../utils/db-helper');
@@ -26,7 +27,7 @@ const azureService = require('./AzureService');
 async function getTCUserName(provider, gitUser) {
   Joi.attempt({provider, gitUser}, getTCUserName.schema);
   const criteria = {};
-  if (_.isNumber(gitUser)) {
+  if (_.isNumber(gitUser) || v.isUUID(gitUser)) {
     if (provider === 'github') {
       criteria.githubUserId = gitUser;
     } else if (provider === 'gitlab') {
@@ -34,14 +35,13 @@ async function getTCUserName(provider, gitUser) {
     } else if (provider === 'azure') {
       criteria.azureUserId = gitUser;
     }
-  }
-  if (_.isString(gitUser)) {
+  } else if (_.isString(gitUser) || v.isEmail(gitUser)) {
     if (provider === 'github') {
       criteria.githubUsername = gitUser;
     } else if (provider === 'gitlab') {
       criteria.gitlabUsername = gitUser;
     } else if (provider === 'azure') {
-      criteria.azureUserId = gitUser;
+      criteria.azureEmail = gitUser;
     }
   }
   if (_.isEmpty(criteria)) {

@@ -4,7 +4,7 @@
 'use strict';
 
 /**
- * This provides methods around gitlab api.
+ * This provides methods around azure api.
  * @author TCSCODER
  * @version 1.0
  */
@@ -12,7 +12,6 @@
 const config = require('config');
 const _ = require('lodash');
 const Joi = require('joi');
-const GitlabAPI = require('node-gitlab-api');
 const superagent = require('superagent');
 const superagentPromise = require('superagent-promise');
 const logger = require('../utils/logger');
@@ -31,43 +30,7 @@ const copilotUserSchema = Joi.object().keys({
 }).required();
 
 /**
- * authenticate the gitlab using access token
- * @param {String} accessToken the access token of copilot
- * @returns {Object} the gitlab instance
- * @private
- */
-async function _authenticate(accessToken) {
-  try {
-    const gitlab = GitlabAPI({
-      url: config.GITLAB_API_BASE_URL,
-      oauthToken: accessToken
-    });
-    return gitlab;
-  } catch (err) {
-    throw errors.convertGitLabError(err, 'Failed to during authenticate to Github using access token of copilot.');
-  }
-}
-
-/**
- * Removes assignees from issue
- * @param {Object} gitlab the gitlab instance
- * @param {Number} projectId the project id
- * @param {Number} issueId the issue number
- * @param {Array} assignees the users to remove
- * @private
- */
-async function _removeAssignees(gitlab, projectId, issueId, assignees) {
-  try {
-    const issue = await gitlab.projects.issues.show(projectId, issueId);
-    const oldAssignees = _.difference(issue.assignee_ids, assignees);
-    await gitlab.projects.issues.edit(projectId, issueId, {assignee_ids: oldAssignees});
-  } catch (err) {
-    throw errors.convertGitLabError(err, 'Error occurred during remove assignees from issue.');
-  }
-}
-
-/**
- * creates the comments on gitlab issue
+ * creates the comments on azure issue
  * @param {Object} copilot the copilot
  * @param {String} repoFullName the organization/project-name
  * @param {Number} workItemId the issue number
@@ -86,7 +49,7 @@ async function createComment(copilot, repoFullName, workItemId, body) {
       .set('Content-Type', 'application/json')
       .end();
   } catch (err) {
-    throw errors.convertGitLabError(err, 'Error occurred during creating comment on issue.');
+    throw errors.convertAzureError(err, 'Error occurred during creating comment on issue.');
   }
   logger.debug(`Azure comment is added on issue with message: "${body}"`);
 }
@@ -99,26 +62,34 @@ createComment.schema = {
 };
 
 /**
- * updates the title of gitlab issue
+ * updates the title of azure issue
  * @param {Object} copilot the copilot
- * @param {Number} projectId the project id
+ * @param {Number} repoFullName the project id
  * @param {Number} issueId the issue number
  * @param {string} title new title
  */
-async function updateIssue(copilot, projectId, issueId, title) {
-  Joi.attempt({copilot, projectId, issueId, title}, updateIssue.schema);
-  const gitlab = await _authenticate(copilot.accessToken);
+async function updateIssue(copilot, repoFullName, issueId, title) {
+  Joi.attempt({copilot, repoFullName, issueId, title}, updateIssue.schema);
   try {
-    await gitlab.projects.issues.edit(projectId, issueId, {title});
+    await request
+      .patch(`${config.AZURE_DEVOPS_API_BASE_URL}/${repoFullName}/_apis/wit/workItems/${issueId}?api-version=5.1`)
+      .send([{
+        op: 'add',
+        path: '/fields/System.Title',
+        value: title
+      }])
+      .set('Authorization', `Bearer ${copilot.accessToken}`)
+      .set('Content-Type', 'application/json-patch+json')
+      .end();
   } catch (err) {
-    throw errors.convertGitLabError(err, 'Error occurred during updating issue.');
+    throw errors.convertAzureError(err, 'Error occurred during updating issue.');
   }
   logger.debug(`Azure issue title is updated for issue number ${issueId}`);
 }
 
 updateIssue.schema = {
   copilot: copilotUserSchema,
-  projectId: Joi.number().positive().required(),
+  repoFullName: Joi.string().required(),
   issueId: Joi.number().positive().required(),
   title: Joi.string().required()
 };
@@ -126,45 +97,60 @@ updateIssue.schema = {
 /**
  * Assigns the issue to user login
  * @param {Object} copilot the copilot
- * @param {Number} projectId the project id
+ * @param {Number} repoFullName the project id
  * @param {Number} issueId the issue number
- * @param {Number} userId the user id of assignee
+ * @param {Number} user the user id of assignee
  */
-async function assignUser(copilot, projectId, issueId, userId) {
-  Joi.attempt({copilot, projectId, issueId, userId}, assignUser.schema);
-  const gitlab = await _authenticate(copilot.accessToken);
+async function assignUser(copilot, repoFullName, issueId, user) {
+  Joi.attempt({copilot, repoFullName, issueId, user}, assignUser.schema);
   try {
-    const issue = await gitlab.projects.issues.show(projectId, issueId);
-    const oldAssignees = _.without(issue.assignee_ids, userId);
-    if (oldAssignees && oldAssignees.length > 0) {
-      await _removeAssignees(gitlab, projectId, issueId, oldAssignees);
-    }
-    await gitlab.projects.issues.edit(projectId, issueId, {assignee_ids: [userId]});
+    await request
+      .patch(`${config.AZURE_DEVOPS_API_BASE_URL}/${repoFullName}/_apis/wit/workItems/${issueId}?api-version=5.1`)
+      .send([{
+        op: 'add',
+        path: '/fields/System.AssignedTo',
+        value: user
+      }])
+      .set('Authorization', `Bearer ${copilot.accessToken}`)
+      .set('Content-Type', 'application/json-patch+json')
+      .end();
   } catch (err) {
-    throw errors.convertGitLabError(err, 'Error occurred during assigning issue user.');
+    throw errors.convertAzureError(err, 'Error occurred during update assignee.');
   }
   logger.debug(`Azure issue with number ${issueId} is assigned to ${issueId}`);
 }
 
 assignUser.schema = {
   copilot: copilotUserSchema,
-  projectId: Joi.number().positive().required(),
+  repoFullName: Joi.string().required(),
   issueId: Joi.number().positive().required(),
-  userId: Joi.number().required()
+  user: Joi.string()
 };
 
 /**
  * Removes an assignee from the issue
  * @param {Object} copilot the copilot
- * @param {Number} projectId the project id
+ * @param {Number} repoFullName the project id
  * @param {Number} issueId the issue number
  * @param {Number} userId the user id of assignee to remove
  */
-async function removeAssign(copilot, projectId, issueId, userId) {
-  Joi.attempt({copilot, projectId, issueId, userId}, removeAssign.schema);
-  const gitlab = await _authenticate(copilot.accessToken);
-  await _removeAssignees(gitlab, projectId, issueId, [userId]);
-  logger.debug(`Azure user ${userId} is unassigned from issue number ${issueId}`);
+async function removeAssign(copilot, repoFullName, issueId) {
+  Joi.attempt({copilot, repoFullName, issueId}, removeAssign.schema);
+  try {
+    await request
+      .patch(`${config.AZURE_DEVOPS_API_BASE_URL}/${repoFullName}/_apis/wit/workItems/${issueId}?api-version=5.1`)
+      .send([{
+        op: 'add',
+        path: '/fields/System.AssignedTo',
+        value: ''
+      }])
+      .set('Authorization', `Bearer ${copilot.accessToken}`)
+      .set('Content-Type', 'application/json-patch+json')
+      .end();
+  } catch (err) {
+    throw errors.convertAzureError(err, 'Error occurred during remove assignee.');
+  }
+  logger.debug(`Azure user is unassigned from issue number ${issueId}`);
 }
 
 removeAssign.schema = assignUser.schema;
@@ -191,25 +177,7 @@ getUsernameById.schema = {
 };
 
 /**
- * Gets the user id by username
- * @param {Object} copilot the copilot
- * @param {string} login the username
- * @returns {Number} the user id if found else null
- */
-async function getUserIdByLogin(copilot, login) {
-  Joi.attempt({copilot, login}, getUserIdByLogin.schema);
-  const gitlab = await _authenticate(copilot.accessToken);
-  const user = await gitlab.users.all({username: login});
-  return user.length ? user[0].id : null;
-}
-
-getUserIdByLogin.schema = {
-  copilot: copilotUserSchema,
-  login: Joi.string().required()
-};
-
-/**
- * updates the gitlab issue as paid and fix accepted
+ * updates the azure issue as paid and fix accepted
  * @param {Object} copilot the copilot
  * @param {Number} repoFullName the project id
  * @param {Number} issueId the issue number
@@ -241,7 +209,7 @@ async function markIssueAsPaid(copilot, repoFullName, issueId, challengeId, exis
       .set('Content-Type', 'application/json')
       .end();
   } catch (err) {
-    throw errors.convertGitLabError(err, 'Error occurred during updating issue as paid.');
+    throw errors.convertAzureError(err, 'Error occurred during updating issue as paid.');
   }
   logger.debug(`Azure issue is updated for as paid and fix accepted for ${issueId}`);
 }
@@ -254,36 +222,44 @@ markIssueAsPaid.schema = {
 };
 
 /**
- * change the state of gitlab issue
+ * change the state of azure issue
  * @param {Object} copilot the copilot
- * @param {string} projectId the project id
+ * @param {string} repoFullName the project id
  * @param {Number} issueId the issue issue id
  * @param {string} state new state
  */
-async function changeState(copilot, projectId, issueId, state) {
-  Joi.attempt({copilot, projectId, issueId, state}, changeState.schema);
-  const gitlab = await _authenticate(copilot.accessToken);
+async function changeState(copilot, repoFullName, issueId, state) {
+  Joi.attempt({copilot, repoFullName, issueId, state}, changeState.schema);
   try {
-    await gitlab.projects.issues.edit(projectId, issueId, {state_event: state});
+    await request
+      .patch(`${config.AZURE_DEVOPS_API_BASE_URL}/${repoFullName}/_apis/wit/workItems/${issueId}?api-version=5.1`)
+      .send([{
+        op: 'add',
+        path: '/fields/System.State',
+        value: state
+      }])
+      .set('Authorization', `Bearer ${copilot.accessToken}`)
+      .set('Content-Type', 'application/json-patch+json')
+      .end();
   } catch (err) {
-    throw errors.convertGitLabError(err, 'Error occurred during updating status of issue.');
+    throw errors.convertAzureError(err, 'Error occurred during updating status of issue.');
   }
   logger.debug(`Azure issue state is updated to '${state}' for issue number ${issueId}`);
 }
 
 changeState.schema = {
   copilot: copilotUserSchema,
-  projectId: Joi.number().positive().required(),
+  repoFullName: Joi.string().required(),
   issueId: Joi.number().positive().required(),
   state: Joi.string().required()
 };
 
 /**
- * updates the gitlab issue with new labels
+ * updates the azure issue with new labels
  * @param {Object} copilot the copilot
  * @param {string} repoFullName the project id
  * @param {Number} issueId the issue issue id
- * @param {Number} labels the labels
+ * @param {Array} labels the labels
  */
 async function addLabels(copilot, repoFullName, issueId, labels) {
   Joi.attempt({copilot, repoFullName, issueId, labels}, addLabels.schema);
@@ -300,7 +276,7 @@ async function addLabels(copilot, repoFullName, issueId, labels) {
       .set('Content-Type', 'application/json-patch+json')
       .end();
   } catch (err) {
-    throw errors.convertGitLabError(err, 'Error occurred during adding label in issue.');
+    throw errors.convertAzureError(err, 'Error occurred during adding label in issue.');
   }
   logger.debug(`Azure issue is updated with new labels for ${issueId}`);
 }
@@ -357,7 +333,6 @@ module.exports = {
   assignUser,
   removeAssign,
   getUsernameById,
-  getUserIdByLogin,
   markIssueAsPaid,
   changeState,
   addLabels,
