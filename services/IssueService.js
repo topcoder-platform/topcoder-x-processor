@@ -683,7 +683,8 @@ async function handleIssueUnAssignment(event, issue) {
     }
 
     if (dbIssue.assignee) {
-      const assigneeUserId = await gitHelper.getUserIdByLogin(event, dbIssue.assignee);
+      const assigneeUserId = event.provider === 'azure' ? dbIssue.assignee :
+        await gitHelper.getUserIdByLogin(event, dbIssue.assignee);
       if (!assigneeUserId) {
         // The assignement of this user was failed and broken.
         // We don't need to handle the unassignment.
@@ -691,6 +692,7 @@ async function handleIssueUnAssignment(event, issue) {
       }
       logger.debug(`Looking up TC handle of git user: ${assigneeUserId}`);
       const userMapping = await userService.getTCUserName(event.provider, assigneeUserId);
+      logger.debug(userMapping);
 
       // We still have assignee(s) left on the ticket.
       if (event.data.issue.assignees && event.data.issue.assignees.length > 0) {
@@ -905,7 +907,7 @@ process.schema = Joi.object().keys({
       id: Joi.number().required(),
       body: Joi.string().allow(''),
       user: Joi.object().keys({
-        id: Joi.number().required()
+        id: Joi.alternatives().try(Joi.string(), Joi.number()).required()
       })
     }),
     assignee: Joi.object().keys({

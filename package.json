@@ -51,6 +51,7 @@
     "topcoder-dev-api-projects": "^1.0.1",
     "topcoder-healthcheck-dropin": "^1.0.3",
     "util": "^0.11.0",
+    "validator": "^13.0.0",
     "winston": "^2.4.3"
   },
   "devDependencies": {

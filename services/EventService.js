@@ -13,6 +13,7 @@ const _ = require('lodash');
 const logger = require('../utils/logger');
 const models = require('../models');
 const dbHelper = require('../utils/db-helper');
+const azureService = require('./AzureService');
 const gitHubService = require('./GithubService');
 const gitlabService = require('./GitlabService');
 
@@ -26,8 +27,10 @@ const timeoutMapper = {};
 async function reOpenIssue(event, issue) {
   if (event.provider === 'github') {
     await gitHubService.changeState(event.copilot, event.data.repository.full_name, issue.number, 'open');
-  } else {
+  } else if (event.provider === 'gitlab') {
     await gitlabService.changeState(event.copilot, event.data.repository.id, issue.number, 'reopen');
+  } else if (event.provider === 'azure') {
+    await gitlabService.changeState(event.copilot, event.data.repository.full_name, issue.number, 'To Do');
   }
 }
 
@@ -91,8 +94,10 @@ async function handleEventGracefully(event, data, err) {
       // notify error in git host
       if (event.provider === 'github') {
         await gitHubService.createComment(event.copilot, event.data.repository.full_name, data.number, comment);
-      } else {
+      } else if (event.provider === 'gitlab') {
         await gitlabService.createComment(event.copilot, event.data.repository.id, data.number, comment);
+      } else if (event.provider === 'azure') {
+        await azureService.createComment(event.copilot, event.data.repository.full_name, data.number, comment);
       }
 
       if (event.event === 'issue.closed') {
@@ -102,8 +107,10 @@ async function handleEventGracefully(event, data, err) {
         const readyForReviewLabels = [config.READY_FOR_REVIEW_ISSUE_LABEL];
         if (event.provider === 'github') {
           await gitHubService.addLabels(event.copilot, event.data.repository.full_name, data.number, readyForReviewLabels);
-        } else {
+        } else if (event.provider === 'gitlab') {
           await gitlabService.addLabels(event.copilot, event.data.repository.id, data.number, readyForReviewLabels);
+        } else if (event.provider === 'azure') {
+          await azureService.addLabels(event.copilot, event.data.repository.full_name, data.number, readyForReviewLabels);
         }
       }
     }

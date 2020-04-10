@@ -57,8 +57,10 @@ class GitHelper {
   async reOpenIssue(event, issue) {
     if (event.provider === 'github') {
       await gitHubService.changeState(event.copilot, event.data.repository.full_name, issue.number, 'open');
-    } else {
+    } else if (event.provider === 'gitlab') {
       await gitlabService.changeState(event.copilot, event.data.repository.id, issue.number, 'reopen');
+    } else if (event.provider === 'azure') {
+      await azureService.changeState(event.copilot, event.data.repository.full_name, issue.number, 'To Do');
     }
   }
 
@@ -89,8 +91,10 @@ class GitHelper {
   async removeAssign(event, issueNumber, assigneeUserId, assigneeUsername) {
     if (event.provider === 'github') {
       await gitHubService.removeAssign(event.copilot, event.data.repository.full_name, issueNumber, assigneeUsername);
-    } else {
+    } else if (event.provider === 'gitlab') {
       await gitlabService.removeAssign(event.copilot, event.data.repository.id, issueNumber, assigneeUserId);
+    } else if (event.provider === 'azure') {
+      await azureService.removeAssign(event.copilot, event.data.repository.full_name, issueNumber);
     }
   }
 
@@ -103,8 +107,10 @@ class GitHelper {
   async updateIssue(event, issueNumber, newTitle) {
     if (event.provider === 'github') {
       await gitHubService.updateIssue(event.copilot, event.data.repository.full_name, issueNumber, newTitle);
-    } else {
+    } else if (event.provider === 'gitlab') {
       await gitlabService.updateIssue(event.copilot, event.data.repository.id, issueNumber, newTitle);
+    } else if (event.provider === 'azure') {
+      await azureService.updateIssue(event.copilot, event.data.repository.full_name, issueNumber, newTitle);
     }
   }
 
@@ -117,9 +123,11 @@ class GitHelper {
   async assignUser(event, issueNumber, assignedUser) {
     if (event.provider === 'github') {
       await gitHubService.assignUser(event.copilot, event.data.repository.full_name, issueNumber, assignedUser);
-    } else {
+    } else if (event.provider === 'gitlab') {
       const userId = await gitlabService.getUserIdByLogin(event.copilot, assignedUser);
       await gitlabService.assignUser(event.copilot, event.data.repository.id, issueNumber, userId);
+    } else if (event.provider === 'azure') {
+      await azureService.assignUser(event.copilot, event.data.repository.full_name, issueNumber, assignedUser);
     }
   }
 
@@ -165,7 +173,7 @@ class GitHelper {
   async getUserIdByLogin(event, assignee) {
     if (event.provider === 'github') {
       return await gitHubService.getUserIdByLogin(event.copilot, assignee);
-    } else if (event.provider === 'github') {
+    } else if (event.provider === 'gitlab') {
       return gitlabService.getUserIdByLogin(event.copilot, assignee);
     } else if (event.provider === 'azure') {
       return azureService.getUserIdByLogin(event.copilot, assignee);
