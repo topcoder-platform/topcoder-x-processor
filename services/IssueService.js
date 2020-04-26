@@ -237,6 +237,8 @@ async function handleIssueAssignment(event, issue, force = false) {
             const contestUrl = getUrlForChallengeId(dbIssue.challengeId);
             const comment = `Contest ${contestUrl} has been updated - ${userMapping.topcoderUsername} has been unassigned.`;
             await rollbackAssignee(event, assigneeUserId, issue, false, comment);
+            const additionalComment = `${userMapping.topcoderUsername} has been unassigned because this ticket doesn't have the ${config.OPEN_FOR_PICKUP_ISSUE_LABEL} label.`; // eslint-disable-line max-len
+            await gitHelper.createComment(event, issue.number, additionalComment);
           } else {
             const comment = `This ticket isn't quite ready to be worked on yet. Please wait until it has the ${config.OPEN_FOR_PICKUP_ISSUE_LABEL} label`;
             await rollbackAssignee(event, assigneeUserId, issue, false, comment);
