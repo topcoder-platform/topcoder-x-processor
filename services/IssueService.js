@@ -67,17 +67,17 @@ function parsePrizes(issue) {
  * @private
  */
 async function ensureChallengeExists(event, issue, create = true) {
-  logger.debug('Enter ensureChallengeExists to scan an issue record');
-  logger.debug(`Enter ensureChallengeExists. Number: ${issue.number}`);
-  logger.debug(`Enter ensureChallengeExists. provider: ${issue.provider}`);
-  logger.debug(`Enter ensureChallengeExists. repositoryId: ${issue.repositoryId}`);
+  logger.debugWithContext('Enter ensureChallengeExists to scan an issue record', event, issue);
+  logger.debugWithContext(`Enter ensureChallengeExists. Number: ${issue.number}`, event, issue);
+  logger.debugWithContext(`Enter ensureChallengeExists. provider: ${issue.provider}`, event, issue);
+  logger.debugWithContext(`Enter ensureChallengeExists. repositoryId: ${issue.repositoryId}`, event, issue);
 
   let dbIssue = await dbHelper.queryOneIssue(models.Issue, issue.repositoryId, issue.number, issue.provider);
-  logger.debug(`DB Issue number: ${issue.number}`);
-  logger.debug(`DB Issue provider: ${issue.provider}`);
-  logger.debug(`DB Issue repository: ${issue.repositoryId}`);
+  logger.debugWithContext(`DB Issue number: ${issue.number}`, event, issue);
+  logger.debugWithContext(`DB Issue provider: ${issue.provider}`, event, issue);
+  logger.debugWithContext(`DB Issue repository: ${issue.repositoryId}`, event, issue);
   if (dbIssue && dbIssue.status === 'challenge_creation_pending') {
-    logger.debug('dbIssue is PENDING');
+    logger.debugWithContext('dbIssue is PENDING', event, issue);
     throw errors.internalDependencyError(`Challenge for the updated issue ${issue.number} is creating, rescheduling this event`);
   }
   if (dbIssue && dbIssue.status === 'challenge_creation_failed') {
@@ -87,11 +87,11 @@ async function ensureChallengeExists(event, issue, create = true) {
   }
 
   if (!dbIssue && create) {
-    logger.debug('dbIssue is NULL, process to create new record and challenge');
+    logger.debugWithContext('dbIssue is NULL, process to create new record and challenge', event, issue);
 
     await handleIssueCreate(event, issue, true);
     dbIssue = await dbHelper.queryOneIssue(models.Issue, issue.repositoryId, issue.number, issue.provider);
-    logger.debug(`dbIssue is CREATED ${dbIssue ? 'Succesfully' : 'Failed'}`);
+    logger.debugWithContext(`dbIssue is CREATED ${dbIssue ? 'Succesfully' : 'Failed'}`, event, issue);
   }
   return dbIssue;
 }
@@ -181,7 +181,7 @@ function parseComment(comment) {
  */
 async function handleIssueAssignment(event, issue, force = false) {
   const assigneeUserId = event.data.assignee.id;
-  logger.debug(`Looking up TC handle of git user: ${assigneeUserId}`);
+  logger.debugWithContext(`Looking up TC handle of git user: ${assigneeUserId}`, event, issue);
   const userMapping = await userService.getTCUserName(event.provider, assigneeUserId);
   if (userMapping && userMapping.topcoderUsername) {
     let dbIssue;
@@ -207,7 +207,7 @@ async function handleIssueAssignment(event, issue, force = false) {
 
       // The assignees is updated but the assignee has already registered.
       if (dbIssue.assignee === issue.assignee) {
-        logger.debug(`${userMapping.topcoderUsername} Already registered as assignee`);
+        logger.debugWithContext(`${userMapping.topcoderUsername} Already registered as assignee`, event, issue);
         return;
       }
 
@@ -225,12 +225,12 @@ async function handleIssueAssignment(event, issue, force = false) {
           const issueLabels = _(issue.labels).push(config.NOT_READY_ISSUE_LABEL).value(); // eslint-disable-line lodash/chaining
           const comment = `This ticket isn't quite ready to be worked on yet.Please wait until it has the ${config.OPEN_FOR_PICKUP_ISSUE_LABEL} label`;
 
-          logger.debug(`Adding label ${config.NOT_READY_ISSUE_LABEL}`);
+          logger.debugWithContext(`Adding label ${config.NOT_READY_ISSUE_LABEL}`, event, issue);
           await gitHelper.addLabels(event, issue.number, issueLabels);
 
           await rollbackAssignee(event, assigneeUserId, issue, false, comment);
         } else {
-          logger.debug('Does not has Open for pickup but has assignee, remain labels');
+          logger.debugWithContext('Does not has Open for pickup but has assignee, remain labels', event, issue);
           await gitHelper.addLabels(event, issue.number, issue.labels);
 
           if (!hasNotReadyLabel) { // eslint-disable-line max-depth
@@ -247,10 +247,10 @@ async function handleIssueAssignment(event, issue, force = false) {
         return;
       }
 
-      logger.debug(`Getting the topcoder member ID for member name: ${userMapping.topcoderUsername}`);
+      logger.debugWithContext(`Getting the topcoder member ID for member name: ${userMapping.topcoderUsername}`, event, issue);
       const topcoderUserId = await topcoderApiHelper.getTopcoderMemberId(userMapping.topcoderUsername);
       // Update the challenge
-      logger.debug(`Assigning user to challenge: ${userMapping.topcoderUsername}`);
+      logger.debugWithContext(`Assigning user to challenge: ${userMapping.topcoderUsername}`, event, issue);
       topcoderApiHelper.assignUserAsRegistrant(topcoderUserId, dbIssue.challengeId);
       dbIssue = await dbHelper.update(models.Issue, dbIssue.id, {
         assignee: issue.assignee,
@@ -273,7 +273,7 @@ async function handleIssueAssignment(event, issue, force = false) {
     const comment = `Contest ${contestUrl} has been updated - it has been assigned to ${userMapping.topcoderUsername}.`;
     await gitHelper.createComment(event, issue.number, comment);
 
-    logger.debug(`Member ${userMapping.topcoderUsername} is assigned to challenge with id ${dbIssue.challengeId}`);
+    logger.debugWithContext(`Member ${userMapping.topcoderUsername} is assigned to challenge with id ${dbIssue.challengeId}`, event, issue);
   } else {
     await rollbackAssignee(event, assigneeUserId, issue);
   }
@@ -288,17 +288,17 @@ async function handleIssueAssignment(event, issue, force = false) {
 async function handleIssueComment(event, issue) {
   const parsedComment = parseComment(event.data.comment);
   if (parsedComment.isBid) {
-    logger.debug(`New bid is received with amount ${parsedComment.bidAmount}.`);
+    logger.debugWithContext(`New bid is received with amount ${parsedComment.bidAmount}.`, event, issue);
   }
   if (parsedComment.isAcceptBid) {
-    logger.debug(`Bid by ${parsedComment.assignedUser} is accepted with amount ${parsedComment.bidAmount} `);
+    logger.debugWithContext(`Bid by ${parsedComment.assignedUser} is accepted with amount ${parsedComment.bidAmount} `, event, issue);
     const newTitle = `[$${parsedComment.acceptedBidAmount}] ${issue.title}`;
-    logger.debug(`updating issue: ${event.data.repository.name}/${issue.number}`);
+    logger.debugWithContext(`updating issue: ${event.data.repository.name}/${issue.number}`, event, issue);
 
     await gitHelper.updateIssue(event, issue.number, newTitle);
 
     // assign user
-    logger.debug(`assigning user, ${parsedComment.assignedUser} to issue: ${event.data.repository.name}/${issue.number}`);
+    logger.debugWithContext(`assigning user, ${parsedComment.assignedUser} to issue: ${event.data.repository.name}/${issue.number}`, event, issue);
     await gitHelper.assignUser(event, issue.number, parsedComment.assignedUser);
   }
 }
@@ -329,7 +329,7 @@ async function handleIssueUpdate(event, issue) {
       dbIssue.prizes.length === issue.prizes.length &&
       dbIssue.prizes[0] === issue.prizes[0]) {
       // Title, body, prizes doesn't change, just ignore
-      logger.debug(`nothing changed for issue ${issue.number}`);
+      logger.debugWithContext(`nothing changed for issue ${issue.number}`, event, issue);
       return;
     }
 
@@ -353,7 +353,7 @@ async function handleIssueUpdate(event, issue) {
     return;
   }
 
-  logger.debug(`updated challenge ${dbIssue.challengeId} for for issue ${issue.number}`);
+  logger.debugWithContext(`updated challenge ${dbIssue.challengeId} for for issue ${issue.number}`, event, issue);
 }
 
 
@@ -382,11 +382,11 @@ async function handleIssueClose(event, issue) { // eslint-disable-line
 
     // if the issue has payment success or payment pending status, we'll ignore this process.
     if (dbIssue && dbIssue.status === 'challenge_payment_successful') {
-      logger.debug('Ignoring close issue processing. The issue has challenge_payment_successful.');
+      logger.debugWithContext('Ignoring close issue processing. The issue has challenge_payment_successful.', event, issue);
       return;
     }
     if (dbIssue && dbIssue.status === 'challenge_payment_pending') {
-      logger.debug('Ignoring close issue processing. The issue has challenge_payment_pending.');
+      logger.debugWithContext('Ignoring close issue processing. The issue has challenge_payment_pending.', event, issue);
       return;
     }
 
@@ -394,7 +394,7 @@ async function handleIssueClose(event, issue) { // eslint-disable-line
       let closeChallenge = false;
       // if issue is closed without Fix accepted label
       if (!_.includes(event.data.issue.labels, config.FIX_ACCEPTED_ISSUE_LABEL) || _.includes(event.data.issue.labels, config.CANCELED_ISSUE_LABEL)) {
-        logger.debug(`This issue ${issue.number} is closed without fix accepted label.`);
+        logger.debugWithContext(`This issue ${issue.number} is closed without fix accepted label.`, event, issue);
         let comment = 'This ticket was not processed for payment. If you would like to process it for payment,';
         comment += ' please reopen it, add the ```' + config.FIX_ACCEPTED_ISSUE_LABEL + '``` label, and then close it again';// eslint-disable-line
         await gitHelper.createComment(event, issue.number, comment);
@@ -406,7 +406,8 @@ async function handleIssueClose(event, issue) { // eslint-disable-line
       }
 
       if (closeChallenge) {
-        logger.debug(`The associated challenge ${dbIssue.challengeId} is being scheduled for cancellation since no payment will be given`);
+        logger.debugWithContext(`The associated challenge ${dbIssue.challengeId} is being scheduled for cancellation since no payment will be given`,
+          event, issue);
         // Currently, there is no working API for closing challenge.
         // The process is just ignored.
         return;
@@ -414,20 +415,20 @@ async function handleIssueClose(event, issue) { // eslint-disable-line
 
       // if issue is closed without assignee then do nothing
       if (!event.data.assignee.id) {
-        logger.debug(`This issue ${issue.number} doesn't have assignee so ignoring this event.`);
+        logger.debugWithContext(`This issue ${issue.number} doesn't have assignee so ignoring this event.`, event, issue);
         return;
       }
 
       // if issue has paid label don't process further
       if (_.includes(event.data.issue.labels, config.PAID_ISSUE_LABEL)) {
-        logger.debug(`This issue ${issue.number} is already paid with challenge ${dbIssue.challengeId}`);
+        logger.debugWithContext(`This issue ${issue.number} is already paid with challenge ${dbIssue.challengeId}`, event, issue);
         return;
       }
-      logger.debug(`Getting the challenge meta-data for challenge ID : ${dbIssue.challengeId}`);
+      logger.debugWithContext(`Getting the challenge meta-data for challenge ID : ${dbIssue.challengeId}`, event, issue);
 
       const challenge = await topcoderApiHelper.getChallengeById(dbIssue.challengeId);
       if (challenge.currentStatus === 'Completed') {
-        logger.debug('Challenge is already complete, so no point in trying to do anything further');
+        logger.debugWithContext('Challenge is already complete, so no point in trying to do anything further', event, issue);
         return;
       }
 
@@ -437,7 +438,7 @@ async function handleIssueClose(event, issue) { // eslint-disable-line
         updatedAt: new Date()
       });
 
-      logger.debug(`Looking up TC handle of git user: ${event.data.assignee.id}`);
+      logger.debugWithContext(`Looking up TC handle of git user: ${event.data.assignee.id}`, event, issue);
       const assigneeMember = await userService.getTCUserName(event.provider, event.data.assignee.id);
       event.assigneeMember = assigneeMember;
 
@@ -450,10 +451,10 @@ async function handleIssueClose(event, issue) { // eslint-disable-line
       // get project detail from db
       const project = await getProjectDetail(event);
 
-      logger.debug(`Getting the billing account ID for project ID: ${project.tcDirectId}`);
+      logger.debugWithContext(`Getting the billing account ID for project ID: ${project.tcDirectId}`, event, issue);
       const accountId = await topcoderApiHelper.getProjectBillingAccountId(project.tcDirectId);
 
-      logger.debug(`Assigning the billing account id ${accountId} to challenge`);
+      logger.debugWithContext(`Assigning the billing account id ${accountId} to challenge`, event, issue);
 
       // adding assignees as well if it is missed/failed during update
       // prize needs to be again set after adding billing account otherwise it won't let activate
@@ -466,7 +467,7 @@ async function handleIssueClose(event, issue) { // eslint-disable-line
       const copilotAlreadySet = await topcoderApiHelper.roleAlreadySet(dbIssue.challengeId, 'Copilot');
 
       if (!copilotAlreadySet) {
-        logger.debug(`Getting the topcoder member ID for copilot name : ${event.copilot.topcoderUsername}`);
+        logger.debugWithContext(`Getting the topcoder member ID for copilot name : ${event.copilot.topcoderUsername}`, event, issue);
         // get copilot tc user id
         const copilotTopcoderUserId = await topcoderApiHelper.getTopcoderMemberId(event.copilot.topcoderUsername);
 
@@ -480,19 +481,19 @@ async function handleIssueClose(event, issue) { // eslint-disable-line
         };
         await topcoderApiHelper.addResourceToChallenge(dbIssue.challengeId, copilotResourceBody);
       } else {
-        logger.debug('Copilot is already set, so skipping');
+        logger.debugWithContext('Copilot is already set, so skipping', event, issue);
       }
 
-      logger.debug(`Getting the topcoder member ID for member name: ${assigneeMember.topcoderUsername}`);
+      logger.debugWithContext(`Getting the topcoder member ID for member name: ${assigneeMember.topcoderUsername}`, event, issue);
       const winnerId = await topcoderApiHelper.getTopcoderMemberId(assigneeMember.topcoderUsername);
       const assigneeAlreadySet = await topcoderApiHelper.roleAlreadySet(dbIssue.challengeId, 'Submitter');
 
       if (!assigneeAlreadySet) {
         // adding reg
-        logger.debug('Adding assignee because one was not set');
+        logger.debugWithContext('Adding assignee because one was not set', event, issue);
         await topcoderApiHelper.assignUserAsRegistrant(winnerId, dbIssue.challengeId);
       } else {
-        logger.debug('Assignee is already set, so skipping');
+        logger.debugWithContext('Assignee is already set, so skipping', event, issue);
       }
 
       // activate challenge
@@ -500,7 +501,7 @@ async function handleIssueClose(event, issue) { // eslint-disable-line
         await topcoderApiHelper.activateChallenge(dbIssue.challengeId);
       }
 
-      logger.debug(`Closing challenge with winner ${assigneeMember.topcoderUsername}(${winnerId})`);
+      logger.debugWithContext(`Closing challenge with winner ${assigneeMember.topcoderUsername}(${winnerId})`, event, issue);
       await topcoderApiHelper.closeChallenge(dbIssue.challengeId, winnerId);
       event.paymentSuccessful = true;
     }
@@ -519,7 +520,7 @@ async function handleIssueClose(event, issue) { // eslint-disable-line
   // Only update the label to paid if the payment successfully processed.
   if (event.paymentSuccessful) {
     try {
-      logger.debug('update issue as paid');
+      logger.debugWithContext('update issue as paid', event, issue);
       const labels = _(dbIssue.labels)
         .filter((i) => i !== config.OPEN_FOR_PICKUP_ISSUE_LABEL && i !== config.ASSIGNED_ISSUE_LABEL)
         .push(config.ASSIGNED_ISSUE_LABEL)
@@ -563,7 +564,7 @@ async function handleIssueCreate(event, issue, forceAssign = false) {
   }
 
   if (!issue.tcxReady) {
-    logger.debug('The issue doesn\'t have tcx_ labels. Creation ignored.');
+    logger.debugWithContext('The issue doesn\'t have tcx_ labels. Creation ignored.', event, issue);
     return;
   }
 
@@ -593,7 +594,7 @@ async function handleIssueCreate(event, issue, forceAssign = false) {
       fullRepoUrl = `${config.AZURE_DEVOPS_API_BASE_URL}/${event.data.repository.full_name}`;
     }
 
-    logger.debug(`existing project was found with id ${projectId} for repository ${event.data.repository.full_name}`);
+    logger.debugWithContext(`existing project was found with id ${projectId} for repository ${event.data.repository.full_name}`, event, issue);
 
     // Create a new challenge
     issue.challengeId = await topcoderApiHelper.createChallenge({
@@ -637,7 +638,7 @@ async function handleIssueCreate(event, issue, forceAssign = false) {
   } catch (err) {
     logger.error(`Comment creation failure: ${err}`);
     delete issueCreationLock[creationLockKey];
-    logger.debug(`new challenge created with id ${issue.challengeId} for issue ${issue.number}`);
+    logger.debugWithContext(`new challenge created with id ${issue.challengeId} for issue ${issue.number}`, event, issue);
   }
 }
 
@@ -658,7 +659,7 @@ async function handleIssueLabelUpdated(event, issue) {
   // Sometimes Github send label updated event before issue created event.
   // This process will be ignored. The label will be processed (stored) at hanleIssueCreated.
   if (!dbIssue) {
-    logger.debug('DB record not found. Issue label update ignored.');
+    logger.debugWithContext('DB record not found. Issue label update ignored.', event, issue);
     return;
   }
   await dbHelper.update(models.Issue, dbIssue.id, {
@@ -692,9 +693,9 @@ async function handleIssueUnAssignment(event, issue) {
         // We don't need to handle the unassignment.
         return;
       }
-      logger.debug(`Looking up TC handle of git user: ${assigneeUserId}`);
+      logger.debugWithContext(`Looking up TC handle of git user: ${assigneeUserId}`, event, issue);
       const userMapping = await userService.getTCUserName(event.provider, assigneeUserId);
-      logger.debug(userMapping);
+      logger.debugWithContext(userMapping, event, issue);
 
       // We still have assignee(s) left on the ticket.
       if (event.data.issue.assignees && event.data.issue.assignees.length > 0) {
@@ -713,10 +714,10 @@ async function handleIssueUnAssignment(event, issue) {
           .push(config.OPEN_FOR_PICKUP_ISSUE_LABEL)
           .value();
         issue.labels = updateLabels;
-        logger.debug(`Getting the topcoder member ID for member name: ${userMapping.topcoderUsername}`);
+        logger.debugWithContext(`Getting the topcoder member ID for member name: ${userMapping.topcoderUsername}`, event, issue);
         const topcoderUserId = await topcoderApiHelper.getTopcoderMemberId(userMapping.topcoderUsername);
         // Update the challenge to remove the assignee
-        logger.debug(`un-assigning user from challenge: ${userMapping.topcoderUsername}`);
+        logger.debugWithContext(`un-assigning user from challenge: ${userMapping.topcoderUsername}`, event, issue);
         topcoderApiHelper.removeResourceToChallenge(dbIssue.challengeId, {
           roleId: 1,
           resourceUserId: topcoderUserId
@@ -725,7 +726,7 @@ async function handleIssueUnAssignment(event, issue) {
         const comment = `Contest ${contestUrl} has been updated - ${userMapping.topcoderUsername} has been unassigned.`;
         await gitHelper.createComment(event, issue.number, comment);
         await gitHelper.addLabels(event, issue.number, updateLabels);
-        logger.debug(`Member ${userMapping.topcoderUsername} is unassigned from challenge with id ${dbIssue.challengeId}`);
+        logger.debugWithContext(`Member ${userMapping.topcoderUsername} is unassigned from challenge with id ${dbIssue.challengeId}`, event, issue);
       }
     } else {
       // Handle multiple assignees. TC-X allows only one assignee.
@@ -794,7 +795,7 @@ async function handleIssueRecreate(event, issue) {
   }
 
   const issueLabels = _(updateLabels).push(config.OPEN_FOR_PICKUP_ISSUE_LABEL).value(); // eslint-disable-line lodash/chaining
-  logger.debug(`Adding label ${config.OPEN_FOR_PICKUP_ISSUE_LABEL}`);
+  logger.debugWithContext(`Adding label ${config.OPEN_FOR_PICKUP_ISSUE_LABEL}`, event, issue);
   await gitHelper.addLabels(event, issue.number, issueLabels);
 
   const creationLockKey = `${issue.provider}-${issue.repositoryId}-${issue.number}`;
@@ -828,6 +829,7 @@ async function process(event) {
     tcxReady: true
   };
   const fullRepoUrl = gitHelper.getFullRepoUrl(event);
+  event.data.repository.repoUrl = fullRepoUrl;
 
   const project = await dbHelper.scanOne(models.Project, {
     repoUrl: fullRepoUrl
