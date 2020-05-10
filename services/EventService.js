@@ -103,15 +103,6 @@ async function handleEventGracefully(event, data, err) {
       if (event.event === 'issue.closed') {
         // reopen
         await reOpenIssue(event, data);
-        // ensure label is ready for review
-        const readyForReviewLabels = [config.READY_FOR_REVIEW_ISSUE_LABEL];
-        if (event.provider === 'github') {
-          await gitHubService.addLabels(event.copilot, event.data.repository.full_name, data.number, readyForReviewLabels);
-        } else if (event.provider === 'gitlab') {
-          await gitlabService.addLabels(event.copilot, event.data.repository.id, data.number, readyForReviewLabels);
-        } else if (event.provider === 'azure') {
-          await azureService.addLabels(event.copilot, event.data.repository.full_name, data.number, readyForReviewLabels);
-        }
       }
     }
   }
