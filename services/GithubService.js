@@ -234,19 +234,19 @@ getUserIdByLogin.schema = {
  * @param {Object} copilot the copilot
  * @param {string} repoFullName the repository
  * @param {Number} number the issue number
- * @param {Number} challengeId the challenge id
+ * @param {String} challengeUUID the challenge id
  * @param {Array} existLabels the issue labels
  *
  */
-async function markIssueAsPaid(copilot, repoFullName, number, challengeId, existLabels) {
-  Joi.attempt({copilot, repoFullName, number, challengeId, existLabels}, markIssueAsPaid.schema);
+async function markIssueAsPaid(copilot, repoFullName, number, challengeUUID, existLabels) {
+  Joi.attempt({copilot, repoFullName, number, challengeUUID, existLabels}, markIssueAsPaid.schema);
   const github = await _authenticate(copilot.accessToken);
   const {owner, repo} = _parseRepoUrl(repoFullName);
   const labels = _(existLabels).filter((i) => i !== config.FIX_ACCEPTED_ISSUE_LABEL)
       .push(config.FIX_ACCEPTED_ISSUE_LABEL, config.PAID_ISSUE_LABEL).value();
   try {
     await github.issues.edit({owner, repo, number, labels});
-    const body = helper.prepareAutomatedComment(`Payment task has been updated: ${config.TC_OR_DETAIL_LINK}${challengeId}`, copilot);
+    const body = helper.prepareAutomatedComment(`Challenge \`${challengeUUID}\` has been paid and closed.`, copilot);
     await github.issues.createComment({owner, repo, number, body});
   } catch (err) {
     throw errors.convertGitHubError(err, 'Error occurred during updating issue as paid.');
@@ -258,7 +258,7 @@ markIssueAsPaid.schema = {
   copilot: copilotUserSchema,
   repoFullName: Joi.string().required(),
   number: Joi.number().required(),
-  challengeId: Joi.number().positive().required(),
+  challengeUUID: Joi.string().required(),
   existLabels: Joi.array().items(Joi.string()).required()
 };
 

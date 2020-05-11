@@ -203,23 +203,23 @@ async function handlePaymentAdd(event, payment) {
       };
 
       // Create a new challenge
-      const challengeId = await topcoderApiHelper.createChallenge(newChallenge);
+      const challengeUUID = await topcoderApiHelper.createChallenge(newChallenge);
 
-      logger.debug(`updating database payment with new challenge id:${challengeId}`);
+      logger.debug(`updating database payment with new challenge id:${challengeUUID}`);
 
       // update db payment
       payment = dbHelper.update(models.CopilotPayment, payment.id, {
-        challengeId,
+        challengeUUID,
         status: 'challenge_creation_successful'
       });
 
       // adding user as registrants
-      await topcoderApiHelper.assignUserAsRegistrant(topcoderMemberId, challengeId);
+      await topcoderApiHelper.assignUserAsRegistrant(copilot.handle, challengeUUID);
 
       // active challenge
-      await topcoderApiHelper.activateChallenge(challengeId);
+      await topcoderApiHelper.activateChallenge(challengeUUID);
 
-      logger.debug(`challenge ${challengeId} has been activated!`);
+      logger.debug(`challenge ${challengeUUID} has been activated!`);
     } catch (ex) {
       await dbHelper.update(models.CopilotPayment, payment.id, {
         status: 'challenge_creation_retried'

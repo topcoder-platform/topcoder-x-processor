@@ -181,11 +181,11 @@ getUsernameById.schema = {
  * @param {Object} copilot the copilot
  * @param {Number} repoFullName the project id
  * @param {Number} issueId the issue number
- * @param {Number} challengeId the challenge id
+ * @param {String} challengeUUID the challenge id
  * @param {Array} existLabels the issue labels
  */
-async function markIssueAsPaid(copilot, repoFullName, issueId, challengeId, existLabels) {
-  Joi.attempt({copilot, repoFullName, issueId, challengeId}, markIssueAsPaid.schema);
+async function markIssueAsPaid(copilot, repoFullName, issueId, challengeUUID, existLabels) {
+  Joi.attempt({copilot, repoFullName, issueId, challengeUUID}, markIssueAsPaid.schema);
   const labels = _(existLabels).filter((i) => i !== config.FIX_ACCEPTED_ISSUE_LABEL)
     .push(config.FIX_ACCEPTED_ISSUE_LABEL, config.PAID_ISSUE_LABEL).value();
   try {
@@ -199,7 +199,7 @@ async function markIssueAsPaid(copilot, repoFullName, issueId, challengeId, exis
       .set('Authorization', `Bearer ${copilot.accessToken}`)
       .set('Content-Type', 'application/json-patch+json')
       .end();
-    const body = helper.prepareAutomatedComment(`Payment task has been updated: ${config.TC_OR_DETAIL_LINK}${challengeId}`, copilot);
+    const body = helper.prepareAutomatedComment(`Challenge \`${challengeUUID}\` has been paid and closed.`, copilot);
     await request
       .post(`${config.AZURE_DEVOPS_API_BASE_URL}/${repoFullName}/_apis/wit/workItems/${issueId}/comments?api-version=5.1-preview.3`)
       .send({
@@ -218,7 +218,7 @@ markIssueAsPaid.schema = {
   copilot: copilotUserSchema,
   repoFullName: Joi.string().required(),
   issueId: Joi.number().positive().required(),
-  challengeId: Joi.number().positive().required()
+  challengeUUID: Joi.string().required()
 };
 
 /**

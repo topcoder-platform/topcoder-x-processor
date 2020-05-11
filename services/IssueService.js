@@ -32,12 +32,12 @@ const issueCreationLock = {};
 
 /**
  * Generate the contest url, given the challenge id
- * @param {String} challengeId The id of the challenge in topcoder
+ * @param {Object} issue The issue
  * @returns {String} The topcoder url to access the challenge
  * @private
  */
-function getUrlForChallengeId(challengeId) {
-  return `${config.TC_URL}/challenges/${challengeId}`;
+function getUrlForChallengeId(issue) {
+  return issue.challengeId ? `${config.TC_URL}/challenges/${issue.challengeId}` : `\`${issue.challengeUUID}\``;
 }
 
 /**
@@ -234,8 +234,8 @@ async function handleIssueAssignment(event, issue, force = false) {
           await gitHelper.addLabels(event, issue.number, issue.labels);
 
           if (!hasNotReadyLabel) { // eslint-disable-line max-depth
-            const contestUrl = getUrlForChallengeId(dbIssue.challengeId);
-            const comment = `Contest ${contestUrl} has been updated - ${userMapping.topcoderUsername} has been unassigned.`;
+            const contestUrl = getUrlForChallengeId(dbIssue);
+            const comment = `Challenge ${contestUrl} ${userMapping.topcoderUsername} has been unassigned.`;
             await rollbackAssignee(event, assigneeUserId, issue, false, comment);
             const additionalComment = `${userMapping.topcoderUsername} has been unassigned because this ticket doesn't have the ${config.OPEN_FOR_PICKUP_ISSUE_LABEL} label.`; // eslint-disable-line max-len
             await gitHelper.createComment(event, issue.number, additionalComment);
@@ -248,10 +248,9 @@ async function handleIssueAssignment(event, issue, force = false) {
       }
 
       logger.debugWithContext(`Getting the topcoder member ID for member name: ${userMapping.topcoderUsername}`, event, issue);
-      const topcoderUserId = await topcoderApiHelper.getTopcoderMemberId(userMapping.topcoderUsername);
       // Update the challenge
       logger.debugWithContext(`Assigning user to challenge: ${userMapping.topcoderUsername}`, event, issue);
-      topcoderApiHelper.assignUserAsRegistrant(topcoderUserId, dbIssue.challengeId);
+      await topcoderApiHelper.assignUserAsRegistrant(userMapping.topcoderUsername, dbIssue.challengeUUID);
       dbIssue = await dbHelper.update(models.Issue, dbIssue.id, {
         assignee: issue.assignee,
         assignedAt: new Date(),
@@ -269,11 +268,11 @@ async function handleIssueAssignment(event, issue, force = false) {
       eventService.handleEventGracefully(event, issue, err);
       return;
     }
-    const contestUrl = getUrlForChallengeId(dbIssue.challengeId);
-    const comment = `Contest ${contestUrl} has been updated - it has been assigned to ${userMapping.topcoderUsername}.`;
+    const contestUrl = getUrlForChallengeId(dbIssue);
+    const comment = `Challenge ${contestUrl} has been assigned to ${userMapping.topcoderUsername}.`;
     await gitHelper.createComment(event, issue.number, comment);
 
-    logger.debugWithContext(`Member ${userMapping.topcoderUsername} is assigned to challenge with id ${dbIssue.challengeId}`, event, issue);
+    logger.debugWithContext(`Member ${userMapping.topcoderUsername} is assigned to challenge with id ${dbIssue.challengeUUID}`, event, issue);
   } else {
     await rollbackAssignee(event, assigneeUserId, issue);
   }
@@ -334,10 +333,13 @@ async function handleIssueUpdate(event, issue) {
     }
 
     // Update the challenge
-    await topcoderApiHelper.updateChallenge(dbIssue.challengeId, {
+    await topcoderApiHelper.updateChallenge(dbIssue.challengeUUID, {
       name: issue.title,
-      detailedRequirements: issue.body,
-      prizes: issue.prizes
+      description: issue.body,
+      prizeSets: [{
+        type: 'Challenge prizes',
+        prizes: _.map(issue.prizes, (prize) => ({type: 'money', value: prize}))
+      }]
     });
     // Save
     await dbHelper.update(models.Issue, dbIssue.id, {
@@ -353,7 +355,7 @@ async function handleIssueUpdate(event, issue) {
     return;
   }
 
-  logger.debugWithContext(`updated challenge ${dbIssue.challengeId} for for issue ${issue.number}`, event, issue);
+  logger.debugWithContext(`updated challenge ${dbIssue.challengeUUID} for for issue ${issue.number}`, event, issue);
 }
 
 
@@ -406,7 +408,7 @@ async function handleIssueClose(event, issue) { // eslint-disable-line
       }
 
       if (closeChallenge) {
-        logger.debugWithContext(`The associated challenge ${dbIssue.challengeId} is being scheduled for cancellation since no payment will be given`,
+        logger.debugWithContext(`The associated challenge ${dbIssue.challengeUUID} is being scheduled for cancellation since no payment will be given`,
           event, issue);
         // Currently, there is no working API for closing challenge.
         // The process is just ignored.
@@ -421,13 +423,13 @@ async function handleIssueClose(event, issue) { // eslint-disable-line
 
       // if issue has paid label don't process further
       if (_.includes(event.data.issue.labels, config.PAID_ISSUE_LABEL)) {
-        logger.debugWithContext(`This issue ${issue.number} is already paid with challenge ${dbIssue.challengeId}`, event, issue);
+        logger.debugWithContext(`This issue ${issue.number} is already paid with challenge ${dbIssue.challengeUUID}`, event, issue);
         return;
       }
-      logger.debugWithContext(`Getting the challenge meta-data for challenge ID : ${dbIssue.challengeId}`, event, issue);
+      logger.debugWithContext(`Getting the challenge meta-data for challenge ID : ${dbIssue.challengeUUID}`, event, issue);
 
-      const challenge = await topcoderApiHelper.getChallengeById(dbIssue.challengeId);
-      if (challenge.currentStatus === 'Completed') {
+      const challenge = await topcoderApiHelper.getChallengeById(dbIssue.challengeUUID);
+      if (challenge.status === 'Completed') {
         logger.debugWithContext('Challenge is already complete, so no point in trying to do anything further', event, issue);
         return;
       }
@@ -459,50 +461,42 @@ async function handleIssueClose(event, issue) { // eslint-disable-line
       // adding assignees as well if it is missed/failed during update
       // prize needs to be again set after adding billing account otherwise it won't let activate
       const updateBody = {
-        billingAccountId: accountId,
-        prizes: issue.prizes
+        prizeSets: [{
+          type: 'Challenge prizes',
+          prizes: _.map(issue.prizes, (prize) => ({type: 'money', value: prize}))
+        }]
       };
-      await topcoderApiHelper.updateChallenge(dbIssue.challengeId, updateBody);
+      await topcoderApiHelper.updateChallenge(dbIssue.challengeUUID, updateBody);
 
-      const copilotAlreadySet = await topcoderApiHelper.roleAlreadySet(dbIssue.challengeId, 'Copilot');
+      const copilotAlreadySet = await topcoderApiHelper.roleAlreadySet(dbIssue.challengeUUID, config.ROLE_ID_COPILOT);
 
       if (!copilotAlreadySet) {
         logger.debugWithContext(`Getting the topcoder member ID for copilot name : ${event.copilot.topcoderUsername}`, event, issue);
         // get copilot tc user id
-        const copilotTopcoderUserId = await topcoderApiHelper.getTopcoderMemberId(event.copilot.topcoderUsername);
-
-        // role id 14 for copilot
-        const copilotResourceBody = {
-          roleId: 14,
-          resourceUserId: copilotTopcoderUserId,
-          phaseId: 0,
-          addNotification: true,
-          addForumWatch: true
-        };
-        await topcoderApiHelper.addResourceToChallenge(dbIssue.challengeId, copilotResourceBody);
+        await topcoderApiHelper.addResourceToChallenge(dbIssue.challengeUUID, event.copilot.topcoderUsername, config.ROLE_ID_COPILOT);
       } else {
         logger.debugWithContext('Copilot is already set, so skipping', event, issue);
       }
 
       logger.debugWithContext(`Getting the topcoder member ID for member name: ${assigneeMember.topcoderUsername}`, event, issue);
       const winnerId = await topcoderApiHelper.getTopcoderMemberId(assigneeMember.topcoderUsername);
-      const assigneeAlreadySet = await topcoderApiHelper.roleAlreadySet(dbIssue.challengeId, 'Submitter');
+      const assigneeAlreadySet = await topcoderApiHelper.roleAlreadySet(dbIssue.challengeUUID, config.ROLE_ID_SUBMITTER);
 
       if (!assigneeAlreadySet) {
         // adding reg
         logger.debugWithContext('Adding assignee because one was not set', event, issue);
-        await topcoderApiHelper.assignUserAsRegistrant(winnerId, dbIssue.challengeId);
+        await topcoderApiHelper.assignUserAsRegistrant(assigneeMember.topcoderUsername, dbIssue.challengeUUID);
       } else {
         logger.debugWithContext('Assignee is already set, so skipping', event, issue);
       }
 
       // activate challenge
-      if (challenge.currentStatus === 'Draft') {
-        await topcoderApiHelper.activateChallenge(dbIssue.challengeId);
+      if (challenge.status === 'Draft') {
+        await topcoderApiHelper.activateChallenge(dbIssue.challengeUUID);
       }
 
       logger.debugWithContext(`Closing challenge with winner ${assigneeMember.topcoderUsername}(${winnerId})`, event, issue);
-      await topcoderApiHelper.closeChallenge(dbIssue.challengeId, winnerId);
+      await topcoderApiHelper.closeChallenge(dbIssue.challengeUUID, winnerId, assigneeMember.topcoderUsername);
       event.paymentSuccessful = true;
     }
   } catch (e) {
@@ -530,7 +524,7 @@ async function handleIssueClose(event, issue) { // eslint-disable-line
         status: 'challenge_payment_successful',
         updatedAt: new Date()
       });
-      await gitHelper.markIssueAsPaid(event, issue.number, dbIssue.challengeId, labels);
+      await gitHelper.markIssueAsPaid(event, issue.number, dbIssue.challengeUUID, labels);
     } catch (e) {
       await eventService.handleEventGracefully(event, issue, e);
       return;
@@ -585,31 +579,20 @@ async function handleIssueCreate(event, issue, forceAssign = false) {
 
     const projectId = project.tcDirectId;
 
-    let fullRepoUrl;
-    if (issue.provider === 'github') {
-      fullRepoUrl = `https://github.com/${event.data.repository.full_name}`;
-    } else if (issue.provider === 'gitlab') {
-      fullRepoUrl = `${config.GITLAB_API_BASE_URL}/${event.data.repository.full_name}`;
-    } else if (issue.provider === 'azure') {
-      fullRepoUrl = `${config.AZURE_DEVOPS_API_BASE_URL}/${event.data.repository.full_name}`;
-    }
-
     logger.debugWithContext(`existing project was found with id ${projectId} for repository ${event.data.repository.full_name}`, event, issue);
 
     // Create a new challenge
-    issue.challengeId = await topcoderApiHelper.createChallenge({
+    issue.challengeUUID = await topcoderApiHelper.createChallenge({
       name: issue.title,
       projectId,
       detailedRequirements: issue.body,
-      prizes: issue.prizes,
-      task: true,
-      submissionGuidelines: `Git issue link: ${fullRepoUrl}/issues/${issue.number}`
+      prizes: issue.prizes
     });
 
     // Save
     // update db payment
     await dbHelper.update(models.Issue, dbIssue.id, {
-      challengeId: issue.challengeId,
+      challengeUUID: issue.challengeUUID,
       status: 'challenge_creation_successful',
       updatedAt: new Date()
     });
@@ -621,8 +604,8 @@ async function handleIssueCreate(event, issue, forceAssign = false) {
     return;
   }
   try {
-    const contestUrl = getUrlForChallengeId(issue.challengeId);
-    const comment = `Contest ${contestUrl} has been created for this ticket.`;
+    const contestUrl = getUrlForChallengeId(issue);
+    const comment = `Challenge ${contestUrl} has been created for this ticket.`;
     await gitHelper.createComment(event, issue.number, comment);
 
     if (event.provider === 'gitlab' || forceAssign) {
@@ -638,7 +621,7 @@ async function handleIssueCreate(event, issue, forceAssign = false) {
   } catch (err) {
     logger.error(`Comment creation failure: ${err}`);
     delete issueCreationLock[creationLockKey];
-    logger.debugWithContext(`new challenge created with id ${issue.challengeId} for issue ${issue.number}`, event, issue);
+    logger.debugWithContext(`new challenge created with id ${issue.challengeUUID} for issue ${issue.number}`, event, issue);
   }
 }
 
@@ -715,18 +698,14 @@ async function handleIssueUnAssignment(event, issue) {
           .value();
         issue.labels = updateLabels;
         logger.debugWithContext(`Getting the topcoder member ID for member name: ${userMapping.topcoderUsername}`, event, issue);
-        const topcoderUserId = await topcoderApiHelper.getTopcoderMemberId(userMapping.topcoderUsername);
         // Update the challenge to remove the assignee
         logger.debugWithContext(`un-assigning user from challenge: ${userMapping.topcoderUsername}`, event, issue);
-        topcoderApiHelper.removeResourceToChallenge(dbIssue.challengeId, {
-          roleId: 1,
-          resourceUserId: topcoderUserId
-        });
-        const contestUrl = getUrlForChallengeId(dbIssue.challengeId);
-        const comment = `Contest ${contestUrl} has been updated - ${userMapping.topcoderUsername} has been unassigned.`;
+        await topcoderApiHelper.removeResourceToChallenge(dbIssue.challengeUUID, userMapping.topcoderUsername, config.ROLE_ID_SUBMITTER);
+        const contestUrl = getUrlForChallengeId(dbIssue);
+        const comment = `Challenge ${contestUrl} ${userMapping.topcoderUsername} has been unassigned.`;
         await gitHelper.createComment(event, issue.number, comment);
         await gitHelper.addLabels(event, issue.number, updateLabels);
-        logger.debugWithContext(`Member ${userMapping.topcoderUsername} is unassigned from challenge with id ${dbIssue.challengeId}`, event, issue);
+        logger.debugWithContext(`Member ${userMapping.topcoderUsername} is unassigned from challenge with id ${dbIssue.challengeUUID}`, event, issue);
       }
     } else {
       // Handle multiple assignees. TC-X allows only one assignee.
@@ -905,7 +884,8 @@ process.schema = Joi.object().keys({
     repository: Joi.object().keys({
       id: Joi.alternatives().try(Joi.string(), Joi.number()).required(),
       name: Joi.string().required(),
-      full_name: Joi.string().required()
+      full_name: Joi.string().required(),
+      repoUrl: Joi.string().optional()
     }).required(),
     comment: Joi.object().keys({
       id: Joi.number().required(),

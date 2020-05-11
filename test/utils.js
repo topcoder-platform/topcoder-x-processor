@@ -278,7 +278,7 @@ async function ensureChallengeCompleted(challengeId) {
     assert.exists(challenge);
     assert.equal(challenge.currentStatus, 'Completed');
 
-    const resources = await topcoderApiHelper.getChallengeResources(challengeId);
+    const resources = await topcoderApiHelper.getResourcesFromChallenge(challengeId);
     assert.isArray(resources);
     const copilot = _.filter(resources, (r) => r.role === 'Copilot'); // eslint-disable-line lodash/matches-prop-shorthand
     assert.lengthOf(copilot, 1);

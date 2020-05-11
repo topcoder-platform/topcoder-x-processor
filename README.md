@@ -54,6 +54,12 @@ The following config parameters are supported, they are defined in `config/defau
 |TOKEN_CACHE_TIME| The machine-to-machine token cache validation time |43200|
 |AUTH0_CLIENT_ID| The Auth0 ClientID for generating Machine-to-machine token ||
 |AUTH0_CLIENT_SECRET| The Auth0 Client Secret for generating Machine-to-machine token ||
+|ROLE_ID_COPILOT| The registered role id of copilot ||
+|ROLE_ID_SUBMITTER| The registered role id of submitter ||
+|TYPE_ID_FIRST2FINISH| The registered type id of first 2 finish challenge ||
+|DEFAULT_TIMELINE_TEMPLATE_ID| The default timeline template id ||
+|TC_API_URL| The topcoder backend API url |`https://api.topcoder-dev.com/v5`|
+|TC_API_URL_V3| The topcoder backend API url V3 |`https://api.topcoder-dev.com/v3`|
 
 KAFKA_OPTIONS should be object as described in https://github.com/oleksiyk/kafka#ssl
 For using with SSL, the options should be as
@@ -172,7 +178,7 @@ This is a description
 
 - You will see a new comments
 
-Contest https://www.topcoder-dev.com/challenges/30054075 has been created for this ticket.
+Challenge 17ab4b5b-fad6-405a-8abb-9f23e9fa3730 has been created for this ticket
 
 ```This is an automated message for tonyj via Topcoder X```
 
@@ -212,7 +218,7 @@ https://www.topcoder-dev.com/challenges/30054075
 - ticket added assignee
 - add comments
 
-Contest https://www.topcoder-dev.com/challenges/30054075 has been updated - it has been assigned to tonyj.<br/><br/>```This is an automated message for tonyj via Topcoder X```
+Challenge 17ab4b5b-fad6-405a-8abb-9f23e9fa3730 has been assigned to mess.<br/><br/>```This is an automated message for tonyj via Topcoder X```
 
 - Visit the challenge url to verify registered member
 
@@ -232,7 +238,7 @@ Contest https://www.topcoder-dev.com/challenges/30054075 has been updated - it h
 - Unassign member of issue
 - Wait a minute or more
 - Ticket adds comments
-Contest https://www.topcoder-dev.com/challenges/30054075 has been updated - tonyj has been unassigned.<br/><br/>```This is an automated message for tonyj via Topcoder X```
+Challenge 17ab4b5b-fad6-405a-8abb-9f23e9fa3730 mess has been unassigned.<br/><br/>```This is an automated message for tonyj via Topcoder X```
 - Ticket updated labels
 added  tcx_OpenForPickup and removed  tcx_Assigned labels
 - Visit the challenge url to verify no registered member
@@ -264,7 +270,7 @@ This ticket was not processed for payment. If you would like to process it for p
   - Close ticket
   - Ticket adds tcx_Paid label
   - Ticket adds comments
-  Payment task has been updated: https://software.topcoder-dev.com/review/actions/ViewProjectDetails?pid=30054000<br/><br/>```This is an automated message for tonyj via Topcoder X```
+  Challenge 17ab4b5b-fad6-405a-8abb-9f23e9fa3730 has been paid and closed<br/><br/>```This is an automated message for tonyj via Topcoder X```
   - Ticket closed comment
   - Wait a long time (Challenge status will change to Active and then change to Completed for long time later)
   - Visit  the challenge on TC Direct to verify challenge status is Active and change to Completed after 17 minute or more

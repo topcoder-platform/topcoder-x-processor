@@ -40,34 +40,19 @@ module.exports = {
   },
   TC_AUTHZ_URL: process.env.TC_AUTHZ_URL || 'https://api.topcoder-dev.com/v3/authorizations',
   NEW_CHALLENGE_TEMPLATE: process.env.NEW_CHALLENGE_TEMPLATE || {
-    milestoneId: 1,
-    subTrack: 'FIRST_2_FINISH',
-    reviewType: 'COMMUNITY',
-    technologies: [],
-    platforms: [],
-    finalDeliverableTypes: [],
-    confidentialityType: 'PUBLIC',
-    submissionGuidelines: 'Upload the updated code to TopCoder',
-
-    // From here, the properties will be set by the processor.
-    // Just leave them here for readability
-    name: null,
-    projectId: null,
-    registrationStartDate: null,
-    registrationStartsAt: null,
-
-    // NOTE: if subTrack is FIRST_2_FINISH,
-    // the ***EndsAt will be set automatically by TC APIs
-    registrationEndsAt: null,
-    submissionEndsAt: null,
-    detailedRequirements: null,
-    prizes: null
+    legacy:{
+      reviewType: 'community',
+      track: 'DEVELOP'
+    },
+    status: 'Draft'
   },
 
   // NOTE: if subTrack is FIRST_2_FINISH,
   // this config has no effect since the ***EndsAt will be set automatically by TC APIs
   NEW_CHALLENGE_DURATION_IN_DAYS: process.env.NEW_CHALLENGE_DURATION_IN_DAYS || 5,
   TC_URL: process.env.TC_URL || 'https://www.topcoder-dev.com',
+  TC_API_URL: process.env.TC_API_URL || 'https://api.topcoder-dev.com/v5',
+  TC_API_URL_V3: process.env.TC_API_URL || 'https://api.topcoder-dev.com/v3',
   GITLAB_API_BASE_URL: process.env.GITLAB_API_BASE_URL || 'https://gitlab.com',
   AZURE_API_BASE_URL: process.env.AZURE_API_BASE_URL || 'https://app.vssps.visualstudio.com',
   AZURE_DEVOPS_API_BASE_URL: process.env.AZURE_DEVOPS_API_BASE_URL || 'https://dev.azure.com',
@@ -106,4 +91,8 @@ module.exports = {
   WEBSITE: process.env.WEBSITE || 'http://topcoderx.topcoder-dev.com',
   WEBSITE_SECURE: process.env.WEBSITE_SECURE || 'https://topcoderx.topcoder-dev.com',
 
+  ROLE_ID_COPILOT: process.env.ROLE_ID_COPILOT || 'cfe12b3f-2a24-4639-9d8b-ec86726f76bd',
+  ROLE_ID_SUBMITTER: process.env.ROLE_ID_SUBMITTER || '732339e7-8e30-49d7-9198-cccf9451e221',
+  TYPE_ID_FIRST2FINISH: process.env.TYPE_ID_FIRST2FINISH || '6950164f-3c5e-4bdc-abc8-22aaf5a1bd49',
+  DEFAULT_TIMELINE_TEMPLATE_ID: process.env.DEFAULT_TIMELINE_TEMPLATE_ID || '7ebf1c69-f62f-4d3a-bdfb-fe9ddb56861c'
 };
