@@ -41,7 +41,8 @@ const schema = new Schema({
   updatedAt: {
     type: Date,
     default: Date.now
-  }
+  },
+  createCopilotPayments: {type: String, required: false}
 });
 
 module.exports = schema;

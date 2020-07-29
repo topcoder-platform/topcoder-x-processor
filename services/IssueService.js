@@ -466,7 +466,7 @@ async function handleIssueClose(event, issue) { // eslint-disable-line
 
       const copilotAlreadySet = await topcoderApiHelper.roleAlreadySet(dbIssue.challengeId, 'Copilot');
 
-      if (!copilotAlreadySet) {
+      if (!copilotAlreadySet && project.createCopilotPayments === 'true') {
         logger.debugWithContext(`Getting the topcoder member ID for copilot name : ${event.copilot.topcoderUsername}`, event, issue);
         // get copilot tc user id
         const copilotTopcoderUserId = await topcoderApiHelper.getTopcoderMemberId(event.copilot.topcoderUsername);
@@ -481,7 +481,7 @@ async function handleIssueClose(event, issue) { // eslint-disable-line
         };
         await topcoderApiHelper.addResourceToChallenge(dbIssue.challengeId, copilotResourceBody);
       } else {
-        logger.debugWithContext('Copilot is already set, so skipping', event, issue);
+        logger.debugWithContext('Copilot is already set or the project create copilot payments option is disabled, so skipping', event, issue);
       }
 
       logger.debugWithContext(`Getting the topcoder member ID for member name: ${assigneeMember.topcoderUsername}`, event, issue);
@@ -905,7 +905,8 @@ process.schema = Joi.object().keys({
     repository: Joi.object().keys({
       id: Joi.alternatives().try(Joi.string(), Joi.number()).required(),
       name: Joi.string().required(),
-      full_name: Joi.string().required()
+      full_name: Joi.string().required(),
+      repoUrl: Joi.string().optional()
     }).required(),
     comment: Joi.object().keys({
       id: Joi.number().required(),
