@@ -199,15 +199,26 @@ getUserIdByLogin.schema = {
  * @param {Number} issueId the issue number
  * @param {Number} challengeId the challenge id
  * @param {Array} existLabels the issue labels
+ * @param {String} winner the winner topcoder handle
+ * @param {Boolean} createCopilotPayments the option to create copilot payments or not
  */
-async function markIssueAsPaid(copilot, projectId, issueId, challengeId, existLabels) {
+async function markIssueAsPaid(copilot, projectId, issueId, challengeId, existLabels, winner, createCopilotPayments) { // eslint-disable-line max-params
   Joi.attempt({copilot, projectId, issueId, challengeId}, markIssueAsPaid.schema);
   const gitlab = await _authenticate(copilot.accessToken);
   const labels = _(existLabels).filter((i) => i !== config.FIX_ACCEPTED_ISSUE_LABEL)
     .push(config.FIX_ACCEPTED_ISSUE_LABEL, config.PAID_ISSUE_LABEL).value();
   try {
     await gitlab.projects.issues.edit(projectId, issueId, {labels: labels.join(',')});
-    const body = helper.prepareAutomatedComment(`Payment task has been updated: ${config.TC_OR_DETAIL_LINK}${challengeId}`, copilot);
+    let commentMessage = '```\n';
+    commentMessage += '*Payments Complete*\n';
+    commentMessage += `Winner: ${winner}\n`;
+    if (createCopilotPayments) {
+      commentMessage += `Copilot: ${copilot.topcoderUsername}\n`;
+    }
+    commentMessage += '```\n';
+    commentMessage += `Payment task has been updated: ${config.TC_OR_DETAIL_LINK}${challengeId}`;
+
+    const body = helper.prepareAutomatedComment(commentMessage, copilot);
     await gitlab.projects.issues.notes.create(projectId, issueId, {body});
   } catch (err) {
     throw errors.convertGitLabError(err, 'Error occurred during updating issue as paid.');

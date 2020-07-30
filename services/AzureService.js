@@ -183,8 +183,10 @@ getUsernameById.schema = {
  * @param {Number} issueId the issue number
  * @param {Number} challengeId the challenge id
  * @param {Array} existLabels the issue labels
+ * @param {String} winner the winner topcoder handle
+ * @param {Boolean} createCopilotPayments the option to create copilot payments or not
  */
-async function markIssueAsPaid(copilot, repoFullName, issueId, challengeId, existLabels) {
+async function markIssueAsPaid(copilot, repoFullName, issueId, challengeId, existLabels, winner, createCopilotPayments) { // eslint-disable-line max-params
   Joi.attempt({copilot, repoFullName, issueId, challengeId}, markIssueAsPaid.schema);
   const labels = _(existLabels).filter((i) => i !== config.FIX_ACCEPTED_ISSUE_LABEL)
     .push(config.FIX_ACCEPTED_ISSUE_LABEL, config.PAID_ISSUE_LABEL).value();
@@ -199,7 +201,16 @@ async function markIssueAsPaid(copilot, repoFullName, issueId, challengeId, exis
       .set('Authorization', `Bearer ${copilot.accessToken}`)
       .set('Content-Type', 'application/json-patch+json')
       .end();
-    const body = helper.prepareAutomatedComment(`Payment task has been updated: ${config.TC_OR_DETAIL_LINK}${challengeId}`, copilot);
+
+    let commentMessage = '```\n';
+    commentMessage += '*Payments Complete*\n';
+    commentMessage += `Winner: ${winner}\n`;
+    if (createCopilotPayments) {
+      commentMessage += `Copilot: ${copilot.topcoderUsername}\n`;
+    }
+    commentMessage += '```\n';
+    commentMessage += `Payment task has been updated: ${config.TC_OR_DETAIL_LINK}${challengeId}`;
+    const body = helper.prepareAutomatedComment(commentMessage, copilot);
     await request
       .post(`${config.AZURE_DEVOPS_API_BASE_URL}/${repoFullName}/_apis/wit/workItems/${issueId}/comments?api-version=5.1-preview.3`)
       .send({

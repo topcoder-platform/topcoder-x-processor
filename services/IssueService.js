@@ -465,8 +465,11 @@ async function handleIssueClose(event, issue) { // eslint-disable-line
       await topcoderApiHelper.updateChallenge(dbIssue.challengeId, updateBody);
 
       const copilotAlreadySet = await topcoderApiHelper.roleAlreadySet(dbIssue.challengeId, 'Copilot');
+      const createCopilotPayments = project.createCopilotPayments === 'true' &&
+          event.copilot.topcoderUsername.toLowerCase() !== assigneeMember.topcoderUsername.toLowerCase();
+      event.createCopilotPayments = createCopilotPayments;
 
-      if (!copilotAlreadySet && project.createCopilotPayments === 'true') {
+      if (!copilotAlreadySet && createCopilotPayments) {
         logger.debugWithContext(`Getting the topcoder member ID for copilot name : ${event.copilot.topcoderUsername}`, event, issue);
         // get copilot tc user id
         const copilotTopcoderUserId = await topcoderApiHelper.getTopcoderMemberId(event.copilot.topcoderUsername);
@@ -530,7 +533,13 @@ async function handleIssueClose(event, issue) { // eslint-disable-line
         status: 'challenge_payment_successful',
         updatedAt: new Date()
       });
-      await gitHelper.markIssueAsPaid(event, issue.number, dbIssue.challengeId, labels);
+      await gitHelper.markIssueAsPaid(
+        event,
+        issue.number,
+        dbIssue.challengeId,
+        labels,
+        event.assigneeMember.topcoderUsername,
+        event.createCopilotPayments);
     } catch (e) {
       await eventService.handleEventGracefully(event, issue, e);
       return;
@@ -922,6 +931,7 @@ process.schema = Joi.object().keys({
   }).required(),
   retryCount: Joi.number().integer().default(0).optional(),
   paymentSuccessful: Joi.boolean().default(false).optional(),
+  createCopilotPayments: Joi.boolean().default(false).optional(),
   challengeValid: Joi.boolean().default(false).optional(),
   dbIssue: Joi.object().optional(),
   assigneeMember: Joi.object().optional()
