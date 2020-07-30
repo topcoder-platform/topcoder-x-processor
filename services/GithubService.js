@@ -236,17 +236,28 @@ getUserIdByLogin.schema = {
  * @param {Number} number the issue number
  * @param {Number} challengeId the challenge id
  * @param {Array} existLabels the issue labels
+ * @param {String} winner the winner topcoder handle
+ * @param {Boolean} createCopilotPayments the option to create copilot payments or not
  *
  */
-async function markIssueAsPaid(copilot, repoFullName, number, challengeId, existLabels) {
-  Joi.attempt({copilot, repoFullName, number, challengeId, existLabels}, markIssueAsPaid.schema);
+async function markIssueAsPaid(copilot, repoFullName, number, challengeId, existLabels, winner, createCopilotPayments) { // eslint-disable-line max-params
+  Joi.attempt({copilot, repoFullName, number, challengeId, existLabels, winner, createCopilotPayments}, markIssueAsPaid.schema);
   const github = await _authenticate(copilot.accessToken);
   const {owner, repo} = _parseRepoUrl(repoFullName);
   const labels = _(existLabels).filter((i) => i !== config.FIX_ACCEPTED_ISSUE_LABEL)
       .push(config.FIX_ACCEPTED_ISSUE_LABEL, config.PAID_ISSUE_LABEL).value();
   try {
     await github.issues.edit({owner, repo, number, labels});
-    const body = helper.prepareAutomatedComment(`Payment task has been updated: ${config.TC_OR_DETAIL_LINK}${challengeId}`, copilot);
+    let commentMessage = '```\n';
+    commentMessage += '*Payments Complete*\n';
+    commentMessage += `Winner: ${winner}\n`;
+    if (createCopilotPayments) {
+      commentMessage += `Copilot: ${copilot.topcoderUsername}\n`;
+    }
+    commentMessage += '```\n';
+    commentMessage += `Payment task has been updated: ${config.TC_OR_DETAIL_LINK}${challengeId}`;
+
+    const body = helper.prepareAutomatedComment(commentMessage, copilot);
     await github.issues.createComment({owner, repo, number, body});
   } catch (err) {
     throw errors.convertGitHubError(err, 'Error occurred during updating issue as paid.');
@@ -259,7 +270,9 @@ markIssueAsPaid.schema = {
   repoFullName: Joi.string().required(),
   number: Joi.number().required(),
   challengeId: Joi.number().positive().required(),
-  existLabels: Joi.array().items(Joi.string()).required()
+  existLabels: Joi.array().items(Joi.string()).required(),
+  winner: Joi.string().required(),
+  createCopilotPayments: Joi.boolean().default(false).optional()
 };
 
 /**

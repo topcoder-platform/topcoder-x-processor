@@ -137,14 +137,37 @@ class GitHelper {
    * @param {Number} issueNumber the issue Number
    * @param {Number} challengeId the challenge id
    * @param {Array} existLabels the exist labels of the issue
+   * @param {String} winner the winner topcoder handle
+   * @param {Boolean} createCopilotPayments the option to create copilot payments or not
    */
-  async markIssueAsPaid(event, issueNumber, challengeId, existLabels) {
+  async markIssueAsPaid(event, issueNumber, challengeId, existLabels, winner, createCopilotPayments = false) { // eslint-disable-line max-params
     if (event.provider === 'github') {
-      await gitHubService.markIssueAsPaid(event.copilot, event.data.repository.full_name, issueNumber, challengeId, existLabels);
+      await gitHubService.markIssueAsPaid(
+        event.copilot,
+        event.data.repository.full_name,
+        issueNumber,
+        challengeId,
+        existLabels,
+        winner,
+        createCopilotPayments);
     } else if (event.provider === 'gitlab') {
-      await gitlabService.markIssueAsPaid(event.copilot, event.data.repository.id, issueNumber, challengeId, existLabels);
+      await gitlabService.markIssueAsPaid(
+        event.copilot,
+        event.data.repository.id,
+        issueNumber,
+        challengeId,
+        existLabels,
+        winner,
+        createCopilotPayments);
     } else if (event.provider === 'azure') {
-      await azureService.markIssueAsPaid(event.copilot, event.data.repository.full_name, issueNumber, challengeId, existLabels);
+      await azureService.markIssueAsPaid(
+        event.copilot,
+        event.data.repository.full_name,
+        issueNumber,
+        challengeId,
+        existLabels,
+        winner,
+        createCopilotPayments);
     }
   }
 
