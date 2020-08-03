@@ -217,7 +217,7 @@ async function markIssueAsPaid(copilot, projectId, issueId, challengeId, existLa
     if (createCopilotPayments) {
       commentMessage += `Copilot: ${copilot.topcoderUsername}\n`;
     }
-    
+
     const body = helper.prepareAutomatedComment(commentMessage, copilot);
     await gitlab.projects.issues.notes.create(projectId, issueId, {body});
   } catch (err) {

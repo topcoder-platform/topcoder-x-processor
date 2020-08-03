@@ -599,8 +599,6 @@ async function handleIssueCreate(event, issue, forceAssign = false) {
       fullRepoUrl = `https://github.com/${event.data.repository.full_name}`;
     } else if (issue.provider === 'gitlab') {
       fullRepoUrl = `${config.GITLAB_API_BASE_URL}/${event.data.repository.full_name}`;
-    } else if (issue.provider === 'azure') {
-      fullRepoUrl = `${config.AZURE_DEVOPS_API_BASE_URL}/${event.data.repository.full_name}`;
     }
 
     logger.debugWithContext(`existing project was found with id ${projectId} for repository ${event.data.repository.full_name}`, event, issue);
@@ -695,8 +693,7 @@ async function handleIssueUnAssignment(event, issue) {
     }
 
     if (dbIssue.assignee) {
-      const assigneeUserId = event.provider === 'azure' ? dbIssue.assignee :
-        await gitHelper.getUserIdByLogin(event, dbIssue.assignee);
+      const assigneeUserId = await gitHelper.getUserIdByLogin(event, dbIssue.assignee);
       if (!assigneeUserId) {
         // The assignement of this user was failed and broken.
         // We don't need to handle the unassignment.
@@ -864,7 +861,7 @@ async function process(event) {
   const copilot = await userService.getRepositoryCopilotOrOwner(event.provider, event.data.repository.full_name);
   event.copilot = copilot;
 
-  // Some provider (azure) has non numeric repo id. we need to convert it to number by hashing it.
+  // Some provider has non numeric repo id. we need to convert it to number by hashing it.
   if (_.isString(issue.repositoryId)) {
     issue.repositoryIdStr = issue.repositoryId;
     issue.repositoryId = helper.hashCode(issue.repositoryId);
@@ -897,7 +894,7 @@ async function process(event) {
 process.schema = Joi.object().keys({
   event: Joi.string().valid('issue.created', 'issue.updated', 'issue.closed', 'comment.created', 'comment.updated', 'issue.assigned',
     'issue.labelUpdated', 'issue.unassigned', 'issue.recreated').required(),
-  provider: Joi.string().valid('github', 'gitlab', 'azure').required(),
+  provider: Joi.string().valid('github', 'gitlab').required(),
   data: Joi.object().keys({
     issue: Joi.object().keys({
       number: Joi.number().required(),

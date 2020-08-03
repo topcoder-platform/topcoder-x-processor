@@ -255,7 +255,7 @@ async function markIssueAsPaid(copilot, repoFullName, number, challengeId, exist
     if (createCopilotPayments) {
       commentMessage += `Copilot: ${copilot.topcoderUsername}\n`;
     }
-    
+
     const body = helper.prepareAutomatedComment(commentMessage, copilot);
     await github.issues.createComment({owner, repo, number, body});
   } catch (err) {

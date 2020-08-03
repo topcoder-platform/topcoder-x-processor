@@ -67,26 +67,6 @@ errors.convertGitLabError = function convertGitLabError(err, message) {
 };
 
 /**
- * Convert azure api error.
- * @param {Error} err the azure api error
- * @param {String} message the error message
- * @returns {Error} converted error
- */
-errors.convertAzureError = function convertAzureError(err, message) {
-  let resMsg = `${message}. ${err.message}.`;
-  const detail = _.get(err, 'response.body.message');
-  if (detail) {
-    resMsg += ` Detail: ${detail}`;
-  }
-  const apiError = new ProcessorError(
-        err.status || _.get(err, 'response.status', constants.SERVICE_ERROR_STATUS),
-        resMsg,
-        'azure'
-    );
-  return apiError;
-};
-
-/**
  * Convert topcoder api error.
  * @param {Error} err the topcoder api error
  * @param {String} message the error message
