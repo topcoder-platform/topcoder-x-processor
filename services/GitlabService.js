@@ -211,11 +211,11 @@ async function markIssueAsPaid(copilot, projectId, issueId, challengeId, existLa
     await gitlab.projects.issues.edit(projectId, issueId, {labels: labels.join(',')});
     let commentMessage = '';
 
-    commentMessage += `Payment task has been updated: ${config.TC_OR_DETAIL_LINK}${challengeId}\n`;
-    commentMessage += '*Payments Complete*\n';
-    commentMessage += `Winner: ${winner}\n`;
+    commentMessage += `Payment task has been updated: ${config.TC_OR_DETAIL_LINK}${challengeId}\n\n`;
+    commentMessage += '*Payments Complete*\n\n';
+    commentMessage += `Winner: ${winner}\n\n`;
     if (createCopilotPayments) {
-      commentMessage += `Copilot: ${copilot.topcoderUsername}\n`;
+      commentMessage += `Copilot: ${copilot.topcoderUsername}`;
     }
 
     const body = helper.prepareAutomatedComment(commentMessage, copilot);
