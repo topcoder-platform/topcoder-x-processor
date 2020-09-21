@@ -197,13 +197,13 @@ getUserIdByLogin.schema = {
  * @param {Object} copilot the copilot
  * @param {Number} projectId the project id
  * @param {Number} issueId the issue number
- * @param {Number} challengeId the challenge id
+ * @param {String} challengeUUID the challenge uuid
  * @param {Array} existLabels the issue labels
  * @param {String} winner the winner topcoder handle
  * @param {Boolean} createCopilotPayments the option to create copilot payments or not
  */
-async function markIssueAsPaid(copilot, projectId, issueId, challengeId, existLabels, winner, createCopilotPayments) { // eslint-disable-line max-params
-  Joi.attempt({copilot, projectId, issueId, challengeId}, markIssueAsPaid.schema);
+async function markIssueAsPaid(copilot, projectId, issueId, challengeUUID, existLabels, winner, createCopilotPayments) { // eslint-disable-line max-params
+  Joi.attempt({copilot, projectId, issueId, challengeUUID, existLabels, winner, createCopilotPayments}, markIssueAsPaid.schema);
   const gitlab = await _authenticate(copilot.accessToken);
   const labels = _(existLabels).filter((i) => i !== config.FIX_ACCEPTED_ISSUE_LABEL)
     .push(config.FIX_ACCEPTED_ISSUE_LABEL, config.PAID_ISSUE_LABEL).value();
@@ -211,12 +211,13 @@ async function markIssueAsPaid(copilot, projectId, issueId, challengeId, existLa
     await gitlab.projects.issues.edit(projectId, issueId, {labels: labels.join(',')});
     let commentMessage = '';
 
-    commentMessage += `Payment task has been updated: ${config.TC_OR_DETAIL_LINK}${challengeId}\n\n`;
+    commentMessage += `Payment task has been updated: ${config.TC_URL}/challenges/${challengeUUID}\n\n`;
     commentMessage += '*Payments Complete*\n\n';
     commentMessage += `Winner: ${winner}\n\n`;
     if (createCopilotPayments) {
-      commentMessage += `Copilot: ${copilot.topcoderUsername}`;
+      commentMessage += `Copilot: ${copilot.topcoderUsername}\n\n`;
     }
+    commentMessage += `Challenge \`${challengeUUID}\` has been paid and closed.`;
 
     const body = helper.prepareAutomatedComment(commentMessage, copilot);
     await gitlab.projects.issues.notes.create(projectId, issueId, {body});
@@ -230,7 +231,10 @@ markIssueAsPaid.schema = {
   copilot: copilotUserSchema,
   projectId: Joi.number().positive().required(),
   issueId: Joi.number().positive().required(),
-  challengeId: Joi.number().positive().required()
+  challengeUUID: Joi.string().required(),
+  existLabels: Joi.array().items(Joi.string()).required(),
+  winner: Joi.string().required(),
+  createCopilotPayments: Joi.boolean().default(false).optional()
 };
 
 /**

@@ -14,6 +14,7 @@
 const config = require('config');
 const gitHubService = require('../services/GithubService');
 const gitlabService = require('../services/GitlabService');
+const azureService = require('../services/AzureService');
 
 class GitHelper {
   /**
@@ -120,30 +121,20 @@ class GitHelper {
    * updates the github/gitlab issue as paid and fix accepted
    * @param {Object} event the event
    * @param {Number} issueNumber the issue Number
-   * @param {Number} challengeId the challenge id
+   * @param {String} challengeUUID the challenge id
    * @param {Array} existLabels the exist labels of the issue
    * @param {String} winner the winner topcoder handle
    * @param {Boolean} createCopilotPayments the option to create copilot payments or not
    */
-  async markIssueAsPaid(event, issueNumber, challengeId, existLabels, winner, createCopilotPayments = false) { // eslint-disable-line max-params
+  async markIssueAsPaid(event, issueNumber, challengeUUID, existLabels, winner, createCopilotPayments = false) {
     if (event.provider === 'github') {
-      await gitHubService.markIssueAsPaid(
-        event.copilot,
-        event.data.repository.full_name,
-        issueNumber,
-        challengeId,
-        existLabels,
-        winner,
+      await gitHubService.markIssueAsPaid(event.copilot, event.data.repository.full_name, issueNumber, challengeUUID, existLabels, winner,
         createCopilotPayments);
     } else if (event.provider === 'gitlab') {
-      await gitlabService.markIssueAsPaid(
-        event.copilot,
-        event.data.repository.id,
-        issueNumber,
-        challengeId,
-        existLabels,
-        winner,
+      await gitlabService.markIssueAsPaid(event.copilot, event.data.repository.id, issueNumber, challengeUUID, existLabels, winner,
         createCopilotPayments);
+    } else if (event.provider === 'azure') {
+      await azureService.markIssueAsPaid(event.copilot, event.data.repository.full_name, issueNumber, challengeUUID, existLabels);
     }
   }
 
