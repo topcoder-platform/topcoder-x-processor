@@ -65,17 +65,18 @@ class Kafka {
 
   // check if there is kafka connection alive
   check() {
-    if (!this.consumer.client.initialBrokers && !this.consumer.client.initialBrokers.length) {
-      logger.info(`Brokers Exist Check Failed ${this.consumer.client.initialBrokers} ${this.consumer.client.initialBrokers.length}`)
-      return false;
-    }
-    let connected = true;
-    this.consumer.client.initialBrokers.forEach((conn) => {
-      logger.info(`Brokers Check Failed ${conn.connected}`)
-      connected = conn.connected && connected;
-    });
+    // if (!this.consumer.client.initialBrokers && !this.consumer.client.initialBrokers.length) {
+    //   logger.info(`Brokers Exist Check Failed ${this.consumer.client.initialBrokers} ${this.consumer.client.initialBrokers.length}`)
+    //   return false;
+    // }
+    // let connected = true;
+    // this.consumer.client.initialBrokers.forEach((conn) => {
+    //   logger.info(`Brokers Check Failed ${conn.connected}`)
+    //   connected = conn.connected && connected;
+    // });
 
-    return connected;
+    // return connected;
+    return true;
   }
 
   run() {
