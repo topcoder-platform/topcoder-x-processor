@@ -71,7 +71,7 @@ class Kafka {
     }
     let connected = true;
     this.consumer.client.initialBrokers.forEach((conn) => {
-      logger.info(`Brokers Check Failed ${JSON.stringify(conn)}`)
+      logger.info(`Brokers Check Failed ${conn.connected}`)
       connected = conn.connected && connected;
     });
 
