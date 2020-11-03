@@ -86,7 +86,7 @@ async function _removeAssignees(github, owner, repo, number, assignees) {
  * @returns {string} username if found
  */
 async function _getUsernameById(github, id) {
-  const user = await github.users.getById({ id });
+  const user = await github.users.getById({id});
   return user ? user.data.login : null;
 }
 
@@ -98,11 +98,11 @@ async function _getUsernameById(github, id) {
  * @param {string} title new title
  */
 async function updateIssue(copilot, repoFullName, number, title) {
-  Joi.attempt({ copilot, repoFullName, number, title }, updateIssue.schema);
+  Joi.attempt({copilot, repoFullName, number, title}, updateIssue.schema);
   const github = await _authenticate(copilot.accessToken);
-  const { owner, repo } = _parseRepoUrl(repoFullName);
+  const {owner, repo} = _parseRepoUrl(repoFullName);
   try {
-    await github.issues.edit({ owner, repo, number, title });
+    await github.issues.edit({owner, repo, number, title});
   } catch (err) {
     throw errors.convertGitHubError(err, 'Error occurred during updating issue.');
   }
@@ -124,17 +124,17 @@ updateIssue.schema = {
  * @param {string} user the user login of assignee
  */
 async function assignUser(copilot, repoFullName, number, user) {
-  Joi.attempt({ copilot, repoFullName, number, user }, assignUser.schema);
+  Joi.attempt({copilot, repoFullName, number, user}, assignUser.schema);
   const github = await _authenticate(copilot.accessToken);
-  const { owner, repo } = _parseRepoUrl(repoFullName);
+  const {owner, repo} = _parseRepoUrl(repoFullName);
   try {
-    const issue = await github.issues.get({ owner, repo, number });
+    const issue = await github.issues.get({owner, repo, number});
 
     const oldAssignees = _(issue.data.assignees).map('login').without(user).value();
     if (oldAssignees && oldAssignees.length > 0) {
       await _removeAssignees(github, owner, repo, number, oldAssignees);
     }
-    await github.issues.addAssigneesToIssue({ owner, repo, number, assignees: [user] });
+    await github.issues.addAssigneesToIssue({owner, repo, number, assignees: [user]});
   } catch (err) {
     throw errors.convertGitHubError(err, 'Error occurred during assigning issue user.');
   }
@@ -156,10 +156,10 @@ assignUser.schema = {
  * @param {string} user the user login of assignee
  */
 async function removeAssign(copilot, repoFullName, number, user) {
-  Joi.attempt({ copilot, repoFullName, number, user }, removeAssign.schema);
+  Joi.attempt({copilot, repoFullName, number, user}, removeAssign.schema);
 
   const github = await _authenticate(copilot.accessToken);
-  const { owner, repo } = _parseRepoUrl(repoFullName);
+  const {owner, repo} = _parseRepoUrl(repoFullName);
   await _removeAssignees(github, owner, repo, number, [user]);
   logger.debug(`Github user ${user} is unassigned from issue number ${number}`);
 }
@@ -174,12 +174,12 @@ removeAssign.schema = assignUser.schema;
  * @param {string} body the comment body text
  */
 async function createComment(copilot, repoFullName, number, body) {
-  Joi.attempt({ copilot, repoFullName, number, body }, createComment.schema);
+  Joi.attempt({copilot, repoFullName, number, body}, createComment.schema);
   const github = await _authenticate(copilot.accessToken);
-  const { owner, repo } = _parseRepoUrl(repoFullName);
+  const {owner, repo} = _parseRepoUrl(repoFullName);
   try {
     body = helper.prepareAutomatedComment(body, copilot);
-    await github.issues.createComment({ owner, repo, number, body });
+    await github.issues.createComment({owner, repo, number, body});
   } catch (err) {
     throw errors.convertGitHubError(err, 'Error occurred during creating comment on issue.');
   }
@@ -200,7 +200,7 @@ createComment.schema = {
  * @returns {string} the username if found else null
  */
 async function getUsernameById(copilot, userId) {
-  Joi.attempt({ copilot, userId }, getUsernameById.schema);
+  Joi.attempt({copilot, userId}, getUsernameById.schema);
   const github = await _authenticate(copilot.accessToken);
   const login = await _getUsernameById(github, userId);
   return login;
@@ -218,9 +218,9 @@ getUsernameById.schema = {
  * @returns {Number} the user id if found else null
  */
 async function getUserIdByLogin(copilot, login) {
-  Joi.attempt({ copilot, login }, getUserIdByLogin.schema);
+  Joi.attempt({copilot, login}, getUserIdByLogin.schema);
   const github = await _authenticate(copilot.accessToken);
-  const user = await github.users.getForUser({ username: login });
+  const user = await github.users.getForUser({username: login});
   return user.data ? user.data.id : null;
 }
 
@@ -243,11 +243,11 @@ getUserIdByLogin.schema = {
 async function markIssueAsPaid(copilot, repoFullName, number, challengeUUID, existLabels, winner, createCopilotPayments) { // eslint-disable-line max-params
   Joi.attempt({copilot, repoFullName, number, challengeUUID, existLabels, winner, createCopilotPayments}, markIssueAsPaid.schema);
   const github = await _authenticate(copilot.accessToken);
-  const { owner, repo } = _parseRepoUrl(repoFullName);
+  const {owner, repo} = _parseRepoUrl(repoFullName);
   const labels = _(existLabels).filter((i) => i !== config.FIX_ACCEPTED_ISSUE_LABEL)
     .push(config.FIX_ACCEPTED_ISSUE_LABEL, config.PAID_ISSUE_LABEL).value();
   try {
-    await github.issues.edit({ owner, repo, number, labels });
+    await github.issues.edit({owner, repo, number, labels});
     let commentMessage = '';
     commentMessage += `Payment task has been updated: ${config.TC_URL}/challenges/${challengeUUID}\n`;
     commentMessage += '*Payments Complete*\n';
@@ -283,11 +283,11 @@ markIssueAsPaid.schema = {
  * @param {string} state new state
  */
 async function changeState(copilot, repoFullName, number, state) {
-  Joi.attempt({ copilot, repoFullName, number, state }, changeState.schema);
+  Joi.attempt({copilot, repoFullName, number, state}, changeState.schema);
   const github = await _authenticate(copilot.accessToken);
-  const { owner, repo } = _parseRepoUrl(repoFullName);
+  const {owner, repo} = _parseRepoUrl(repoFullName);
   try {
-    await github.issues.edit({ owner, repo, number, state });
+    await github.issues.edit({owner, repo, number, state});
   } catch (err) {
     throw errors.convertGitHubError(err, 'Error occurred during updating status of issue.');
   }
@@ -309,11 +309,11 @@ changeState.schema = {
  * @param {Number} labels the challenge id
  */
 async function addLabels(copilot, repoFullName, number, labels) {
-  Joi.attempt({ copilot, repoFullName, number, labels }, addLabels.schema);
+  Joi.attempt({copilot, repoFullName, number, labels}, addLabels.schema);
   const github = await _authenticate(copilot.accessToken);
-  const { owner, repo } = _parseRepoUrl(repoFullName);
+  const {owner, repo} = _parseRepoUrl(repoFullName);
   try {
-    await github.issues.edit({ owner, repo, number, labels });
+    await github.issues.edit({owner, repo, number, labels});
   } catch (err) {
     throw errors.convertGitHubError(err, 'Error occurred during adding label in issue.');
   }

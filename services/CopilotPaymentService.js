@@ -63,14 +63,14 @@ function updateChallengeDetails(payments) {
  */
 async function getExistingChallengeIdIfExists(event, dbPayment) {
   // check if there is existing active challenge associated with this project
-  let existingPayments = await dbHelper.scan(models.CopilotPayment, {
+  const existingPayments = await dbHelper.scan(models.CopilotPayment, {
     project: {eq: dbPayment.project},
     username: {eq: event.project.copilot},
     closed: {eq: 'false'}
   });
 
-  const payment = _.find(existingPayments, x => x.challengeUUID);
-  
+  const payment = _.find(existingPayments, (x) => x.challengeUUID);
+
   // if no existing challenge found then it will be created by processor
   if (payment) {
     // update db payment
@@ -286,7 +286,7 @@ async function handlePaymentUpdates(event) {
       },
       ExpressionAttributeValues: filterValues
     });
-   
+
     if (dbPayments) {
       const challengeIds = _(dbPayments).map('challengeUUID').uniq().filter(_.isString)
         .value();
