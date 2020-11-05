@@ -77,13 +77,18 @@ async function ensureChallengeExists(event, issue, create = true) {
   logger.debugWithContext(`DB Issue number: ${issue.number}`, event, issue);
   logger.debugWithContext(`DB Issue provider: ${issue.provider}`, event, issue);
   logger.debugWithContext(`DB Issue repository: ${issue.repositoryId}`, event, issue);
-  if (dbIssue && dbIssue.status === 'challenge_creation_pending') {
+
+  if (dbIssue && dbIssue.status === constants.ISSUE_STATUS.CHALLENGE_CREATION_PENDING) {
     logger.debugWithContext('dbIssue is PENDING', event, issue);
     throw errors.internalDependencyError(`Challenge for the updated issue ${issue.number} is creating, rescheduling this event`);
   }
-  if (dbIssue && dbIssue.status === 'challenge_creation_failed') {
+  const hasOpenForPickupLabel = _(issue.labels).includes(config.OPEN_FOR_PICKUP_ISSUE_LABEL);
+  if (dbIssue && dbIssue.status === constants.ISSUE_STATUS.CHALLENGE_CREATION_FAILED && hasOpenForPickupLabel) {
     // remove issue from db
     await dbHelper.removeIssue(models.Issue, issue.repositoryId, issue.number, issue.provider);
+    dbIssue = null;
+  }
+  if (dbIssue && dbIssue.status === constants.ISSUE_STATUS.CHALLENGE_CANCELLED) {
     dbIssue = null;
   }
 
@@ -92,7 +97,7 @@ async function ensureChallengeExists(event, issue, create = true) {
 
     await handleIssueCreate(event, issue, true);
     dbIssue = await dbHelper.queryOneIssue(models.Issue, issue.repositoryId, issue.number, issue.provider);
-    logger.debugWithContext(`dbIssue is CREATED ${dbIssue ? 'Succesfully' : 'Failed'}`, event, issue);
+    logger.debugWithContext(`dbIssue is CREATED ${dbIssue ? 'Successfully' : 'Failed'}`, event, issue);
   }
   return dbIssue;
 }
@@ -384,23 +389,36 @@ async function handleIssueClose(event, issue) { // eslint-disable-line
     event.dbIssue = dbIssue;
 
     // if the issue has payment success or payment pending status, we'll ignore this process.
-    if (dbIssue && dbIssue.status === 'challenge_payment_successful') {
+    if (dbIssue && dbIssue.status === constants.ISSUE_STATUS.CHALLENGE_PAYMENT_SUCCESSFUL) {
       logger.debugWithContext('Ignoring close issue processing. The issue has challenge_payment_successful.', event, issue);
       return;
     }
-    if (dbIssue && dbIssue.status === 'challenge_payment_pending') {
+    if (dbIssue && dbIssue.status === constants.ISSUE_STATUS.CHALLENGE_PAYMENT_PENDING) {
       logger.debugWithContext('Ignoring close issue processing. The issue has challenge_payment_pending.', event, issue);
       return;
     }
 
     if (!event.paymentSuccessful) {
       let closeChallenge = false;
-      // if issue is closed without Fix accepted label
-      if (!_.includes(event.data.issue.labels, config.FIX_ACCEPTED_ISSUE_LABEL) || _.includes(event.data.issue.labels, config.CANCELED_ISSUE_LABEL)) {
+      // if issue is closed without Fix accepted and cancel label
+      if (!_.includes(event.data.issue.labels, config.FIX_ACCEPTED_ISSUE_LABEL) && !_.includes(event.data.issue.labels, config.CANCELED_ISSUE_LABEL)) {
         logger.debugWithContext(`This issue ${issue.number} is closed without fix accepted label.`, event, issue);
         let comment = 'This ticket was not processed for payment. If you would like to process it for payment,';
         comment += ' please reopen it, add the ```' + config.FIX_ACCEPTED_ISSUE_LABEL + '``` label, and then close it again';// eslint-disable-line
         await gitHelper.createComment(event, issue.number, comment);
+        closeChallenge = true;
+      }
+
+      // if issue is close with cancelled label
+      if (_.includes(event.data.issue.labels, config.CANCELED_ISSUE_LABEL)) {
+        const comment = `Challenge ${dbIssue.challengeUUID} has been cancelled`;
+        await topcoderApiHelper.cancelPrivateContent(dbIssue.challengeUUID);
+        await gitHelper.createComment(event, issue.number, comment);
+        // update the issue status to payment pending to prevent double processing.
+        await dbHelper.update(models.Issue, dbIssue.id, {
+          status: constants.ISSUE_STATUS.CHALLENGE_CANCELLED,
+          updatedAt: new Date()
+        });
         closeChallenge = true;
       }
 
@@ -437,7 +455,7 @@ async function handleIssueClose(event, issue) { // eslint-disable-line
 
       // update the issue status to payment pending to prevent double processing.
       await dbHelper.update(models.Issue, dbIssue.id, {
-        status: 'challenge_payment_pending',
+        status: constants.ISSUE_STATUS.CHALLENGE_PAYMENT_PENDING,
         updatedAt: new Date()
       });
 
@@ -503,7 +521,7 @@ async function handleIssueClose(event, issue) { // eslint-disable-line
     // update the issue status to payment failed
     if (!event.paymentSuccessful && dbIssue && dbIssue.id) {
       await dbHelper.update(models.Issue, dbIssue.id, {
-        status: 'challenge_payment_failed',
+        status: constants.ISSUE_STATUS.CHALLENGE_PAYMENT_FAILED,
         updatedAt: new Date()
       });
     }
@@ -520,7 +538,7 @@ async function handleIssueClose(event, issue) { // eslint-disable-line
         .value();
       dbIssue = await dbHelper.update(models.Issue, dbIssue.id, {
         labels,
-        status: 'challenge_payment_successful',
+        status: constants.ISSUE_STATUS.CHALLENGE_PAYMENT_SUCCESSFUL,
         updatedAt: new Date()
       });
       await gitHelper.markIssueAsPaid(event, issue.number, dbIssue.challengeUUID, labels, event.assigneeMember.topcoderUsername,
@@ -552,7 +570,7 @@ async function handleIssueCreate(event, issue, forceAssign = false) {
   // Check if duplicated
   let dbIssue = await dbHelper.queryOneIssue(models.Issue, issue.repositoryId, issue.number, issue.provider);
 
-  if (dbIssue) {
+  if (dbIssue && dbIssue.status !== constants.ISSUE_STATUS.CHALLENGE_CANCELLED) {
     throw new Error(
       `Issue ${issue.number} is already in ${dbIssue.status}`);
   }
@@ -573,9 +591,17 @@ async function handleIssueCreate(event, issue, forceAssign = false) {
     // create issue with challenge creation pending
     const issueObject = _.assign({}, _.omit(issue, 'assignee'), {
       id: helper.generateIdentifier(),
-      status: 'challenge_creation_pending'
+      status: constants.ISSUE_STATUS.CHALLENGE_CREATION_PENDING
     });
-    dbIssue = await dbHelper.create(models.Issue, issueObject);
+
+    if (!dbIssue) {
+      dbIssue = await dbHelper.create(models.Issue, issueObject);
+    } else if (dbIssue && dbIssue.status !== 'challenge_cancelled') {
+      await dbHelper.update(models.Issue, dbIssue.id, {
+        status: constants.ISSUE_STATUS.CHALLENGE_CREATION_PENDING,
+        updatedAt: new Date()
+      });
+    }
 
     const projectId = project.tcDirectId;
 
@@ -593,7 +619,7 @@ async function handleIssueCreate(event, issue, forceAssign = false) {
     // update db payment
     await dbHelper.update(models.Issue, dbIssue.id, {
       challengeUUID: issue.challengeUUID,
-      status: 'challenge_creation_successful',
+      status: constants.ISSUE_STATUS.CHALLENGE_CREATION_SUCCESSFUL,
       updatedAt: new Date()
     });
   } catch (e) {

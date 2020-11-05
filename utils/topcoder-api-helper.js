@@ -386,7 +386,7 @@ async function cancelPrivateContent(id) {
 
     loggerFile.info(`EndPoint: PATCH /challenges/${id},  PATCH parameters: { status: '${constants.CHALLENGE_STATUS.CANCELED}' }, Status Code:null,
     Error: 'Failed to cancel challenge.', Details: ${circularJSON.stringify(err)}`);
-    throw errors.convertTopcoderApiError(err, 'Failed to activate challenge.');
+    throw errors.convertTopcoderApiError(err, 'Failed to cancel challenge.');
   }
 }
 
@@ -426,9 +426,9 @@ async function removeResourceToChallenge(id, handle, roleId) {
     DELETE parameters: null, Status Code:${statusCode}, Response:${circularJSON.stringify(response.data)}`);
   } catch (err) {
     loggerFile.info(`EndPoint: DELETE /resources, DELETE parameters: null, Status Code:null,
-    Error: 'Failed to add resource to the challenge.', Details: ${circularJSON.stringify(err)}`);
+    Error: 'Failed to remove resource from the challenge.', Details: ${circularJSON.stringify(err)}`);
     logger.error(`Response Data: ${JSON.stringify(err.response.data)}`);
-    throw errors.convertTopcoderApiError(err, 'Failed to add resource to the challenge.');
+    throw errors.convertTopcoderApiError(err, 'Failed to remove resource from the challenge.');
   }
 }
 
