@@ -30,11 +30,6 @@ module.exports = {
   TC_AUTHZ_URL: process.env.TC_AUTHZ_URL || 'https://api.topcoder-dev.com/v3/authorizations',
   TC_DIRECT_ID: 7377,
   NEW_CHALLENGE_TEMPLATE: process.env.NEW_CHALLENGE_TEMPLATE || {
-    legacy: {
-      reviewType: 'community',
-      track: 'DEVELOP',
-      directProjectId: 7377
-    },
     status: 'Draft'
   },
 
