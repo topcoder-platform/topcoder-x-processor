@@ -74,15 +74,15 @@ errors.convertGitLabError = function convertGitLabError(err, message) {
  */
 errors.convertTopcoderApiError = function convertTopcoderApiError(err, message) {
   let resMsg = `${message}`;
-  const detail = _.get(err, 'response.body.result.content');
+  const detail = _.get(err, 'response.data.message');
   if (detail) {
     resMsg += ` Detail: ${detail}`;
   }
   const apiError = new ProcessorError(
-        err.status || _.get(err, 'response.body.result.status', constants.SERVICE_ERROR_STATUS),
-        resMsg,
-        'topcoder'
-    );
+    err.response.status || _.get(err, 'response.body.result.status', constants.SERVICE_ERROR_STATUS),
+    resMsg,
+    'topcoder'
+  );
   return apiError;
 };
 

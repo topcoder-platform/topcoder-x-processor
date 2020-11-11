@@ -50,7 +50,7 @@ async function handleEventGracefully(event, data, err) {
     // reschedule event
     if (event.retryCount < config.RETRY_COUNT) {
       logger.debug('Scheduling event for next retry');
-      const newEvent = {...event};
+      const newEvent = { ...event };
       newEvent.retryCount += 1;
       delete newEvent.copilot;
       const timeoutKey = setTimeout(async () => {
@@ -77,13 +77,18 @@ async function handleEventGracefully(event, data, err) {
           comment = `The challenge cancel failed: ${comment}`;
         }
       } else if (event.event === 'issue.created') {
-        // comment for challenge creation failed
-        comment = 'The challenge creation on the Topcoder platform failed.  Please contact support to try again';
+        if (err.name === 'ProcessorError' && err.statusCode && err.message) {
+          // comment for challenge creation failed
+          comment = `[${err.statusCode}]: ${err.message}`
+        } else {
+          // comment for challenge creation failed
+          comment = 'The challenge creation on the Topcoder platform failed.  Please contact support to try again';
+        }
       } else if (event.event === 'copilotPayment.add') {
         // comment for copilot payment challenge create failed
         comment = 'The copilot payment challenge creation on the Topcoder platform failed.  Please contact support to try again';
         await dbHelper.remove(models.CopilotPayment, {
-          id: {eq: data.id}
+          id: { eq: data.id }
         });
         // we dont need to put comment for copilot payment
         return;
