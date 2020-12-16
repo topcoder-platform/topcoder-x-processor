@@ -41,7 +41,7 @@ The following config parameters are supported, they are defined in `config/defau
 |AUTH0_CLIENT_SECRET| The Auth0 Client Secret for generating Machine-to-machine token ||
 |ROLE_ID_COPILOT| The registered role id of copilot ||
 |ROLE_ID_SUBMITTER| The registered role id of submitter ||
-|TYPE_ID_FIRST2FINISH| The registered type id of first 2 finish challenge ||
+|TYPE_ID_TASK| The registered type id of a task ||
 |DEFAULT_TIMELINE_TEMPLATE_ID| The default timeline template id ||
 |TC_API_URL| The topcoder backend API url |`https://api.topcoder-dev.com/v5`|
 |TC_API_URL_V3| The topcoder backend API url V3 |`https://api.topcoder-dev.com/v3`|
