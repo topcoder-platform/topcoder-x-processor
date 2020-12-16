@@ -343,8 +343,8 @@ async function handleIssueUpdate(event, issue) {
       name: issue.title,
       description: issue.body,
       prizeSets: [{
-        type: 'Challenge prizes',
-        prizes: _.map(issue.prizes, (prize) => ({type: 'money', value: prize}))
+        type: 'placement',
+        prizes: _.map(issue.prizes, (prize) => ({type: 'USD', value: prize}))
       }]
     });
     // Save
@@ -476,8 +476,8 @@ async function handleIssueClose(event, issue) { // eslint-disable-line
       // prize needs to be again set after adding billing account otherwise it won't let activate
       const updateBody = {
         prizeSets: [{
-          type: 'Challenge prizes',
-          prizes: _.map(issue.prizes, (prize) => ({type: 'money', value: prize}))
+          type: 'placement',
+          prizes: _.map(issue.prizes, (prize) => ({type: 'USD', value: prize}))
         }]
       };
       await topcoderApiHelper.updateChallenge(dbIssue.challengeUUID, updateBody);

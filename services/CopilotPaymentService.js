@@ -116,8 +116,8 @@ async function _updateChallenge(copilotUsername, projectId, challengeId) {
       name: challengeTitle,
       detailedRequirements: requirements,
       prizeSets: [{
-        type: 'Challenge prizes',
-        prizes: _.map(prizes, (prize) => ({type: 'money', value: prize}))
+        type: 'copilot',
+        prizes: _.map(prizes, (prize) => ({type: 'USD', value: prize}))
       }]
     };
 

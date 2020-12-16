@@ -70,8 +70,8 @@ async function createChallenge(challenge) {
     name: challenge.name,
     description: challenge.detailedRequirements,
     prizeSets: [{
-      type: 'Challenge prizes',
-      prizes: _.map(challenge.prizes, (prize) => ({type: 'money', value: prize}))
+      type: 'placement',
+      prizes: _.map(challenge.prizes, (prize) => ({type: 'USD', value: prize}))
     }],
     timelineTemplateId: config.DEFAULT_TIMELINE_TEMPLATE_ID,
     projectId: challenge.projectId,
