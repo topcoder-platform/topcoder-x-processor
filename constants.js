@@ -26,7 +26,7 @@ const USER_ROLES = {
 const CHALLENGE_STATUS = {
   ACTIVE: 'Active',
   COMPLETED: 'Completed',
-  CANCELED: 'Canceled'
+  CANCELED: 'Cancelled'
 };
 
 const SERVICE_ERROR_STATUS = 500;

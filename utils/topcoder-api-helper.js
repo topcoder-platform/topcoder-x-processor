@@ -431,6 +431,34 @@ async function removeResourceToChallenge(id, handle, roleId) {
     throw errors.convertTopcoderApiError(err, 'Failed to remove resource from the challenge.');
   }
 }
+/**
+ * Finds project by given direct id and returns it
+ * @param {id} id in the database
+ * @param {Number} directId
+ * @returns {Promise}
+ */
+async function getProjectByDirectId(id, directId) {
+  const apiKey = await getM2Mtoken();
+  return axios.get(`${config.TC_API_URL}/projects`, {
+    params: {
+      directProjectId: directId
+    },
+    headers: {
+      authorization: `Bearer ${apiKey}`
+    }
+  }).then((data) => {
+    // Append database project id to response
+    data.dbId = id;
+    // Log to debug if project is empty
+    if (data.data.length === 0) {
+      logger.debug(`Project with direct id ${directId} (database: ${id}) was not found in connect`);
+    }
+    return data;
+  }).catch((err) => {
+    logger.logFullError(err);
+    throw errors.convertTopcoderApiError(err, `Failed to fetch project with direct id ${directId}`);
+  });
+}
 
 
 module.exports = {
@@ -448,5 +476,6 @@ module.exports = {
   unregisterUserFromChallenge,
   cancelPrivateContent,
   assignUserAsRegistrant,
-  removeResourceToChallenge
+  removeResourceToChallenge,
+  getProjectByDirectId
 };

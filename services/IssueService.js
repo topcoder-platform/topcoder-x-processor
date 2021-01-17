@@ -13,7 +13,6 @@
 const config = require('config');
 const _ = require('lodash');
 const Joi = require('joi');
-const MarkdownIt = require('markdown-it');
 const logger = require('../utils/logger');
 const errors = require('../utils/errors');
 const topcoderApiHelper = require('../utils/topcoder-api-helper');
@@ -25,7 +24,6 @@ const userService = require('./UserService');
 const eventService = require('./EventService');
 const constants = require('../constants');
 
-const md = new MarkdownIt();
 
 // A variable to store issue creation lock to prevent duplicate creation process.
 // The key is `${provider}-${repositoryId}-${number}`. The value is True.
@@ -216,13 +214,18 @@ async function handleIssueAssignment(event, issue, force = false) {
         logger.debugWithContext(`${userMapping.topcoderUsername} Already registered as assignee`, event, issue);
         return;
       }
-
-      // The issue has registered assignee. Ignore it.
+      const hasAssignedLabel = _.includes(issue.labels, config.ASSIGNED_ISSUE_LABEL);
+      // Gitlab doesn't send separate unassignment hook if we unassigne and assigne users in the same step
+      // in result new assignee was not handled previously
+      if (dbIssue.assignee && event.provider === 'gitlab' && dbIssue.assignee !== assigneeUserId && hasAssignedLabel) {
+        await handleIssueUnAssignment(event, issue);
+        return;
+      }
+      // The github issue has registered assignee. Ignore it.
       // If there is assignee changes, it will be handled at handleIssueUnassignment and this func will be called again.
       if (dbIssue.assignee) {
         return;
       }
-
       // ensure issue has open for pickup label
       const hasOpenForPickupLabel = _(issue.labels).includes(config.OPEN_FOR_PICKUP_ISSUE_LABEL); // eslint-disable-line lodash/chaining
       const hasNotReadyLabel = _(issue.labels).includes(config.NOT_READY_ISSUE_LABEL); // eslint-disable-line lodash/chaining
@@ -693,7 +696,6 @@ async function handleIssueUnAssignment(event, issue) {
       // Ignore it.
       return;
     }
-
     if (dbIssue.assignee) {
       const assigneeUserId = await gitHelper.getUserIdByLogin(event, dbIssue.assignee);
       if (!assigneeUserId) {
@@ -865,8 +867,7 @@ async function process(event) {
     issue.repositoryId = helper.hashCode(issue.repositoryId);
   }
 
-  // Markdown the body
-  issue.body = md.render(_.get(issue, 'body', ''));
+  issue.body = _.get(issue, 'body', '');
   if (event.data.issue.assignees && event.data.issue.assignees.length > 0 && event.data.issue.assignees[0].id) {
     issue.assignee = await gitHelper.getUsernameById(event, event.data.issue.assignees[0].id);
   }

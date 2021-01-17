@@ -9,7 +9,8 @@
     "test": "mocha",
     "test:github": "mocha test/github.test.js",
     "test:gitlab": "mocha test/gitlab.test.js",
-    "create-tables": "CREATE_DB=true node scripts/create-update-tables.js"
+    "create-tables": "CREATE_DB=true node scripts/create-update-tables.js",
+    "direct-connect-migration": "node scripts/direct-connect-migration.js"
   },
   "engines": {
     "node": "~8.6.0"
