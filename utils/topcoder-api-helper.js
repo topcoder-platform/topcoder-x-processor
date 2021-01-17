@@ -66,7 +66,7 @@ async function createProject(projectName) {
 async function createChallenge(challenge) {
   const apiKey = await getM2Mtoken();
   const body = _.assign({}, config.NEW_CHALLENGE_TEMPLATE, {
-    typeId: config.TYPE_ID_FIRST2FINISH,
+    typeId: config.TYPE_ID_TASK,
     name: challenge.name,
     description: challenge.detailedRequirements,
     prizeSets: [{
