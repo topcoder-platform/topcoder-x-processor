@@ -8,7 +8,9 @@
     "lint": "eslint . --ignore-pattern 'public/*' --ext .js --fix || true",
     "test": "mocha",
     "test:github": "mocha test/github.test.js",
-    "test:gitlab": "mocha test/gitlab.test.js"
+    "test:gitlab": "mocha test/gitlab.test.js",
+    "create-tables": "CREATE_DB=true node scripts/create-update-tables.js",
+    "direct-connect-migration": "node scripts/direct-connect-migration.js"
   },
   "engines": {
     "node": "~8.6.0"
@@ -24,8 +26,6 @@
   },
   "homepage": "https://gitlab.com/luettich/processor#README",
   "dependencies": {
-    "@topcoder-platform/topcoder-api-challenges-v4-wrapper": "^1.0.5",
-    "@topcoder-platform/topcoder-api-challenges-v4-wrapper-dev": "^1.0.5",
     "axios": "^0.19.0",
     "circular-json": "^0.5.7",
     "config": "^1.30.0",
@@ -42,12 +42,12 @@
     "no-kafka": "^3.2.10",
     "node-gitlab-api": "^2.2.8",
     "nodemailer": "^4.6.7",
+    "superagent": "^3.6.0",
+    "superagent-promise": "^1.1.0",
     "tc-core-library-js": "appirio-tech/tc-core-library-js.git#v2.6.3",
-    "topcoder-api-challenges": "^1.0.6",
-    "topcoder-api-projects": "^1.0.1",
-    "topcoder-dev-api-projects": "^1.0.1",
     "topcoder-healthcheck-dropin": "^1.0.3",
     "util": "^0.11.0",
+    "validator": "^13.0.0",
     "winston": "^2.4.3"
   },
   "devDependencies": {

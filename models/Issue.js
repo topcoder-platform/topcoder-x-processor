@@ -48,6 +48,7 @@ const schema = new Schema({
       name: 'RepositoryIdIndex'
     }
   },
+  repositoryIdStr: {type: String, required: false},
   labels: {
     type: Array,
     required: false
@@ -59,6 +60,7 @@ const schema = new Schema({
   },
   // From topcoder api
   challengeId: {type: Number, required: false},
+  challengeUUID: {type: String, required: false},
   projectId: {type: String},
   status: {type: String},
   assignedAt: {type: Date, required: false}

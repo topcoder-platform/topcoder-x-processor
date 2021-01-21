@@ -13,93 +13,17 @@
 'use strict';
 
 const config = require('config');
-const jwtDecode = require('jwt-decode');
 const axios = require('axios');
 const _ = require('lodash');
-const moment = require('moment');
 const circularJSON = require('circular-json');
 
 const m2mAuth = require('tc-core-library-js').auth.m2m;
 
-const m2m = m2mAuth(_.pick(config, ['AUTH0_URL', 'AUTH0_AUDIENCE', 'TOKEN_CACHE_TIME', 'AUTH0_PROXY_SERVER_URL']));
-
-let topcoderApiProjects = require('topcoder-api-projects');
-let topcoderApiChallenges = require('@topcoder-platform/topcoder-api-challenges-v4-wrapper');
-
-const topcoderDevApiProjects = require('topcoder-dev-api-projects');
-const topcoderDevApiChallenges = require('@topcoder-platform/topcoder-api-challenges-v4-wrapper-dev');
-
+const m2m = m2mAuth(_.pick(config, ['AUTH0_URL', 'AUTH0_AUDIENCE', 'TOKEN_CACHE_TIME', 'AUTH0_PROXY_SERVER_URL', 'GRANT_TYPE']));
+const constants = require('../constants');
 const logger = require('./logger');
 const loggerFile = require('./logger-file');
 const errors = require('./errors');
-
-
-if (config.TC_DEV_ENV) {
-  topcoderApiProjects = topcoderDevApiProjects;
-  topcoderApiChallenges = topcoderDevApiChallenges;
-}
-
-// Cache the access token
-let cachedAccessToken;
-
-// Init the API instances
-const projectsClient = topcoderApiProjects.ApiClient.instance;
-const challengesClient = topcoderApiChallenges.ApiClient.instance;
-
-// Timeout increase to 5 minutes
-challengesClient.timeout = 300000;
-
-const bearer = projectsClient.authentications.bearer;
-bearer.apiKeyPrefix = 'Bearer';
-challengesClient.authentications.bearer = bearer;
-const projectsApiInstance = new topcoderApiProjects.DefaultApi();
-const challengesApiInstance = new topcoderApiChallenges.DefaultApi();
-
-/**
- * Authenticate with Topcoder API and get the access token.
- * @returns {String} the access token issued by Topcoder
- * @private
- */
-async function getAccessToken() {
-  // Check the cached access token
-  if (cachedAccessToken) {
-    const decoded = jwtDecode(cachedAccessToken);
-    if (decoded.iat > new Date().getTime()) {
-      // Still not expired, just use it
-      return cachedAccessToken;
-    }
-  }
-
-  // Authenticate
-  const v2Response = await axios.post(config.TC_AUTHN_URL, config.TC_AUTHN_REQUEST_BODY);
-  const v2IdToken = _.get(v2Response, 'data.id_token');
-  const v2RefreshToken = _.get(v2Response, 'data.refresh_token');
-
-  if (!v2IdToken || !v2RefreshToken) {
-    throw new Error(`cannot authenticate with topcoder: ${config.TC_AUTHN_URL}`);
-  }
-
-  // Authorize
-  const v3Response = await axios.post(
-    config.TC_AUTHZ_URL, {
-      param: {
-        externalToken: v2IdToken,
-        refreshToken: v2RefreshToken
-      }
-    }, {
-      headers: {
-        authorization: `Bearer ${v2IdToken}`
-      }
-    });
-
-  cachedAccessToken = _.get(v3Response, 'data.result.content.token');
-
-  if (!cachedAccessToken) {
-    throw new Error(`cannot authorize with topcoder: ${config.TC_AUTHZ_URL}`);
-  }
-
-  return cachedAccessToken;
-}
 
 /**
  * Function to get M2M token
@@ -115,27 +39,20 @@ async function getM2Mtoken() {
  * @returns {Number} the created project id
  */
 async function createProject(projectName) {
-  bearer.apiKey = await getM2Mtoken();
-  // eslint-disable-next-line new-cap
-  const projectBody = new topcoderApiProjects.ProjectRequestBody.constructFromObject({
-    projectName
-  });
+  const apiKey = await getM2Mtoken();
   try {
-    const projectResponse = await new Promise((resolve, reject) => {
-      projectsApiInstance.directProjectsPost(projectBody, (err, res) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(res);
-        }
-      });
+    const response = await axios.post(`${config.TC_API_URL}/projects`, {name: projectName}, {
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      }
     });
-    const statusCode = projectResponse.result ? projectResponse.result.status : null;
-    loggerFile.info(`EndPoint: POST /direct/projects,  POST parameters: ${circularJSON.stringify(projectBody)},
-    Status Code:${statusCode}, Response: ${circularJSON.stringify(projectResponse)}`);
-    return _.get(projectResponse, 'result.content.projectId');
+    const statusCode = response.status ? response.status : null;
+    loggerFile.info(`EndPoint: POST /projects,  POST parameters: ${circularJSON.stringify({name: projectName})},
+    Status Code:${statusCode}, Response: ${circularJSON.stringify(response.data)}`);
+    return _.get(response, 'data.id');
   } catch (err) {
-    loggerFile.info(`EndPoint: POST /direct/projects, POST parameters: ${circularJSON.stringify(projectBody)},
+    loggerFile.info(`EndPoint: POST /direct/projects, POST parameters: ${circularJSON.stringify({name: projectName})},
     Status Code:null, Error: 'Failed to create project.', Details: ${circularJSON.stringify(err)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to create project.');
   }
@@ -147,36 +64,32 @@ async function createProject(projectName) {
  * @returns {Number} the created challenge id
  */
 async function createChallenge(challenge) {
-  bearer.apiKey = await getM2Mtoken();
-  const start = new Date();
-  const startTime = moment(start).toISOString();
-  const end = moment(start).add(config.NEW_CHALLENGE_DURATION_IN_DAYS, 'days').toISOString();
-
-  // eslint-disable-next-line new-cap
-  const challengeBody = new topcoderApiChallenges.NewChallengeBodyParam.constructFromObject({
-    param: _.assign({}, config.NEW_CHALLENGE_TEMPLATE, {
-      registrationStartDate: start,
-      registrationStartsAt: startTime,
-      registrationEndsAt: end,
-      submissionEndsAt: end
-    }, challenge)
+  const apiKey = await getM2Mtoken();
+  const body = _.assign({}, config.NEW_CHALLENGE_TEMPLATE, {
+    typeId: config.TYPE_ID_TASK,
+    name: challenge.name,
+    description: challenge.detailedRequirements,
+    prizeSets: [{
+      type: 'placement',
+      prizes: _.map(challenge.prizes, (prize) => ({type: 'USD', value: prize}))
+    }],
+    timelineTemplateId: config.DEFAULT_TIMELINE_TEMPLATE_ID,
+    projectId: challenge.projectId,
+    trackId: config.DEFAULT_TRACK_ID
   });
   try {
-    const challengeResponse = await new Promise((resolve, reject) => {
-      challengesApiInstance.saveDraftContest(challengeBody, (err, res) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(res);
-        }
-      });
+    const response = await axios.post(`${config.TC_API_URL}/challenges`, body, {
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      }
     });
-    const statusCode = challengeResponse.result ? challengeResponse.result.status : null;
-    logger.debug(`EndPoint: POST /challenges,  POST parameters: ${circularJSON.stringify(challengeBody)},
-    Status Code:${statusCode}, Response: ${circularJSON.stringify(challengeResponse.result)}`);
-    return _.get(challengeResponse, 'result.content.id');
+    const statusCode = response.status ? response.status : null;
+    logger.debug(`EndPoint: POST /challenges,  POST parameters: ${circularJSON.stringify(body)},
+    Status Code:${statusCode}, Response: ${circularJSON.stringify(response.data)}`);
+    return _.get(response, 'data.id');
   } catch (err) {
-    logger.debug(`EndPoint: POST /challenges,  POST parameters: ${circularJSON.stringify(challengeBody)}, Status Code:null,
+    logger.debug(`EndPoint: POST /challenges,  POST parameters: ${circularJSON.stringify(body)}, Status Code:null,
     Error: 'Failed to create challenge.', Details: ${circularJSON.stringify(err)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to create challenge.');
   }
@@ -184,38 +97,30 @@ async function createChallenge(challenge) {
 
 /**
  * Update a challenge.
- * @param {Number} id the challenge id
+ * @param {String} id the challenge id
  * @param {Object} challenge the challenge to update
  */
 async function updateChallenge(id, challenge) {
-  bearer.apiKey = await getM2Mtoken();
+  const apiKey = await getM2Mtoken();
   logger.debug(`Updating challenge ${id} with ${circularJSON.stringify(challenge)}`);
-  // eslint-disable-next-line new-cap
-  const challengeBody = new topcoderApiChallenges.UpdateChallengeBodyParam.constructFromObject({
-    param: challenge
-  });
   try {
-    const response = await new Promise((resolve, reject) => {
-      challengesApiInstance.challengesIdPut(id, challengeBody, (err, res) => {
-        if (err) {
-          logger.error(err);
-          logger.debug(circularJSON.stringify(err));
-          reject(err);
-        } else {
-          resolve(res);
-        }
-      });
+    const response = await axios.patch(`${config.TC_API_URL}/challenges/${id}`, challenge, {
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      }
     });
-    const statusCode = response.result ? response.result.status : null;
-    loggerFile.info(`EndPoint: PUT /challenges/${id},  PUT parameters: null, Status Code:${statusCode}, Response: ${circularJSON.stringify(response)}`);
+    const statusCode = response.status ? response.status : null;
+    logger.debug(`EndPoint: PATCH /challenges/${id},  PATCH parameters: ${circularJSON.stringify(challenge)},
+    Status Code:${statusCode}, Response: ${circularJSON.stringify(response.data)}`);
   } catch (err) {
     logger.error('updateChallenge ERROR.');
-    logger.error(`EndPoint: PUT /challenges/${id}`);
+    logger.error(`EndPoint: PATCH /challenges/${id}`);
     logger.error(`${err.message}`);
     logger.error(`Request: ${JSON.stringify(err.config)}`);
     logger.error(`Response Data: ${JSON.stringify(err.response.data)}`);
 
-    loggerFile.info(`EndPoint: PUT /challenges/${id},  PUT parameters: null, Status Code:null,
+    loggerFile.info(`EndPoint: PATCH /challenges/${id},  PATCH parameters: null, Status Code:null,
     Error: 'Failed to update challenge.', Details: ${circularJSON.stringify(err)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to update challenge.');
   }
@@ -223,35 +128,30 @@ async function updateChallenge(id, challenge) {
 
 /**
  * activates the topcoder challenge
- * @param {Number} id the challenge id
+ * @param {String} id the challenge id
  */
 async function activateChallenge(id) {
-  bearer.apiKey = await getM2Mtoken();
+  const apiKey = await getM2Mtoken();
   logger.debug(`Activating challenge ${id}`);
   try {
-    const response = await new Promise((resolve, reject) => {
-      challengesApiInstance.activateChallenge(id, (err, data) => {
-        if (err) {
-          logger.error(err);
-          logger.debug(circularJSON.stringify(err));
-          reject(err);
-        } else {
-          resolve(data);
-        }
-      });
+    const response = await axios.patch(`${config.TC_API_URL}/challenges/${id}`, {status: constants.CHALLENGE_STATUS.ACTIVE}, {
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      }
     });
-    const statusCode = response.result ? response.result.status : null;
-    loggerFile.info(`EndPoint: POST /challenges/${id}/activate,
-    POST parameters: null, Status Code:${statusCode}, Response: ${circularJSON.stringify(response)}`);
+    const statusCode = response.status ? response.status : null;
+    loggerFile.info(`EndPoint: PATCH /challenges/${id},
+    PATCH parameters: { status: '${constants.CHALLENGE_STATUS.ACTIVE}' }, Status Code:${statusCode}, Response: ${circularJSON.stringify(response.data)}`);
     logger.debug(`Challenge ${id} is activated successfully.`);
   } catch (err) {
     logger.error('activateChallenge ERROR.');
-    logger.error(`EndPoint: POST /challenges/${id}/activate`);
+    logger.error(`EndPoint: PATCH /challenges/${id}`);
     logger.error(`${err.message}`);
     logger.error(`Request: ${JSON.stringify(err.config)}`);
     logger.error(`Response Data: ${JSON.stringify(err.response.data)}`);
 
-    loggerFile.info(`EndPoint: POST /challenges/${id}/activate,  POST parameters: null, Status Code:null,
+    loggerFile.info(`EndPoint: PATCH /challenges/${id},  PATCH parameters: { status: '${constants.CHALLENGE_STATUS.ACTIVE}' }, Status Code:null,
     Error: 'Failed to activate challenge.', Details: ${circularJSON.stringify(err)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to activate challenge.');
   }
@@ -259,25 +159,22 @@ async function activateChallenge(id) {
 
 /**
  * Get challenge details by id
- * @param {Number} id challenge ID
+ * @param {String} id challenge ID
  * @returns {Object} topcoder challenge
  */
 async function getChallengeById(id) {
-  if (!_.isNumber(id)) {
-    throw new Error('The challenge id must valid number');
-  }
   const apiKey = await getM2Mtoken();
   logger.debug('Getting topcoder challenge details');
   try {
-    const response = await axios.get(`${challengesClient.basePath}/challenges/${id}`, {
+    const response = await axios.get(`${config.TC_API_URL}/challenges/${id}`, {
       headers: {
         authorization: `Bearer ${apiKey}`
       },
       'Content-Type': 'application/json'
     });
-    const challenge = _.get(response, 'data.result.content');
-    const statusCode = response.result ? response.result.status : null;
-    loggerFile.info(`EndPoint: GET challenges/${id},  GET parameters: null, Status Code:${statusCode}, Response: ${circularJSON.stringify(response)}`);
+    const challenge = _.get(response, 'data');
+    const statusCode = response.status ? response.status : null;
+    loggerFile.info(`EndPoint: GET challenges/${id},  GET parameters: null, Status Code:${statusCode}, Response: ${circularJSON.stringify(response.data)}`);
     return challenge;
   } catch (err) {
     logger.error('getChallengeById ERROR.');
@@ -293,30 +190,39 @@ async function getChallengeById(id) {
 
 /**
  * closes the topcoder challenge
- * @param {Number} id the challenge id
+ * @param {String} id the challenge id
  * @param {Number} winnerId the winner id
+ * @param {String} winnerUsername the winner handle
  */
-async function closeChallenge(id, winnerId) {
+async function closeChallenge(id, winnerId, winnerUsername) {
   const apiKey = await getM2Mtoken();
   logger.debug(`Closing challenge ${id}`);
   try {
-    let basePath = challengesClient.basePath;
-    const response = await axios.post(`${basePath}/challenges/${id}/close?winnerId=${winnerId}`, null, {
+    const response = await axios.patch(`${config.TC_API_URL}/challenges/${id}`, {
+      status: constants.CHALLENGE_STATUS.COMPLETED,
+      winners: [{
+        userId: winnerId,
+        handle: winnerUsername,
+        placement: 1
+      }]
+    }, {
       headers: {
         authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
       }
     });
-    const statusCode = response ? response.status : null;
-    loggerFile.info(`EndPoint: POST /challenges/${id}/close,  POST parameters: null, Status Code:${statusCode}, Response:${circularJSON.stringify(response)}`);
+    const statusCode = response.status ? response.status : null;
+    logger.debug(`EndPoint: PATCH /challenges/${id},
+    PATCH parameters: { status: '${constants.CHALLENGE_STATUS.COMPLETED}' }, Status Code:${statusCode}, Response: ${circularJSON.stringify(response.data)}`);
     logger.debug(`Challenge ${id} is closed successfully.`);
   } catch (err) {
     logger.error('Closing challenge ERROR.');
-    logger.error(`EndPoint: POST /challenges/${id}/close`);
+    logger.error(`EndPoint: PATCH /challenges/${id}`);
     logger.error(`${err.message}`);
     logger.error(`Request: ${JSON.stringify(err.config)}`);
     logger.error(`Response Data: ${JSON.stringify(err.response.data)}`);
-    loggerFile.info(`EndPoint: POST /challenges/${id}/close, POST parameters: null, Status Code:null,
+
+    logger.error(`EndPoint: PATCH /challenges/${id},  PATCH parameters: { status: '${constants.CHALLENGE_STATUS.COMPLETED}' }, Status Code:null,
     Error: 'Failed to close challenge.', Details: ${circularJSON.stringify(err)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to close challenge.');
   }
@@ -331,24 +237,23 @@ async function getProjectBillingAccountId(id) {
   const apiKey = await getM2Mtoken();
   logger.debug(`Getting project billing detail ${id}`);
   try {
-    const response = await axios.get(`${projectsClient.basePath}/direct/projects/${id}`, {
+    const response = await axios.get(`${config.TC_API_URL}/projects/${id}`, {
       headers: {
         authorization: `Bearer ${apiKey}`
       }
     });
-
-    const billingAccountId = _.get(response, 'data.result.content.billingAccountIds[0]');
+    const billingAccountId = _.get(response, 'data.billingAccountId');
     if (!billingAccountId) {
-      _.set(response, 'data.result.content', `There is no billing account id associated with project ${id}`);
-      throw new Error(response);
+      _.set(response, 'data', `There is no billing account id associated with project ${id}`);
+      return null;
     }
-
     const statusCode = response ? response.status : null;
-    loggerFile.info(`EndPoint: GET /direct/projects/${id},
+    loggerFile.info(`EndPoint: GET /projects/${id},
     GET parameters: null, Status Code:${statusCode}, Response:${circularJSON.stringify(response.data)}`);
     return billingAccountId;
   } catch (err) {
-    loggerFile.info(`EndPoint: GET /direct/projects/${id}, GET parameters: null, Status Code:null,
+    logger.error(`Response Data: ${JSON.stringify(err.response.data)}`);
+    logger.error(`EndPoint: GET /projects/${id}, GET parameters: null, Status Code:null,
     Error: 'Failed to get billing detail for the project.', Details: ${circularJSON.stringify(err)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to get billing detail for the project.');
   }
@@ -360,9 +265,8 @@ async function getProjectBillingAccountId(id) {
  * @returns {Number} the user id
  */
 async function getTopcoderMemberId(handle) {
-  bearer.apiKey = await getM2Mtoken();
   try {
-    const response = await axios.get(`${projectsClient.basePath}/members/${handle}`);
+    const response = await axios.get(`${config.TC_API_URL_V3}/members/${handle}`);
     const statusCode = response ? response.status : null;
     loggerFile.info(`EndPoint: GET members/${handle},  GET parameters: null, Status Code:${statusCode}, Response:${circularJSON.stringify(response.data)}`);
     return _.get(response, 'data.result.content.userId');
@@ -375,61 +279,51 @@ async function getTopcoderMemberId(handle) {
 
 /**
  * adds the resource to the topcoder challenge
- * @param {Number} id the challenge id
- * @param {Object} resource the resource resource to add
+ * @param {String} id the challenge id
+ * @param {String} handle the user handle to add
+ * @param {String} roleId the role id
  */
-async function addResourceToChallenge(id, resource) {
-  bearer.apiKey = await getM2Mtoken();
+async function addResourceToChallenge(id, handle, roleId) {
+  const apiKey = await getM2Mtoken();
   logger.debug(`adding resource to challenge ${id}`);
   try {
-    const response = await new Promise((resolve, reject) => {
-      challengesApiInstance.challengesIdResourcesPost(id, resource, (err, res) => {
-        if (err) {
-          if (_.get(JSON.parse(_.get(err, 'response.text')), 'result.content')
-            === `User ${resource.resourceUserId} with role ${resource.roleId} already exists`) {
-            resolve();
-          } else {
-            logger.error(circularJSON.stringify(err));
-            reject(err);
-          }
-        } else {
-          logger.debug(`resource is added to challenge ${id} successfully.`);
-          resolve(res);
-        }
-      });
+    const response = await axios.post(`${config.TC_API_URL}/resources`, {
+      challengeId: id,
+      memberHandle: handle,
+      roleId
+    }, {
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      }
     });
-    let statusCode = null;
-    if (response && response.result) {
-      statusCode = response.result.status;
-    }
-    loggerFile.info(`EndPoint: POST /challenges/${id}/resources,
-    POST parameters: null, Status Code:${statusCode}, Response:${circularJSON.stringify(response)}`);
+    const statusCode = response.status ? response.status : null;
+    loggerFile.info(`EndPoint: POST /resources,
+    POST parameters: null, Status Code:${statusCode}, Response:${circularJSON.stringify(response.data)}`);
   } catch (err) {
-    loggerFile.info(`EndPoint: POST /challenges/${id}/resources, POST parameters: null, Status Code:null,
+    loggerFile.info(`EndPoint: POST /resources, POST parameters: null, Status Code:null,
     Error: 'Failed to add resource to the challenge.', Details: ${circularJSON.stringify(err)}`);
+    logger.error(`Response Data: ${JSON.stringify(err.response.data)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to add resource to the challenge.');
   }
 }
 
 /**
  * Get challenge resources details by id
- * @param {Number} id challenge ID
+ * @param {String} id challenge ID
  * @returns {Object} topcoder challenge resources
  */
 async function getResourcesFromChallenge(id) {
-  if (!_.isNumber(id)) {
-    throw new Error('The challenge id must valid number');
-  }
   const apiKey = await getM2Mtoken();
   logger.debug(`fetch resource from challenge ${id}`);
   try {
-    const response = await axios.get(`${challengesClient.basePath}/challenges/${id}/resources`, {
+    const response = await axios.get(`${config.TC_API_URL}/resources?challengeId=${id}`, {
       headers: {
         authorization: `Bearer ${apiKey}`
       },
       'Content-Type': 'application/json'
     });
-    const resources = _.get(response, 'data.result.content');
+    const resources = _.get(response, 'data');
     return resources;
   } catch (err) {
     throw errors.convertTopcoderApiError(err, 'Failed to fetch resource from the challenge.');
@@ -439,18 +333,15 @@ async function getResourcesFromChallenge(id) {
 /**
  * Check if role is already set
  * @param {Number} id the challenge id
- * @param {String} role the role to check
+ * @param {String} roleId the role to check
  * @returns {Promise<Boolean>}
  */
-async function roleAlreadySet(id, role) {
-  if (!_.isNumber(id)) {
-    throw new Error('The challenge id must valid number');
-  }
+async function roleAlreadySet(id, roleId) {
   let result = false;
   try {
     const resources = await getResourcesFromChallenge(id);
     resources.forEach((resource) => {
-      if (resource.role === role) {
+      if (resource.roleId === roleId) {
         result = true;
       }
     });
@@ -461,40 +352,12 @@ async function roleAlreadySet(id, role) {
 }
 /**
  * unregister user from topcoder challenge
- * @param {Number} id the challenge id
- * @param {Object} resource the resource  resource to remove
+ * @param {String} id the challenge id
+ * @param {String} handle the user handle to unregister
+ * @param {String} roleId the role id of registered user
  */
-async function unregisterUserFromChallenge(id) {
-  bearer.apiKey = await getM2Mtoken();
-  logger.debug(`removing resource from challenge ${id}`);
-  try {
-    const response = await new Promise((resolve, reject) => {
-      challengesApiInstance.unregisterChallenge(id, (err, res) => {
-        if (err) {
-          // TODO:* Handle when a user tries to unregister a user twice.
-          // if (_.get(JSON.parse(_.get(err, 'response.text')), 'result.content')
-          //   === `User ${resource.resourceUserId} with role ${resource.roleId} already exist`) {
-          //   resolve(res);
-          // } else {
-          //   logger.error(circularJSON.stringify(err));
-          //   reject(err);
-          // }
-          logger.debug(`Error - ${err}`);
-          reject(err);
-        } else {
-          logger.debug(`user is removed from the challenge ${id} successfuly.`);
-          resolve(res);
-        }
-      });
-    });
-    const statusCode = response.result ? response.result.status : null;
-    loggerFile.info(`EndPoint: POST /challenges/${id}/unregister,
-    POST parameters: null, Status Code:${statusCode}, Response:${circularJSON.stringify(response)}`);
-  } catch (err) {
-    loggerFile.info(`EndPoint: POST /challenges/${id}/unregister, POST parameters: null, Status Code:null,
-    Error: 'Failed to remove resource from the challenge', Details: ${circularJSON.stringify(err)}`);
-    throw errors.convertTopcoderApiError(err, 'Failed to remove resource from the challenge');
-  }
+async function unregisterUserFromChallenge(id, handle, roleId) {
+  await removeResourceToChallenge(id, handle, roleId);
 }
 
 /**
@@ -502,25 +365,26 @@ async function unregisterUserFromChallenge(id) {
  * @param {Number} id the challenge id
  */
 async function cancelPrivateContent(id) {
-  bearer.apiKey = await getM2Mtoken();
+  const apiKey = await getM2Mtoken();
   logger.debug(`Cancelling challenge ${id}`);
   try {
-    const response = await new Promise((resolve, reject) => {
-      challengesApiInstance.cancelPrivateContest(id, (err, data) => {
-        if (err) {
-          logger.error(err);
-          logger.debug(circularJSON.stringify(err));
-          reject(err);
-        } else {
-          resolve(data);
-        }
-      });
+    const response = await axios.patch(`${config.TC_API_URL}/challenges/${id}`, {status: constants.CHALLENGE_STATUS.CANCELED}, {
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      }
     });
+    const statusCode = response.status ? response.status : null;
+    loggerFile.info(`EndPoint: PATCH /challenges/${id},
+    PATCH parameters: { status: '${constants.CHALLENGE_STATUS.CANCELED}' }, Status Code:${statusCode}, Response: ${circularJSON.stringify(response.data)}`);
     logger.debug(`Challenge ${id} is cancelled successfully.`);
-    const statusCode = response.result ? response.result.status : null;
-    loggerFile.info(`EndPoint: POST /challenges/${id}/cancel,  POST parameters: null, Status Code:${statusCode}, Response:${circularJSON.stringify(response)}`);
   } catch (err) {
-    loggerFile.info(`EndPoint: POST /challenges/${id}/cancel, POST parameters: null, Status Code:null,
+    logger.error(`EndPoint: PATCH /challenges/${id}`);
+    logger.error(`${err.message}`);
+    logger.error(`Request: ${JSON.stringify(err.config)}`);
+    logger.error(`Response Data: ${JSON.stringify(err.response.data)}`);
+
+    loggerFile.info(`EndPoint: PATCH /challenges/${id},  PATCH parameters: { status: '${constants.CHALLENGE_STATUS.CANCELED}' }, Status Code:null,
     Error: 'Failed to cancel challenge.', Details: ${circularJSON.stringify(err)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to cancel challenge.');
   }
@@ -528,73 +392,72 @@ async function cancelPrivateContent(id) {
 
 /**
  * adds assignee as challenge registrant
- * @param {Number} topcoderUserId the topcoder user id
- * @param {Object} challengeId the challenge id
+ * @param {String} topcoderUsername the topcoder user handle
+ * @param {String} challengeId the challenge id
  * @private
  */
-async function assignUserAsRegistrant(topcoderUserId, challengeId) {
-  // role 1 from registrant
-  const registrantBody = {
-    roleId: 1,
-    resourceUserId: topcoderUserId,
-    phaseId: 0,
-    addNotification: true,
-    addForumWatch: true
-  };
-  await addResourceToChallenge(challengeId, registrantBody);
+async function assignUserAsRegistrant(topcoderUsername, challengeId) {
+  await addResourceToChallenge(challengeId, topcoderUsername, config.ROLE_ID_SUBMITTER);
 }
 
 /**
  * removes the resource from the topcoder challenge
- * @param {Number} id the challenge id
- * @param {Object} resource the resource resource to remove
+ * @param {String} id the challenge id
+ * @param {String} handle the user handle to unregister
+ * @param {String} roleId the role id of registered user
  */
-async function removeResourceToChallenge(id, resource) {
-  bearer.apiKey = await getM2Mtoken();
+async function removeResourceToChallenge(id, handle, roleId) {
+  const apiKey = await getM2Mtoken();
   logger.debug(`removing resource from challenge ${id}`);
   try {
-    const response = await new Promise((resolve, reject) => {
-      challengesApiInstance.challengesIdResourcesDelete(id, resource, (err, res) => {
-        if (err) {
-          logger.error(circularJSON.stringify(err));
-          reject(err);
-        } else {
-          logger.debug(`resource is removed from challenge ${id} successfully.`);
-          resolve(res);
-        }
-      });
+    const response = await axios.delete(`${config.TC_API_URL}/resources`, {
+      data: {
+        challengeId: id,
+        memberHandle: handle,
+        roleId
+      },
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      }
     });
-    const statusCode = response.result ? response.result.status : null;
-    loggerFile.info(`EndPoint: DELETE /challenges/${id}/resources,
-    DELETE parameters: null, Status Code:${statusCode}, Response:${circularJSON.stringify(response)}`);
+    const statusCode = response.status ? response.status : null;
+    loggerFile.info(`EndPoint: DELETE /resources,
+    DELETE parameters: null, Status Code:${statusCode}, Response:${circularJSON.stringify(response.data)}`);
   } catch (err) {
-    loggerFile.info(`EndPoint: DELETE /challenges/${id}/resources, DELETE parameters: null, Status Code:null,
+    loggerFile.info(`EndPoint: DELETE /resources, DELETE parameters: null, Status Code:null,
     Error: 'Failed to remove resource from the challenge.', Details: ${circularJSON.stringify(err)}`);
+    logger.error(`Response Data: ${JSON.stringify(err.response.data)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to remove resource from the challenge.');
   }
 }
-
 /**
- * gets resources from the topcoder challenge
- * @param {String} id the challenge id
- * @returns {Array} the resources of challenge
+ * Finds project by given direct id and returns it
+ * @param {id} id in the database
+ * @param {Number} directId
+ * @returns {Promise}
  */
-async function getChallengeResources(id) {
+async function getProjectByDirectId(id, directId) {
   const apiKey = await getM2Mtoken();
-  logger.debug(`getting resource from challenge ${id}`);
-  try {
-    const response = await axios.get(`${challengesClient.basePath}/challenges/${id}/resources`, {
-      headers: {Authorization: `bearer ${apiKey}`}
-    });
-    const statusCode = response.data ? response.data.result.status : null;
-    loggerFile.info(`EndPoint: GET /challenges/${id}/resources,
-    GET parameters: null, Status Code:${statusCode}, Response:${circularJSON.stringify(response)}`);
-    return _.get(response, 'data.result.content');
-  } catch (err) {
-    loggerFile.info(`EndPoint: GET /challenges/${id}/resources, GET parameters: null, Status Code:null,
-    Error: 'Failed to get resource from the challenge.', Details: ${circularJSON.stringify(err)}`);
-    throw errors.convertTopcoderApiError(err, 'Failed to get resource from the challenge.');
-  }
+  return axios.get(`${config.TC_API_URL}/projects`, {
+    params: {
+      directProjectId: directId
+    },
+    headers: {
+      authorization: `Bearer ${apiKey}`
+    }
+  }).then((data) => {
+    // Append database project id to response
+    data.dbId = id;
+    // Log to debug if project is empty
+    if (data.data.length === 0) {
+      logger.debug(`Project with direct id ${directId} (database: ${id}) was not found in connect`);
+    }
+    return data;
+  }).catch((err) => {
+    logger.logFullError(err);
+    throw errors.convertTopcoderApiError(err, `Failed to fetch project with direct id ${directId}`);
+  });
 }
 
 
@@ -614,5 +477,5 @@ module.exports = {
   cancelPrivateContent,
   assignUserAsRegistrant,
   removeResourceToChallenge,
-  getChallengeResources
+  getProjectByDirectId
 };

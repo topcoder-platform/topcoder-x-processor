@@ -11,6 +11,7 @@
 
 const config = require('config');
 const Joi = require('joi');
+const v = require('validator');
 const _ = require('lodash');
 const logger = require('../utils/logger');
 const dbHelper = require('../utils/db-helper');
@@ -25,14 +26,13 @@ const models = require('../models');
 async function getTCUserName(provider, gitUser) {
   Joi.attempt({provider, gitUser}, getTCUserName.schema);
   const criteria = {};
-  if (_.isNumber(gitUser)) {
+  if (_.isNumber(gitUser) || v.isUUID(gitUser)) {
     if (provider === 'github') {
       criteria.githubUserId = gitUser;
     } else if (provider === 'gitlab') {
       criteria.gitlabUserId = gitUser;
     }
-  }
-  if (_.isString(gitUser)) {
+  } else if (_.isString(gitUser) || v.isEmail(gitUser)) {
     if (provider === 'github') {
       criteria.githubUsername = gitUser;
     } else if (provider === 'gitlab') {
@@ -79,11 +79,17 @@ async function getRepositoryCopilotOrOwner(provider, repoFullName) {
     topcoderUsername: {eq: hasCopilot ? project.copilot.toLowerCase() : project.owner.toLowerCase()}
   });
 
-  if (!userMapping || (provider === 'github' && !userMapping.githubUserId) || (provider === 'gitlab' && !userMapping.gitlabUserId)) {
+  logger.debug('userMapping');
+  logger.debug(userMapping);
+
+  if (!userMapping ||
+    (provider === 'github' && !userMapping.githubUserId) ||
+    (provider === 'gitlab' && !userMapping.gitlabUserId)) {
     throw new Error(`Couldn't find githost username for '${provider}' for this repository '${repoFullName}'.`);
   }
   const user = await dbHelper.scanOne(models.User, {
-    username: provider === 'github' ? userMapping.githubUsername : userMapping.gitlabUsername,
+    username: provider === 'github' ? userMapping.githubUsername :  // eslint-disable-line no-nested-ternary
+      userMapping.gitlabUsername,
     type: provider
   });
 

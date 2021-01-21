@@ -26,6 +26,13 @@ dynamoose.setDefaults({
   update: false
 });
 
+if (process.env.CREATE_DB) {
+  dynamoose.setDefaults({
+    create: true,
+    update: true
+  });
+}
+
 /* eslint-disable global-require */
 const models = {
   Issue: dynamoose.model('Topcoder_X.Issue', require('./Issue')),

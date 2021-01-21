@@ -19,6 +19,7 @@ const topcoderApiHelper = require('../utils/topcoder-api-helper');
 const models = require('../models');
 const dbHelper = require('../utils/db-helper');
 const eventService = require('./EventService');
+const constants = require('../constants');
 
 const md = new MarkdownIt();
 
@@ -62,18 +63,19 @@ function updateChallengeDetails(payments) {
  */
 async function getExistingChallengeIdIfExists(event, dbPayment) {
   // check if there is existing active challenge associated with this project
-  const existingPayments = await dbHelper.scanOne(models.CopilotPayment, {
+  const existingPayments = await dbHelper.scan(models.CopilotPayment, {
     project: {eq: dbPayment.project},
     username: {eq: event.project.copilot},
-    closed: {eq: 'false'},
-    challengeId: {gt: 0}
+    closed: {eq: 'false'}
   });
 
+  const payment = _.find(existingPayments, (x) => x.challengeUUID);
+
   // if no existing challenge found then it will be created by processor
-  if (existingPayments) {
+  if (payment) {
     // update db payment
     dbPayment = await dbHelper.update(models.CopilotPayment, dbPayment.id, {
-      challengeId: existingPayments.challengeId
+      challengeUUID: payment.challengeUUID
     });
   }
   return dbPayment;
@@ -113,7 +115,10 @@ async function _updateChallenge(copilotUsername, projectId, challengeId) {
     const changedPayment = {
       name: challengeTitle,
       detailedRequirements: requirements,
-      prizes: [prizes[0] - 1] // 1 is reduced for copilot fee
+      prizeSets: [{
+        type: 'copilot',
+        prizes: _.map(prizes, (prize) => ({type: 'USD', value: prize}))
+      }]
     };
 
     await topcoderApiHelper.updateChallenge(challengeId, changedPayment);
@@ -163,8 +168,8 @@ async function handlePaymentAdd(event, payment) {
   const copilot = {handle: event.project.copilot};
 
   payment = await getExistingChallengeIdIfExists(event, payment);
-  if (!_.isNil(payment.challengeId)) {
-    await _updateChallenge(copilot.handle, payment.project, payment.challengeId);
+  if (!_.isNil(payment.challengeUUID)) {
+    await _updateChallenge(copilot.handle, payment.project, payment.challengeUUID);
   } else {
     if (await _checkAndReSchedule(event, payment)) {
       return;
@@ -183,10 +188,6 @@ async function handlePaymentAdd(event, payment) {
     }
     try {
       logger.debug(`Getting the billing account ID for project ID: ${project.tcDirectId}`);
-      const accountId = await topcoderApiHelper.getProjectBillingAccountId(project.tcDirectId);
-
-      // use copilot id as the copilot of the challenge
-      const topcoderMemberId = await topcoderApiHelper.getTopcoderMemberId(copilot.handle);
 
       const challengeRequirements = md.render(`$${payment.amount} - ${payment.description}  `);
       const challengeTitle = constructChallengeName(project);
@@ -194,32 +195,28 @@ async function handlePaymentAdd(event, payment) {
         name: challengeTitle,
         projectId: project.tcDirectId,
         detailedRequirements: challengeRequirements,
-        prizes: [1],
-        task: true,
-        billingAccountId: accountId,
-        copilotId: topcoderMemberId,
-        copilotFee: payment.amount - 1,
+        prizes: [payment.amount],
         reviewType: 'INTERNAL'
       };
 
       // Create a new challenge
-      const challengeId = await topcoderApiHelper.createChallenge(newChallenge);
+      const challengeUUID = await topcoderApiHelper.createChallenge(newChallenge);
 
-      logger.debug(`updating database payment with new challenge id:${challengeId}`);
+      logger.debug(`updating database payment with new challenge id:${challengeUUID}`);
 
       // update db payment
       payment = dbHelper.update(models.CopilotPayment, payment.id, {
-        challengeId,
+        challengeUUID,
         status: 'challenge_creation_successful'
       });
 
       // adding user as registrants
-      await topcoderApiHelper.assignUserAsRegistrant(topcoderMemberId, challengeId);
+      await topcoderApiHelper.assignUserAsRegistrant(copilot.handle, challengeUUID);
 
       // active challenge
-      await topcoderApiHelper.activateChallenge(challengeId);
+      await topcoderApiHelper.activateChallenge(challengeUUID);
 
-      logger.debug(`challenge ${challengeId} has been activated!`);
+      logger.debug(`challenge ${challengeUUID} has been activated!`);
     } catch (ex) {
       await dbHelper.update(models.CopilotPayment, payment.id, {
         status: 'challenge_creation_retried'
@@ -238,8 +235,8 @@ async function handlePaymentAdd(event, payment) {
  */
 async function handlePaymentUpdate(event, payment) {
   const copilot = {handle: event.project.copilot};
-  await _updateChallenge(copilot.handle, payment.project, payment.challengeId);
-  logger.debug(`updated payment for challenge ${payment.challengeId} successful.`);
+  await _updateChallenge(copilot.handle, payment.project, payment.challengeUUID);
+  logger.debug(`updated payment for challenge ${payment.challengeUUID} successful.`);
 }
 
 
@@ -251,8 +248,8 @@ async function handlePaymentUpdate(event, payment) {
  */
 async function handlePaymentDelete(event, payment) {
   const copilot = {handle: event.project.copilot};
-  await _updateChallenge(copilot.handle, payment.project, payment.challengeId);
-  logger.debug(`updated payment for challenge ${payment.challengeId} successful.`);
+  await _updateChallenge(copilot.handle, payment.project, payment.challengeUUID);
+  logger.debug(`updated payment for challenge ${payment.challengeUUID} successful.`);
 }
 
 /**
@@ -291,14 +288,14 @@ async function handlePaymentUpdates(event) {
     });
 
     if (dbPayments) {
-      const challengeIds = _(dbPayments).map('challengeId').uniq().filter(_.isNumber)
+      const challengeIds = _(dbPayments).map('challengeUUID').uniq().filter(_.isString)
         .value();
       for (let i = 0; i < challengeIds.length; i++) { // eslint-disable-line no-restricted-syntax
-        const challengeId = challengeIds[i];
-        const challengeDetail = await topcoderApiHelper.getChallengeById(challengeId);
-        if (challengeDetail && challengeDetail.currentStatus === 'Completed') {
+        const challengeUUID = challengeIds[i];
+        const challengeDetail = await topcoderApiHelper.getChallengeById(challengeUUID);
+        if (challengeDetail && challengeDetail.currentStatus === constants.CHALLENGE_STATUS.COMPLETED) {
           const dbChallenges = await dbHelper.scan(models.CopilotPayment, {
-            challengeId,
+            challengeUUID,
             closed: 'false'
           });
           const updateChallenges = _.map(dbChallenges, (challenge) => {
@@ -325,10 +322,10 @@ async function process(event) {
     project: event.data.payment.project,
     amount: event.data.payment.amount,
     description: event.data.payment.description,
-    challengeId: event.data.payment.challengeId
+    challengeUUID: event.data.payment.challengeUUID
   } : {};
-  if (_.isNil(payment.challengeId)) {
-    delete payment.challengeId;
+  if (_.isNil(payment.challengeUUID)) {
+    delete payment.challengeUUID;
   }
   if (payment.project) {
     event.project = await dbHelper.getById(models.Project, payment.project);
@@ -356,7 +353,8 @@ process.schema = Joi.object().keys({
       project: Joi.string().optional(),
       amount: Joi.number().optional(),
       description: Joi.string().optional(),
-      challengeId: Joi.number().optional().allow(null),
+      challengeId: Joi.string().optional().allow(null),
+      challengeUUID: Joi.string().optional().allow(null),
       username: Joi.string().optional(),
       closed: Joi.boolean().optional(),
       status: Joi.string().optional(),

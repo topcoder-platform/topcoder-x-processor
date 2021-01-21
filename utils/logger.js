@@ -13,7 +13,6 @@ const util = require('util');
 const config = require('config');
 const _ = require('lodash');
 const winston = require('winston');
-const getParams = require('get-parameter-names');
 const globalLog = require('global-request-logger');
 
 const logger = new winston.Logger({
@@ -62,21 +61,6 @@ function sanitizeObject(obj) {
 }
 
 /**
- * Convert array with arguments to object
- * @param {Array} params the name of parameters
- * @param {Array} arr the array with values
- * @returns {Object} converted object
- * @private
- */
-function combineObject(params, arr) {
-  const ret = {};
-  _.forEach(arr, (arg, i) => {
-    ret[params[i]] = arg;
-  });
-  return ret;
-}
-
-/**
  * Decorate all functions of a service and log debug information if DEBUG is enabled
  * @param {Object} service the service
  */
@@ -85,17 +69,9 @@ logger.decorateWithLogging = function decorateWithLogging(service) {
     return;
   }
   _.forEach(service, (method, name) => {
-    const params = method.params || getParams(method);
     service[name] = async function serviceMethodWithLogging() {
-      logger.debug(`ENTER ${name}`);
-      logger.debug('input arguments');
-      const args = Array.prototype.slice.call(arguments); // eslint-disable-line
-      logger.debug(util.inspect(sanitizeObject(combineObject(params, args))));
       try {
         const result = await method.apply(this, arguments); // eslint-disable-line
-        logger.debug(`EXIT ${name}`);
-        logger.debug('output arguments');
-        logger.debug(util.inspect(sanitizeObject(result)));
         return result;
       } catch (e) {
         logger.logFullError(e, name);
@@ -111,6 +87,31 @@ logger.decorateWithLogging = function decorateWithLogging(service) {
  */
 logger.buildService = function buildService(service) {
   logger.decorateWithLogging(service);
+};
+
+/**
+ * Log with event context and issue.
+ * @param {String} message the log message
+ * @param {Object} event the event object
+ * @param {Object} issue the issue object (optional)
+ */
+logger.debugWithContext = function debugWithContext(message, event, issue = null) {
+  if (!event) {
+    logger.debug(message);
+    return;
+  }
+  let prefix = '';
+  try {
+    if (event.data.repository.repoUrl) {
+      prefix += event.data.repository.repoUrl;
+      if (issue) {
+        prefix += ` Issue #${issue.number}`;
+      }
+    }
+  } catch (error) {
+    // Ignore error
+  }
+  logger.debug(`${prefix} ${message}`);
 };
 
 // globalLog.initialize();

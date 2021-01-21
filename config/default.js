@@ -27,47 +27,18 @@ module.exports = {
   },
   TC_DEV_ENV: process.env.NODE_ENV === 'production' ? false : true,
   TC_AUTHN_URL: process.env.TC_AUTHN_URL || 'https://topcoder-dev.auth0.com/oauth/ro',
-  TC_AUTHN_REQUEST_BODY: {
-    username: process.env.TC_USERNAME || 'mess',
-    password: process.env.TC_PASSWORD || 'appirio123',
-    client_id: process.env.TC_CLIENT_ID || 'JFDo7HMkf0q2CkVFHojy3zHWafziprhT',
-    sso: false,
-    scope: 'openid profile offline_access',
-    response_type: 'token',
-    connection: process.env.CLIENT_V2CONNECTION || 'TC-User-Database',
-    grant_type: 'password',
-    device: 'Browser'
-  },
   TC_AUTHZ_URL: process.env.TC_AUTHZ_URL || 'https://api.topcoder-dev.com/v3/authorizations',
+  TC_DIRECT_ID: 7377,
   NEW_CHALLENGE_TEMPLATE: process.env.NEW_CHALLENGE_TEMPLATE || {
-    milestoneId: 1,
-    subTrack: 'FIRST_2_FINISH',
-    reviewType: 'COMMUNITY',
-    technologies: [],
-    platforms: [],
-    finalDeliverableTypes: [],
-    confidentialityType: 'PUBLIC',
-    submissionGuidelines: 'Upload the updated code to TopCoder',
-
-    // From here, the properties will be set by the processor.
-    // Just leave them here for readability
-    name: null,
-    projectId: null,
-    registrationStartDate: null,
-    registrationStartsAt: null,
-
-    // NOTE: if subTrack is FIRST_2_FINISH,
-    // the ***EndsAt will be set automatically by TC APIs
-    registrationEndsAt: null,
-    submissionEndsAt: null,
-    detailedRequirements: null,
-    prizes: null
+    status: 'Draft'
   },
 
   // NOTE: if subTrack is FIRST_2_FINISH,
   // this config has no effect since the ***EndsAt will be set automatically by TC APIs
   NEW_CHALLENGE_DURATION_IN_DAYS: process.env.NEW_CHALLENGE_DURATION_IN_DAYS || 5,
   TC_URL: process.env.TC_URL || 'https://www.topcoder-dev.com',
+  TC_API_URL: process.env.TC_API_URL || 'https://api.topcoder-dev.com/v5',
+  TC_API_URL_V3: process.env.TC_API_URL || 'https://api.topcoder-dev.com/v3',
   GITLAB_API_BASE_URL: process.env.GITLAB_API_BASE_URL || 'https://gitlab.com',
   ISSUE_LABEL_PREFIX: process.env.ISSUE_LABEL_PREFIX || 'tcx_',
   PAID_ISSUE_LABEL: process.env.PAID_ISSUE_LABEL || 'tcx_Paid',
@@ -93,5 +64,16 @@ module.exports = {
   TOKEN_CACHE_TIME: process.env.TOKEN_CACHE_TIME || 43200,
   AUTH0_CLIENT_ID: process.env.AUTH0_CLIENT_ID,
   AUTH0_CLIENT_SECRET: process.env.AUTH0_CLIENT_SECRET,
-  AUTH0_PROXY_SERVER_URL: process.env.AUTH0_PROXY_SERVER_URL
+  AUTH0_PROXY_SERVER_URL: process.env.AUTH0_PROXY_SERVER_URL,
+  GRANT_TYPE: 'client_credentials',
+
+  // used as base to construct various URLs
+  WEBSITE: process.env.WEBSITE || 'http://topcoderx.topcoder-dev.com',
+  WEBSITE_SECURE: process.env.WEBSITE_SECURE || 'https://topcoderx.topcoder-dev.com',
+
+  ROLE_ID_COPILOT: process.env.ROLE_ID_COPILOT || 'cfe12b3f-2a24-4639-9d8b-ec86726f76bd',
+  ROLE_ID_SUBMITTER: process.env.ROLE_ID_SUBMITTER || '732339e7-8e30-49d7-9198-cccf9451e221',
+  TYPE_ID_TASK: process.env.TYPE_ID_TASK || 'ecd58c69-238f-43a4-a4bb-d172719b9f31',
+  DEFAULT_TIMELINE_TEMPLATE_ID: process.env.DEFAULT_TIMELINE_TEMPLATE_ID || '53a307ce-b4b3-4d6f-b9a1-3741a58f77e6',
+  DEFAULT_TRACK_ID: process.env.DEFAULT_TIMELINE_TEMPLATE_ID || '9b6fc876-f4d9-4ccb-9dfd-419247628825'
 };

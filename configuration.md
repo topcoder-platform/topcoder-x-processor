@@ -14,7 +14,6 @@ The following config parameters are supported, they are defined in `config/defau
 |KAFKA_CLIENT_CERT_KEY | The Kafka SSL certificate key to use when connecting| Read from kafka_client.key file, but this can be set as a string like it is on Heroku|
 |TC_DEV_ENV| the flag whether to use topcoder development api or production| false|
 | TC_AUTHN_URL | the Topcoder authentication url | https://topcoder-dev.auth0.com/oauth/ro |
-| TC_AUTHN_REQUEST_BODY | the Topcoder authentication request body. This makes use of some environment variables: `TC_USERNAME`, `TC_PASSWORD`, `TC_CLIENT_ID`, `CLIENT_V2CONNECTION` | see `default.js` |
 | TC_AUTHZ_URL | the Topcoder authorization url | https://api.topcoder-dev.com/v3/authorizations |
 | NEW_CHALLENGE_TEMPLATE | the body template for new challenge request. You can change the subTrack, reviewTypes, technologies, .. here | see `default.js` |
 | NEW_CHALLENGE_DURATION_IN_DAYS | the duration of new challenge | 5 |
@@ -40,6 +39,13 @@ The following config parameters are supported, they are defined in `config/defau
 |TOKEN_CACHE_TIME| The machine-to-machine token cache validation time |43200|
 |AUTH0_CLIENT_ID| The Auth0 ClientID for generating Machine-to-machine token ||
 |AUTH0_CLIENT_SECRET| The Auth0 Client Secret for generating Machine-to-machine token ||
+|ROLE_ID_COPILOT| The registered role id of copilot ||
+|ROLE_ID_SUBMITTER| The registered role id of submitter ||
+|TYPE_ID_TASK| The registered type id of a task ||
+|DEFAULT_TIMELINE_TEMPLATE_ID| The default timeline template id ||
+|TC_API_URL| The topcoder backend API url |`https://api.topcoder-dev.com/v5`|
+|TC_API_URL_V3| The topcoder backend API url V3 |`https://api.topcoder-dev.com/v3`|
+|DEFAULT_TRACK_ID| The default track id ||
 
 KAFKA_OPTIONS should be object as described in https://github.com/oleksiyk/kafka#ssl
 For using with SSL, the options should be as
