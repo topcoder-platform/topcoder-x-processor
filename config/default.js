@@ -38,7 +38,7 @@ module.exports = {
   NEW_CHALLENGE_DURATION_IN_DAYS: process.env.NEW_CHALLENGE_DURATION_IN_DAYS || 5,
   TC_URL: process.env.TC_URL || 'https://www.topcoder-dev.com',
   TC_API_URL: process.env.TC_API_URL || 'https://api.topcoder-dev.com/v5',
-  TC_API_URL_V3: process.env.TC_API_URL || 'https://api.topcoder-dev.com/v3',
+  TC_API_URL_V3: process.env.TC_API_URL_V3 || 'https://api.topcoder-dev.com/v3',
   GITLAB_API_BASE_URL: process.env.GITLAB_API_BASE_URL || 'https://gitlab.com',
   ISSUE_LABEL_PREFIX: process.env.ISSUE_LABEL_PREFIX || 'tcx_',
   PAID_ISSUE_LABEL: process.env.PAID_ISSUE_LABEL || 'tcx_Paid',
