@@ -494,6 +494,19 @@ async function handleIssueClose(event, issue) { // eslint-disable-line
         logger.debugWithContext(`Getting the topcoder member ID for copilot name : ${event.copilot.topcoderUsername}`, event, issue);
         // get copilot tc user id
         await topcoderApiHelper.addResourceToChallenge(dbIssue.challengeUUID, event.copilot.topcoderUsername, config.ROLE_ID_COPILOT);
+        const updateBody = {
+          prizeSets: [{
+            type: 'placement',
+            prizes: _.map(issue.prizes, (prize) => ({type: 'USD', value: prize}))
+          },
+          {
+            type: 'copilot',
+            prizes: [{type: 'USD', value: 40}]
+          }
+        ]
+        };
+        await topcoderApiHelper.updateChallenge(dbIssue.challengeUUID, updateBody);
+  
       } else {
         logger.debugWithContext('Copilot is already set or the project create copilot payments option is disabled, so skipping', event, issue);
       }
