@@ -508,7 +508,12 @@ async function handleIssueClose(event, issue) { // eslint-disable-line
         await topcoderApiHelper.updateChallenge(dbIssue.challengeUUID, updateBody);
   
       } else {
-        logger.debugWithContext('Copilot is already set or the project create copilot payments option is disabled, so skipping', event, issue);
+        if(copilotAlreadySet){
+          logger.debugWithContext('Copilot is already set, so skipping', event, issue);
+        }
+        if(!createCopilotPayments){
+          logger.debugWithContext('Create copilot payments is unchecked on the Topcoder-X project setup, so skipping', event, issue);
+        }
       }
 
       logger.debugWithContext(`Getting the topcoder member ID for member name: ${assigneeMember.topcoderUsername}`, event, issue);
