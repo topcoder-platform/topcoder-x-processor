@@ -485,15 +485,13 @@ async function handleIssueClose(event, issue) { // eslint-disable-line
       };
       await topcoderApiHelper.updateChallenge(dbIssue.challengeUUID, updateBody);
 
-      const copilotAlreadySet = await topcoderApiHelper.roleAlreadySet(dbIssue.challengeUUID, config.ROLE_ID_COPILOT);
       const createCopilotPayments = project.createCopilotPayments === 'true' &&
-        event.copilot.topcoderUsername.toLowerCase() !== assigneeMember.topcoderUsername.toLowerCase();
+            event.copilot.topcoderUsername.toLowerCase() !== assigneeMember.topcoderUsername.toLowerCase();
       event.createCopilotPayments = createCopilotPayments;
 
-      if (!copilotAlreadySet && createCopilotPayments) {
-        logger.debugWithContext(`Getting the topcoder member ID for copilot name : ${event.copilot.topcoderUsername}`, event, issue);
-        // get copilot tc user id
-        await topcoderApiHelper.addResourceToChallenge(dbIssue.challengeUUID, event.copilot.topcoderUsername, config.ROLE_ID_COPILOT);
+      if (createCopilotPayments) {
+        logger.debugWithContext(`Setting copilot payment`);
+        
         const updateBody = {
           prizeSets: [{
             type: 'placement',
@@ -507,13 +505,9 @@ async function handleIssueClose(event, issue) { // eslint-disable-line
         };
         await topcoderApiHelper.updateChallenge(dbIssue.challengeUUID, updateBody);
   
-      } else {
-        if(copilotAlreadySet){
-          logger.debugWithContext('Copilot is already set, so skipping', event, issue);
-        }
-        if(!createCopilotPayments){
+      } 
+      else {
           logger.debugWithContext('Create copilot payments is unchecked on the Topcoder-X project setup, so skipping', event, issue);
-        }
       }
 
       logger.debugWithContext(`Getting the topcoder member ID for member name: ${assigneeMember.topcoderUsername}`, event, issue);
@@ -643,6 +637,11 @@ async function handleIssueCreate(event, issue, forceAssign = false) {
       status: constants.ISSUE_STATUS.CHALLENGE_CREATION_SUCCESSFUL,
       updatedAt: new Date()
     });
+    
+    logger.debugWithContext(`Adding copilot to issue: ${event.copilot.topcoderUsername}`, event, issue);
+    // get copilot tc user id
+    await topcoderApiHelper.addResourceToChallenge(issue.challengeUUID, event.copilot.topcoderUsername, config.ROLE_ID_COPILOT);
+    
   } catch (e) {
     logger.error(`Challenge creation failure: ${e}`);
     delete issueCreationLock[creationLockKey];
