@@ -431,9 +431,11 @@ async function handleIssueClose(event, issue) { // eslint-disable-line
 
       if (closeChallenge) {
         logger.debugWithContext(`The associated challenge ${dbIssue.challengeUUID} is being scheduled for cancellation since no payment will be given`,
-          event, issue);
-        // Currently, there is no working API for closing challenge.
-        // The process is just ignored.
+            event, issue);
+        await dbHelper.update(models.Issue, dbIssue.id, {
+          status: constants.ISSUE_STATUS.CHALLENGE_CANCELLED,
+          updatedAt: new Date()
+        });
         return;
       }
 
@@ -525,6 +527,9 @@ async function handleIssueClose(event, issue) { // eslint-disable-line
       // activate challenge
       if (challenge.status === 'Draft') {
         await topcoderApiHelper.activateChallenge(dbIssue.challengeUUID);
+        //HACK - sleep 30 seconds so the legacy processor has time to "catch up"
+        logger.debugWithContext('Sleeping for 30 seconds after activation so everything propagates...', event, issue);
+        await new Promise(resolve => setTimeout(resolve, 30000));
       }
 
       logger.debugWithContext(`Closing challenge with winner ${assigneeMember.topcoderUsername}(${winnerId})`, event, issue);
