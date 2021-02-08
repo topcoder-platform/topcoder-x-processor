@@ -266,10 +266,10 @@ async function getProjectBillingAccountId(id) {
  */
 async function getTopcoderMemberId(handle) {
   try {
-    const response = await axios.get(`${config.TC_API_URL_V3}/members/${handle}`);
+    const response = await axios.get(`${config.TC_API_URL}/members/${handle}`);
     const statusCode = response ? response.status : null;
     loggerFile.info(`EndPoint: GET members/${handle},  GET parameters: null, Status Code:${statusCode}, Response:${circularJSON.stringify(response.data)}`);
-    return _.get(response, 'data.result.content.userId');
+    return _.get(response, 'data.userId');
   } catch (err) {
     loggerFile.info(`EndPoint: GET members/${handle}, GET parameters: null, Status Code:null,
     Error: 'Failed to get topcoder member id.', Details: ${circularJSON.stringify(err)}`);
