@@ -12,9 +12,6 @@ The following config parameters are supported, they are defined in `config/defau
 |KAFKA_GROUP_ID | The Kafka group id name| topcoder-x-processor |
 |KAFKA_CLIENT_CERT | The Kafka SSL certificate to use when connecting| Read from kafka_client.cer file, but this can be set as a string like it is on Heroku |
 |KAFKA_CLIENT_CERT_KEY | The Kafka SSL certificate key to use when connecting| Read from kafka_client.key file, but this can be set as a string like it is on Heroku|
-|TC_DEV_ENV| the flag whether to use topcoder development api or production| false|
-| TC_AUTHN_URL | the Topcoder authentication url | https://topcoder-dev.auth0.com/oauth/ro |
-| TC_AUTHZ_URL | the Topcoder authorization url | https://api.topcoder-dev.com/v3/authorizations |
 | NEW_CHALLENGE_TEMPLATE | the body template for new challenge request. You can change the subTrack, reviewTypes, technologies, .. here | see `default.js` |
 | NEW_CHALLENGE_DURATION_IN_DAYS | the duration of new challenge | 5 |
 |TC_URL| the base URL of topcoder to get the challenge URL| defaults to `https://www.topcoder-dev.com`|
@@ -23,13 +20,11 @@ The following config parameters are supported, they are defined in `config/defau
 |FIX_ACCEPTED_ISSUE_LABEL|the label name for fix accepted, should be one of the label configured in topcoder x ui|'tcx_FixAccepted'|
 |ASSIGNED_ISSUE_LABEL| the label name for assigned, should be one of the label configured in topcoder x ui| 'tcx_Assigned'|
 |OPEN_FOR_PICKUP_ISSUE_LABEL| the label name for open for pickup, should be one of the label configured in topcoder x ui| 'tcx_OpenForPickup'|
-|TC_OR_DETAIL_LINK|the link to online review detail of challenge| see `default.js`, OR link for dev environment|
 |RETRY_COUNT| the number of times an event should be retried to process| 3|
 |RETRY_INTERVAL| the interval at which the event should be retried to process in milliseconds | 120000|
 |READY_FOR_REVIEW_ISSUE_LABEL| the label name for ready for review, should be one of the label configured in topcoder x ui|'tcx_ReadyForReview'|
 |NOT_READY_ISSUE_LABEL| the label name for not ready, should be one of the label configured in topcoder x ui|'tcx_NotReady'|
 |CANCELED_ISSUE_LABEL| the label name for canceled, should be one of the label configured in topcoder x ui|'tcx_Canceled'|
-|CANCEL_CHALLENGE_INTERVAL| the time in millisecond after which the challenge will be closed| '24*60*60*1000'|
 |AWS_ACCESS_KEY_ID | The Amazon certificate key to use when connecting. Use local dynamodb you can set fake value|FAKE_ACCESS_KEY_ID |
 |AWS_SECRET_ACCESS_KEY | The Amazon certificate access key to use when connecting. Use local dynamodb you can set fake value|FAKE_SECRET_ACCESS_KEY |
 |AWS_REGION | The Amazon certificate region to use when connecting. Use local dynamodb you can set fake value|FAKE_REGION |
@@ -44,7 +39,6 @@ The following config parameters are supported, they are defined in `config/defau
 |TYPE_ID_TASK| The registered type id of a task ||
 |DEFAULT_TIMELINE_TEMPLATE_ID| The default timeline template id ||
 |TC_API_URL| The topcoder backend API url |`https://api.topcoder-dev.com/v5`|
-|TC_API_URL_V3| The topcoder backend API url V3 |`https://api.topcoder-dev.com/v3`|
 |DEFAULT_TRACK_ID| The default track id ||
 
 KAFKA_OPTIONS should be object as described in https://github.com/oleksiyk/kafka#ssl

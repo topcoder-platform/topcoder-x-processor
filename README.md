@@ -29,9 +29,6 @@ The following config parameters are supported, they are defined in `config/defau
 | TOPIC                          | the kafka subscribe topic name             |  tc-x-events                    |
 | PARTITION                  | the kafka partition            |  0|
 | KAFKA_OPTIONS                  | the connection option for kafka            |  see below about KAFKA options                  |
-|TC_DEV_ENV| the flag whether to use topcoder development api or production| false|
-| TC_AUTHN_URL | the Topcoder authentication url | https://topcoder-dev.auth0.com/oauth/ro |
-| TC_AUTHZ_URL | the Topcoder authorization url | https://api.topcoder-dev.com/v3/authorizations |
 | NEW_CHALLENGE_TEMPLATE | the body template for new challenge request. You can change the subTrack, reviewTypes, technologies, .. here | see `default.js` |
 | NEW_CHALLENGE_DURATION_IN_DAYS | the duration of new challenge | 5 |
 |TC_URL| the base URL of topcoder to get the challenge URL| defaults to `https://www.topcoder-dev.com`|
@@ -40,7 +37,6 @@ The following config parameters are supported, they are defined in `config/defau
 |FIX_ACCEPTED_ISSUE_LABEL|the label name for fix accepted, should be one of the label configured in topcoder x ui|'tcx_FixAccepted'|
 |ASSIGNED_ISSUE_LABEL| the label name for assigned, should be one of the label configured in topcoder x ui| 'tcx_Assigned'|
 |OPEN_FOR_PICKUP_ISSUE_LABEL| the label name for open for pickup, should be one of the label configured in topcoder x ui| 'tcx_OpenForPickup'|
-|TC_OR_DETAIL_LINK|the link to online review detail of challenge| see `default.js`, OR link for dev environment|
 |RETRY_COUNT| the number of times an event should be retried to process| 3|
 |RETRY_INTERVAL| the interval at which the event should be retried to process in milliseconds | 120000|
 |READY_FOR_REVIEW_ISSUE_LABEL| the label name for ready for review, should be one of the label configured in topcoder x ui|'tcx_ReadyForReview'|
@@ -58,7 +54,6 @@ The following config parameters are supported, they are defined in `config/defau
 |TYPE_ID_TASK| The registered type id of a task ||
 |DEFAULT_TIMELINE_TEMPLATE_ID| The default timeline template id ||
 |TC_API_URL| The topcoder backend API url |`https://api.topcoder-dev.com/v5`|
-|TC_API_URL_V3| The topcoder backend API url V3 |`https://api.topcoder-dev.com/v3`|
 
 KAFKA_OPTIONS should be object as described in https://github.com/oleksiyk/kafka#ssl
 For using with SSL, the options should be as

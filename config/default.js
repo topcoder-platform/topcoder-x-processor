@@ -25,10 +25,6 @@ module.exports = {
       passphrase: 'secret', // NOTE:* This configuration specifies the private key passphrase used while creating it.
     }
   },
-  TC_DEV_ENV: process.env.NODE_ENV === 'production' ? false : true,
-  TC_AUTHN_URL: process.env.TC_AUTHN_URL || 'https://topcoder-dev.auth0.com/oauth/ro',
-  TC_AUTHZ_URL: process.env.TC_AUTHZ_URL || 'https://api.topcoder-dev.com/v3/authorizations',
-  TC_DIRECT_ID: 7377,
   NEW_CHALLENGE_TEMPLATE: process.env.NEW_CHALLENGE_TEMPLATE || {
     status: 'Draft'
   },
@@ -38,7 +34,6 @@ module.exports = {
   NEW_CHALLENGE_DURATION_IN_DAYS: process.env.NEW_CHALLENGE_DURATION_IN_DAYS || 5,
   TC_URL: process.env.TC_URL || 'https://www.topcoder-dev.com',
   TC_API_URL: process.env.TC_API_URL || 'https://api.topcoder-dev.com/v5',
-  TC_API_URL_V3: process.env.TC_API_URL_V3 || 'https://api.topcoder-dev.com/v3',
   GITLAB_API_BASE_URL: process.env.GITLAB_API_BASE_URL || 'https://gitlab.com',
   ISSUE_LABEL_PREFIX: process.env.ISSUE_LABEL_PREFIX || 'tcx_',
   PAID_ISSUE_LABEL: process.env.PAID_ISSUE_LABEL || 'tcx_Paid',
@@ -48,10 +43,8 @@ module.exports = {
   OPEN_FOR_PICKUP_ISSUE_LABEL: process.env.READY_FOR_REVIEW_ISSUE_LABEL || 'tcx_OpenForPickup',
   NOT_READY_ISSUE_LABEL: process.env.NOT_READY_ISSUE_LABEL || 'tcx_NotReady',
   CANCELED_ISSUE_LABEL: process.env.CANCELED_ISSUE_LABEL || 'tcx_Canceled',
-  TC_OR_DETAIL_LINK: process.env.TC_OR_DETAIL_LINK || 'https://software.topcoder-dev.com/review/actions/ViewProjectDetails?pid=',
   RETRY_COUNT: process.env.RETRY_COUNT || 2,
   RETRY_INTERVAL: process.env.RETRY_INTERVAL || 120000, // 2 minutes
-  CANCEL_CHALLENGE_INTERVAL: process.env.CANCEL_CHALLENGE_INTERVAL || 24 * 60 * 60 * 1000, // 24 Hours
   DYNAMODB: {
     AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID,
     AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY,
@@ -68,7 +61,6 @@ module.exports = {
   GRANT_TYPE: 'client_credentials',
 
   // used as base to construct various URLs
-  WEBSITE: process.env.WEBSITE || 'http://topcoderx.topcoder-dev.com',
   WEBSITE_SECURE: process.env.WEBSITE_SECURE || 'https://topcoderx.topcoder-dev.com',
 
   ROLE_ID_COPILOT: process.env.ROLE_ID_COPILOT || 'cfe12b3f-2a24-4639-9d8b-ec86726f76bd',

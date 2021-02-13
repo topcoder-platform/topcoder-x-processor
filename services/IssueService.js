@@ -109,7 +109,8 @@ async function ensureChallengeExists(event, issue, create = true) {
 async function getProjectDetail(event) {
   const fullRepoUrl = gitHelper.getFullRepoUrl(event);
   const project = await dbHelper.scanOne(models.Project, {
-    repoUrl: fullRepoUrl
+    repoUrl: fullRepoUrl,
+    archived: 'false'
   });
 
   return project;
@@ -860,7 +861,8 @@ async function process(event) {
   event.data.repository.repoUrl = fullRepoUrl;
 
   const project = await dbHelper.scanOne(models.Project, {
-    repoUrl: fullRepoUrl
+    repoUrl: fullRepoUrl,
+    archived: 'false'
   });
 
   issue.projectId = project.id;
