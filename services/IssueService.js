@@ -526,12 +526,13 @@ async function handleIssueClose(event, issue) { // eslint-disable-line
       }
 
       // activate challenge
-      if (challenge.status === 'Draft') {
-        await topcoderApiHelper.activateChallenge(dbIssue.challengeUUID);
+      
+      // if (challenge.status === 'Draft') {
+        // await topcoderApiHelper.activateChallenge(dbIssue.challengeUUID);
         //HACK - sleep 30 seconds so the legacy processor has time to "catch up"
-        logger.debugWithContext('Sleeping for 30 seconds after activation so everything propagates...', event, issue);
-        await new Promise(resolve => setTimeout(resolve, 30000));
-      }
+        // logger.debugWithContext('Sleeping for 1 seconds after activation so everything propagates...', event, issue);
+        // await new Promise(resolve => setTimeout(resolve, 1000));
+      // }
 
       logger.debugWithContext(`Closing challenge with winner ${assigneeMember.topcoderUsername}(${winnerId})`, event, issue);
       await topcoderApiHelper.closeChallenge(dbIssue.challengeUUID, winnerId, assigneeMember.topcoderUsername);
