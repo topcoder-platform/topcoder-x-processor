@@ -76,9 +76,11 @@ async function createChallenge(challenge) {
     timelineTemplateId: config.DEFAULT_TIMELINE_TEMPLATE_ID,
     projectId: challenge.projectId,
     trackId: config.DEFAULT_TRACK_ID,
-    legacy:{
-      pureV5Task: true
-    }
+    // legacy:{
+    //   pureV5Task: true
+    // },
+    tags:['Other'],
+    startDate: new Date()
   });
   try {
     const response = await axios.post(`${config.TC_API_URL}/challenges`, body, {
