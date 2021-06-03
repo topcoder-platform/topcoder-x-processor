@@ -18,12 +18,12 @@ const logger = require('./logger');
  */
 async function getById(model, id) {
   return await new Promise((resolve, reject) => {
-    model.query('id').eq(id).consistent().exec((err, result) => {
+    model.queryOne('id').eq(id).consistent().exec((err, result) => {
       if (err) {
         return reject(err);
       }
 
-      return resolve(result[0]);
+      return resolve(result);
     });
   });
 }
@@ -57,7 +57,7 @@ async function scan(model, scanParams) {
 async function queryOneIssue(model, repositoryId, number, provider) {
   return await new Promise((resolve, reject) => {
     model.query('repositoryId').eq(repositoryId)
-    .filter('number')
+    .where('number')
     .eq(number)
     .filter('provider')
     .eq(provider)
@@ -74,20 +74,146 @@ async function queryOneIssue(model, repositoryId, number, provider) {
 }
 
 /**
- * Get single data by scan parameters
- * @param {Object} model The dynamoose model to scan
- * @param {Object} scanParams The scan parameters object
+ * Get single data by query parameters
+ * @param {Object} model The dynamoose model to query
+ * @param {String} repoUrl The repository url
  * @returns {Promise<void>}
  */
-async function scanOne(model, scanParams) {
+async function queryOneActiveProject(model, repoUrl) {
   return await new Promise((resolve, reject) => {
-    model.scan(scanParams).consistent().all().exec((err, result) => {
+    model.query('repoUrl').eq(repoUrl)
+    .where('archived')
+    .eq('false')
+    .all()
+    .exec((err, result) => {
       if (err || !result) {
-        logger.debug(`scanOne. Error. ${err}`);
+        logger.debug(`queryOneActiveProject. Error. ${err}`);
         return reject(err);
       }
-
       return resolve(result.count === 0 ? null : result[0]);
+    });
+  });
+}
+
+/**
+ * Get single data by query parameters
+ * @param {Object} model The dynamoose model to query
+ * @param {String} username The user username
+ * @param {String} type The type of user
+ * @returns {Promise<void>}
+ */
+async function queryOneUserByType(model, username, type) {
+  return await new Promise((resolve, reject) => {
+    model.query('username').eq(username)
+    .where('type')
+    .eq(type)
+    .all()
+    .exec((err, result) => {
+      if (err || !result) {
+        logger.debug(`queryOneUserByType. Error. ${err}`);
+        return reject(err);
+      }
+      return resolve(result.count === 0 ? null : result[0]);
+    });
+  });
+}
+
+/**
+ * Get single data by query parameters
+ * @param {Object} model The dynamoose model to query
+ * @param {String} tcusername The tc username
+ * @returns {Promise<void>}
+ */
+async function queryOneUserMappingByTCUsername(model, tcusername) {
+  return await new Promise((resolve, reject) => {
+    model.queryOne('topcoderUsername').eq(tcusername)
+    .all()
+    .exec((err, result) => {
+      if (err || !result) {
+        logger.debug(`queryOneUserMappingByTCUsername. Error. ${err}`);
+        return reject(err);
+      }
+      return resolve(result);
+    });
+  });
+}
+
+/**
+ * Get single data by query parameters
+ * @param {Object} model The dynamoose model to query
+ * @param {String} username The username
+ * @returns {Promise<void>}
+ */
+async function queryOneUserMappingByGithubUsername(model, username) {
+  return await new Promise((resolve, reject) => {
+    model.queryOne('githubUsername').eq(username)
+    .all()
+    .exec((err, result) => {
+      if (err || !result) {
+        logger.debug(`queryOneUserMappingByGithubUsername. Error. ${err}`);
+        return reject(err);
+      }
+      return resolve(result);
+    });
+  });
+}
+
+/**
+ * Get single data by query parameters
+ * @param {Object} model The dynamoose model to query
+ * @param {String} username The username
+ * @returns {Promise<void>}
+ */
+async function queryOneUserMappingByGitlabUsername(model, username) {
+  return await new Promise((resolve, reject) => {
+    model.queryOne('gitlabUsername').eq(username)
+    .all()
+    .exec((err, result) => {
+      if (err || !result) {
+        logger.debug(`queryOneUserMappingByGitlabUsername. Error. ${err}`);
+        return reject(err);
+      }
+      return resolve(result);
+    });
+  });
+}
+
+/**
+ * Get single data by query parameters
+ * @param {Object} model The dynamoose model to query
+ * @param {Number} userId The user id
+ * @returns {Promise<void>}
+ */
+async function queryOneUserMappingByGithubUserId(model, userId) {
+  return await new Promise((resolve, reject) => {
+    model.queryOne('githubUserId').eq(userId)
+    .all()
+    .exec((err, result) => {
+      if (err || !result) {
+        logger.debug(`queryOneUserMappingByGithubUserId. Error. ${err}`);
+        return reject(err);
+      }
+      return resolve(result);
+    });
+  });
+}
+
+/**
+ * Get single data by query parameters
+ * @param {Object} model The dynamoose model to query
+ * @param {Number} userId The  The user id
+ * @returns {Promise<void>}
+ */
+async function queryOneUserMappingByGitlabUserId(model, userId) {
+  return await new Promise((resolve, reject) => {
+    model.queryOne('gitlabUserId').eq(userId)
+    .all()
+    .exec((err, result) => {
+      if (err || !result) {
+        logger.debug(`queryOneUserMappingByGitlabUserId. Error. ${err}`);
+        return reject(err);
+      }
+      return resolve(result);
     });
   });
 }
@@ -154,10 +280,10 @@ async function update(Model, id, data) {
 /**
  * Delete item in database
  * @param {Object} Model The dynamoose model to delete
- * @param {Object} queryParams The query parameters object
+ * @param {String} id The id of copilot payment
  */
-async function remove(Model, queryParams) {
-  const dbItem = await scanOne(Model, queryParams);
+async function removeCopilotPayment(Model, id) {
+  const dbItem = await getById(Model, id);
   await new Promise((resolve, reject) => {
     if (dbItem != null) {
       dbItem.delete((err) => {
@@ -196,11 +322,17 @@ async function removeIssue(Model, repositoryId, number, provider) {
 module.exports = {
   getById,
   scan,
-  scanOne,
   updateMany,
   create,
   update,
-  remove,
+  queryOneActiveProject,
   queryOneIssue,
+  queryOneUserByType,
+  queryOneUserMappingByGithubUserId,
+  queryOneUserMappingByGitlabUserId,
+  queryOneUserMappingByGithubUsername,
+  queryOneUserMappingByGitlabUsername,
+  queryOneUserMappingByTCUsername,
+  removeCopilotPayment,
   removeIssue
 };

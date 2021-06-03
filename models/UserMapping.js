@@ -23,10 +23,42 @@ const schema = new Schema({
       name: 'TopcoderUsernameIndex'
     }
   },
-  githubUsername: String,
-  gitlabUsername: String,
-  githubUserId: Number,
-  gitlabUserId: Number
+  githubUsername: {
+    type: String,
+    index: {
+      global: true,
+      project: true,
+      rangKey: 'id',
+      name: 'GithubUsernameIndex'
+    }
+  },
+  gitlabUsername: {
+    type: String,
+    index: {
+      global: true,
+      project: true,
+      rangKey: 'id',
+      name: 'GitlabUsernameIndex'
+    }
+  },
+  githubUserId: {
+    type: Number,
+    index: {
+      global: true,
+      project: true,
+      rangKey: 'id',
+      name: 'GithubUserIdIndex'
+    }
+  },
+  gitlabUserId: {
+    type: Number,
+    index: {
+      global: true,
+      project: true,
+      rangKey: 'id',
+      name: 'GitlabUserIdIndex'
+    }
+  }
 });
 
 module.exports = schema;

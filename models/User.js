@@ -37,7 +37,7 @@ const schema = new Schema({
     required: true,
     index: {
       global: true,
-      rangeKey: 'id',
+      rangeKey: 'type',
       project: true,
       name: 'UsernameIndex'
     }
