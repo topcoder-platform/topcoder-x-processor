@@ -1,5 +1,5 @@
 /**
- * This defines user mapping model.
+ * This defines github user mapping model.
  */
 'use strict';
 
@@ -32,15 +32,6 @@ const schema = new Schema({
       name: 'GithubUsernameIndex'
     }
   },
-  gitlabUsername: {
-    type: String,
-    index: {
-      global: true,
-      project: true,
-      rangKey: 'id',
-      name: 'GitlabUsernameIndex'
-    }
-  },
   githubUserId: {
     type: Number,
     index: {
@@ -48,15 +39,6 @@ const schema = new Schema({
       project: true,
       rangKey: 'id',
       name: 'GithubUserIdIndex'
-    }
-  },
-  gitlabUserId: {
-    type: Number,
-    index: {
-      global: true,
-      project: true,
-      rangKey: 'id',
-      name: 'GitlabUserIdIndex'
     }
   }
 });

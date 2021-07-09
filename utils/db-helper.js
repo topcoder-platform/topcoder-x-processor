@@ -129,7 +129,7 @@ async function queryOneUserMappingByTCUsername(model, tcusername) {
     model.queryOne('topcoderUsername').eq(tcusername)
     .all()
     .exec((err, result) => {
-      if (err || !result) {
+      if (err) {
         logger.debug(`queryOneUserMappingByTCUsername. Error. ${err}`);
         return reject(err);
       }
