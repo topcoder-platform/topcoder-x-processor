@@ -28,21 +28,20 @@ async function getTCUserName(provider, gitUser) {
   const criteria = {};
   if (_.isNumber(gitUser) || v.isUUID(gitUser)) {
     if (provider === 'github') {
-      criteria.githubUserId = gitUser;
+      return await dbHelper.queryOneUserMappingByGithubUserId(models.UserMapping, gitUser);
     } else if (provider === 'gitlab') {
-      criteria.gitlabUserId = gitUser;
+      return await dbHelper.queryOneUserMappingByGitlabUserId(models.UserMapping, gitUser);
     }
   } else if (_.isString(gitUser) || v.isEmail(gitUser)) {
     if (provider === 'github') {
-      criteria.githubUsername = gitUser;
+      return await dbHelper.queryOneUserMappingByGithubUsername(models.UserMapping, gitUser);
     } else if (provider === 'gitlab') {
-      criteria.gitlabUsername = gitUser;
+      return await dbHelper.queryOneUserMappingByGitlabUsername(models.UserMapping, gitUser);
     }
   }
   if (_.isEmpty(criteria)) {
     throw new Error('Can\'t find the TCUserName. Invalid gitUser.');
   }
-  return await dbHelper.scanOne(models.UserMapping, criteria);
 }
 
 getTCUserName.schema = {
@@ -65,9 +64,7 @@ async function getRepositoryCopilotOrOwner(provider, repoFullName) {
   } else if (provider === 'gitlab') {
     fullRepoUrl = `${config.GITLAB_API_BASE_URL}/${repoFullName}`;
   }
-  const project = await dbHelper.scanOne(models.Project, {
-    repoUrl: fullRepoUrl
-  });
+  const project = await dbHelper.queryOneActiveProject(models.Project, fullRepoUrl);
 
   const hasCopilot = project.copilot !== undefined; // eslint-disable-line no-undefined
   if (!project || !project.owner) {
@@ -75,9 +72,8 @@ async function getRepositoryCopilotOrOwner(provider, repoFullName) {
     throw new Error(`This repository '${repoFullName}' is not managed by Topcoder X tool.`);
   }
 
-  const userMapping = await dbHelper.scanOne(models.UserMapping, {
-    topcoderUsername: {eq: hasCopilot ? project.copilot.toLowerCase() : project.owner.toLowerCase()}
-  });
+  const userMapping = await dbHelper.queryOneUserMappingByTCUsername(
+    models.UserMapping, hasCopilot ? project.copilot.toLowerCase() : project.owner.toLowerCase());
 
   logger.debug('userMapping');
   logger.debug(userMapping);
@@ -87,11 +83,8 @@ async function getRepositoryCopilotOrOwner(provider, repoFullName) {
     (provider === 'gitlab' && !userMapping.gitlabUserId)) {
     throw new Error(`Couldn't find githost username for '${provider}' for this repository '${repoFullName}'.`);
   }
-  const user = await dbHelper.scanOne(models.User, {
-    username: provider === 'github' ? userMapping.githubUsername :  // eslint-disable-line no-nested-ternary
-      userMapping.gitlabUsername,
-    type: provider
-  });
+  const user = await dbHelper.queryOneUserByType(models.User,
+    provider === 'github' ? userMapping.githubUsername : userMapping.gitlabUsername, provider); // eslint-disable-line no-nested-ternary
 
   if (!user && !hasCopilot) {
     // throw no copilot is configured

@@ -33,7 +33,7 @@ function _parseRepoUrl(fullName) {
   const results = fullName.split('/');
   const repo = results[results.length - 1];
   const owner = _(results).slice(0, results.length - 1).join('/');
-  return { owner, repo };
+  return {owner, repo};
 }
 
 /**

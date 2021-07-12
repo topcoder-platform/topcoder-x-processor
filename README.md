@@ -50,6 +50,7 @@ The following config parameters are supported, they are defined in `config/defau
 |AUTH0_CLIENT_ID| The Auth0 ClientID for generating Machine-to-machine token ||
 |AUTH0_CLIENT_SECRET| The Auth0 Client Secret for generating Machine-to-machine token ||
 |ROLE_ID_COPILOT| The registered role id of copilot ||
+|ROLE_ID_ITERATIVE_REVIEWER| The registered role id of iterative reviewer ||
 |ROLE_ID_SUBMITTER| The registered role id of submitter ||
 |TYPE_ID_TASK| The registered type id of a task ||
 |DEFAULT_TIMELINE_TEMPLATE_ID| The default timeline template id ||

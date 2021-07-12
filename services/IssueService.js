@@ -108,10 +108,7 @@ async function ensureChallengeExists(event, issue, create = true) {
  */
 async function getProjectDetail(event) {
   const fullRepoUrl = gitHelper.getFullRepoUrl(event);
-  const project = await dbHelper.scanOne(models.Project, {
-    repoUrl: fullRepoUrl,
-    archived: 'false'
-  });
+  const project = await dbHelper.queryOneActiveProject(models.Project, fullRepoUrl);
 
   return project;
 }
@@ -202,7 +199,11 @@ async function handleIssueAssignment(event, issue, force = false) {
         }
         return;
       }
-
+      // if the issue has payment success we'll ignore this process.
+      if (dbIssue.status === constants.ISSUE_STATUS.CHALLENGE_PAYMENT_SUCCESSFUL) {
+        logger.debugWithContext('Ignoring this issue processing. The issue has challenge_payment_successful.', event, issue);
+        return;
+      }
       // Handle multiple assignees. TC-X allows only one assignee.
       if (event.data.issue.assignees && event.data.issue.assignees.length > 1) {
         const comment = 'Topcoder-X only supports a single assignee on a ticket to avoid issues with payment';
@@ -332,7 +333,11 @@ async function handleIssueUpdate(event, issue) {
       }
       return;
     }
-
+    // if the issue has payment success we'll ignore this process.
+    if (dbIssue.status === constants.ISSUE_STATUS.CHALLENGE_PAYMENT_SUCCESSFUL) {
+      logger.debugWithContext('Ignoring this issue processing. The issue has challenge_payment_successful.', event, issue);
+      return;
+    }
     if (dbIssue.title === issue.title &&
       dbIssue.body === issue.body &&
       dbIssue.prizes.length === issue.prizes.length &&
@@ -410,7 +415,7 @@ async function handleIssueClose(event, issue) { // eslint-disable-line
         let comment = 'This ticket was not processed for payment. If you would like to process it for payment,';
         comment += ' please reopen it, add the ```' + config.FIX_ACCEPTED_ISSUE_LABEL + '``` label, and then close it again';// eslint-disable-line
         await gitHelper.createComment(event, issue.number, comment);
-        closeChallenge = true;
+        return;
       }
 
       // if issue is close with cancelled label
@@ -493,8 +498,8 @@ async function handleIssueClose(event, issue) { // eslint-disable-line
       event.createCopilotPayments = createCopilotPayments;
 
       if (createCopilotPayments) {
-        logger.debugWithContext(`Setting copilot payment`);
-        
+        logger.debugWithContext('Setting copilot payment');
+
         const updateBody = {
           prizeSets: [{
             type: 'placement',
@@ -504,13 +509,11 @@ async function handleIssueClose(event, issue) { // eslint-disable-line
             type: 'copilot',
             prizes: [{type: 'USD', value: 40}]
           }
-        ]
+          ]
         };
         await topcoderApiHelper.updateChallenge(dbIssue.challengeUUID, updateBody);
-  
-      } 
-      else {
-          logger.debugWithContext('Create copilot payments is unchecked on the Topcoder-X project setup, so skipping', event, issue);
+      } else {
+        logger.debugWithContext('Create copilot payments is unchecked on the Topcoder-X project setup, so skipping', event, issue);
       }
 
       logger.debugWithContext(`Getting the topcoder member ID for member name: ${assigneeMember.topcoderUsername}`, event, issue);
@@ -644,11 +647,11 @@ async function handleIssueCreate(event, issue, forceAssign = false) {
       status: constants.ISSUE_STATUS.CHALLENGE_CREATION_SUCCESSFUL,
       updatedAt: new Date()
     });
-    
+
     logger.debugWithContext(`Adding copilot to issue: ${event.copilot.topcoderUsername}`, event, issue);
     // get copilot tc user id
     await topcoderApiHelper.addResourceToChallenge(issue.challengeUUID, event.copilot.topcoderUsername, config.ROLE_ID_COPILOT);
-    
+    await topcoderApiHelper.addResourceToChallenge(issue.challengeUUID, event.copilot.topcoderUsername, config.ROLE_ID_ITERATIVE_REVIEWER);
   } catch (e) {
     logger.error(`Challenge creation failure: ${e}`);
     delete issueCreationLock[creationLockKey];
@@ -698,6 +701,11 @@ async function handleIssueLabelUpdated(event, issue) {
     logger.debugWithContext('DB record not found. Issue label update ignored.', event, issue);
     return;
   }
+  // if the issue has payment success we'll ignore this process.
+  if (dbIssue.status === constants.ISSUE_STATUS.CHALLENGE_PAYMENT_SUCCESSFUL) {
+    logger.debugWithContext('Ignoring this issue processing. The issue has challenge_payment_successful.', event, issue);
+    return;
+  }
   await dbHelper.update(models.Issue, dbIssue.id, {
     labels: issue.labels,
     updatedAt: new Date()
@@ -718,6 +726,11 @@ async function handleIssueUnAssignment(event, issue) {
     if (!dbIssue) {
       // The dbissue is not found, the db is not accessible, or the issue is still in creation process.
       // Ignore it.
+      return;
+    }
+    // if the issue has payment success we'll ignore this process.
+    if (dbIssue.status === constants.ISSUE_STATUS.CHALLENGE_PAYMENT_SUCCESSFUL) {
+      logger.debugWithContext('Ignoring this issue processing. The issue has challenge_payment_successful.', event, issue);
       return;
     }
     if (dbIssue.assignee) {
@@ -861,10 +874,7 @@ async function process(event) {
   const fullRepoUrl = gitHelper.getFullRepoUrl(event);
   event.data.repository.repoUrl = fullRepoUrl;
 
-  const project = await dbHelper.scanOne(models.Project, {
-    repoUrl: fullRepoUrl,
-    archived: 'false'
-  });
+  const project = await dbHelper.queryOneActiveProject(models.Project, fullRepoUrl);
 
   issue.projectId = project.id;
 
