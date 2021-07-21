@@ -28,15 +28,15 @@ async function getTCUserName(provider, gitUser) {
   const criteria = {};
   if (_.isNumber(gitUser) || v.isUUID(gitUser)) {
     if (provider === 'github') {
-      return await dbHelper.queryOneUserMappingByGithubUserId(models.UserMapping, gitUser);
+      return await dbHelper.queryOneUserMappingByGithubUserId(models.GithubUserMapping, gitUser);
     } else if (provider === 'gitlab') {
-      return await dbHelper.queryOneUserMappingByGitlabUserId(models.UserMapping, gitUser);
+      return await dbHelper.queryOneUserMappingByGitlabUserId(models.GitlabUserMapping, gitUser);
     }
   } else if (_.isString(gitUser) || v.isEmail(gitUser)) {
     if (provider === 'github') {
-      return await dbHelper.queryOneUserMappingByGithubUsername(models.UserMapping, gitUser);
+      return await dbHelper.queryOneUserMappingByGithubUsername(models.GithubUserMapping, gitUser);
     } else if (provider === 'gitlab') {
-      return await dbHelper.queryOneUserMappingByGitlabUsername(models.UserMapping, gitUser);
+      return await dbHelper.queryOneUserMappingByGitlabUsername(models.GitlabUserMapping, gitUser);
     }
   }
   if (_.isEmpty(criteria)) {
@@ -73,7 +73,8 @@ async function getRepositoryCopilotOrOwner(provider, repoFullName) {
   }
 
   const userMapping = await dbHelper.queryOneUserMappingByTCUsername(
-    models.UserMapping, hasCopilot ? project.copilot.toLowerCase() : project.owner.toLowerCase());
+    provider === 'github' ? models.GithubUserMapping : models.GitlabUserMapping, 
+    hasCopilot ? project.copilot.toLowerCase() : project.owner.toLowerCase());
 
   logger.debug('userMapping');
   logger.debug(userMapping);

@@ -38,8 +38,9 @@ const models = {
   Issue: dynamoose.model('Topcoder_X.Issue', require('./Issue')),
   Project: dynamoose.model('Topcoder_X.Project', require('./Project')),
   User: dynamoose.model('Topcoder_X.User', require('./User')),
-  UserMapping: dynamoose.model('Topcoder_X.UserMapping', require('./UserMapping')),
-  CopilotPayment: dynamoose.model('Topcoder_X.CopilotPayment', require('./CopilotPayment'))
+  CopilotPayment: dynamoose.model('Topcoder_X.CopilotPayment', require('./CopilotPayment')),
+  GithubUserMapping: dynamoose.model('Topcoder_X.GithubUserMapping', require('./GithubUserMapping')),
+  GitlabUserMapping: dynamoose.model('Topcoder_X.GitlabUserMapping', require('./GitlabUserMapping'))
 };
 /* eslint-enable global-require */
 
