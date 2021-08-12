@@ -23,15 +23,9 @@ const schema = new Schema({
     type: Number,
     required: true
   },
-  repoUrl: {
-    type: String,
-    required: true,
-    index: {
-      global: true,
-      rangeKey: 'archived',
-      project: true,
-      name: 'RepoUrlIndex'
-    }
+  repoUrls: {
+    type: [String],
+    required: true
   },
   repoId: {type: String, required: false},
   rocketChatWebhook: {type: String, required: false},

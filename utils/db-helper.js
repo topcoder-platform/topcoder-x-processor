@@ -81,8 +81,8 @@ async function queryOneIssue(model, repositoryId, number, provider) {
  */
 async function queryOneActiveProject(model, repoUrl) {
   return await new Promise((resolve, reject) => {
-    model.query('repoUrl').eq(repoUrl)
-    .where('archived')
+    model.scan('repoUrls').contains(repoUrl)
+    .filter('archived')
     .eq('false')
     .all()
     .exec((err, result) => {

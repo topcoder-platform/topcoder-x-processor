@@ -877,6 +877,7 @@ async function process(event) {
   const project = await dbHelper.queryOneActiveProject(models.Project, fullRepoUrl);
 
   issue.projectId = project.id;
+  issue.repoUrl = fullRepoUrl;
 
   // Parse prize from title
   const hasPrizes = parsePrizes(issue);
