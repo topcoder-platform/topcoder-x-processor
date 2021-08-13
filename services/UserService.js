@@ -73,7 +73,7 @@ async function getRepositoryCopilotOrOwner(provider, repoFullName) {
   }
 
   const userMapping = await dbHelper.queryOneUserMappingByTCUsername(
-    provider === 'github' ? models.GithubUserMapping : models.GitlabUserMapping, 
+    provider === 'github' ? models.GithubUserMapping : models.GitlabUserMapping,
     hasCopilot ? project.copilot.toLowerCase() : project.owner.toLowerCase());
 
   logger.debug('userMapping');
