@@ -26,13 +26,13 @@
   },
   "homepage": "https://gitlab.com/luettich/processor#README",
   "dependencies": {
+    "@octokit/rest": "^18.9.0",
     "axios": "^0.19.0",
     "circular-json": "^0.5.7",
     "config": "^1.30.0",
     "dynamoose": "^1.11.1",
     "fs-extra": "^7.0.0",
     "get-parameter-names": "^0.3.0",
-    "github": "^12.1.0",
     "global-request-logger": "^0.1.1",
     "joi": "^13.4.0",
     "jwt-decode": "^2.2.0",
@@ -51,7 +51,6 @@
     "winston": "^2.4.3"
   },
   "devDependencies": {
-    "@octokit/rest": "^15.10.0",
     "chai": "^4.1.2",
     "eslint-config-topcoder": "^2.0.0",
     "eslint-plugin-babel": "^4.1.2",
