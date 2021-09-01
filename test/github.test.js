@@ -89,7 +89,7 @@ describe('Topcoder X github tests', function test() {
     await utils.createProject({
       title: repo.name,
       tcDirectId: config.TC_DIRECT_ID,
-      repoUrl: repo.html_url,
+      repoUrls: [repo.html_url],
       username: config.TOPCODER_USER_NAME,
       secretWebhookKey,
       copilot: config.TOPCODER_USER_NAME,
@@ -111,7 +111,7 @@ describe('Topcoder X github tests', function test() {
       repo: repo.name
     });
     await utils.cleanup(user.id, {
-      repoUrl: repo.html_url,
+      repoUrls: [repo.html_url],
       repositoryId: repo.id
     }, issue.number, PROVIDER);
   });

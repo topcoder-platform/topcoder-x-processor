@@ -2,6 +2,7 @@
  * Copyright (c) 2018 TopCoder, Inc. All rights reserved.
  */
 'use strict';
+const models = require('../models');
 const logger = require('./logger');
 
 /**
@@ -81,16 +82,16 @@ async function queryOneIssue(model, repositoryId, number, provider) {
  */
 async function queryOneActiveProject(model, repoUrl) {
   return await new Promise((resolve, reject) => {
-    model.query('repoUrl').eq(repoUrl)
-    .where('archived')
-    .eq('false')
-    .all()
-    .exec((err, result) => {
-      if (err || !result) {
-        logger.debug(`queryOneActiveProject. Error. ${err}`);
-        return reject(err);
-      }
-      return resolve(result.count === 0 ? null : result[0]);
+    queryOneActiveRepository(models.Repository, repoUrl).then((repo) => {
+      if (!repo) resolve(null);
+      else model.queryOne('id').eq(repo.projectId).consistent()
+        .exec((err, result) => {
+          if (err) {
+            logger.debug(`queryOneActiveProject. Error. ${err}`);
+            return reject(err);
+          }
+          return resolve(result);
+        });
     });
   });
 }
@@ -319,6 +320,28 @@ async function removeIssue(Model, repositoryId, number, provider) {
   });
 }
 
+/**
+ * Query one active repository
+ * @param {Object} model the dynamoose model
+ * @param {String} url the repository url
+ * @returns {Promise<Object>}
+ */
+async function queryOneActiveRepository(model, url) {
+  return await new Promise((resolve, reject) => {
+    model.queryOne({
+      url,
+      archived: 'false'
+    })
+    .all()
+    .exec((err, result) => {
+      if (err) {
+        return reject(err);
+      }
+      return resolve(result);
+    });
+  });
+}
+
 module.exports = {
   getById,
   scan,
@@ -326,6 +349,7 @@ module.exports = {
   create,
   update,
   queryOneActiveProject,
+  queryOneActiveRepository,
   queryOneIssue,
   queryOneUserByType,
   queryOneUserMappingByGithubUserId,
