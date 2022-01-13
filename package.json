@@ -27,7 +27,7 @@
   "homepage": "https://gitlab.com/luettich/processor#README",
   "dependencies": {
     "@octokit/rest": "^18.9.0",
-    "axios": "^0.19.0",
+    "axios": "^0.20.0",
     "circular-json": "^0.5.7",
     "config": "^1.30.0",
     "dynamoose": "^1.11.1",
