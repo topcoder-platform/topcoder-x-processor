@@ -38,7 +38,7 @@
     "jwt-decode": "^2.2.0",
     "lodash": "^4.17.13",
     "markdown-it": "^8.4.1",
-    "moment": "^2.22.2",
+    "moment": "^2.29.2",
     "no-kafka": "^3.2.10",
     "node-gitlab-api": "^2.2.8",
     "nodemailer": "^4.6.7",
