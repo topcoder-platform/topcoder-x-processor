@@ -16,6 +16,9 @@ The following config parameters are supported, they are defined in `config/defau
 | NEW_CHALLENGE_DURATION_IN_DAYS | the duration of new challenge | 5 |
 |TC_URL| the base URL of topcoder to get the challenge URL| defaults to `https://www.topcoder-dev.com`|
 |GITLAB_API_BASE_URL| the URL for gitlab host| defaults to `https://gitlab.com`|
+| GITLAB_CLIENT_ID                       | the GitLab client id | No default - needs to be set up with same value found in topcoder-x-ui |
+| GITLAB_CLIENT_SECRET | the GitLab client secret | No default - needs to be set up with same value found in topcoder-x-ui |
+| GITLAB_OWNER_USER_CALLBACK_URL         | the GitLab callback redirect uri for refreshing copilot token | No default - needs to be set up with same owner user callback value in topcoder-x-ui |
 |PAID_ISSUE_LABEL|the label name for paid, should be one of the label configured in topcoder x ui|'tcx_Paid'|
 |FIX_ACCEPTED_ISSUE_LABEL|the label name for fix accepted, should be one of the label configured in topcoder x ui|'tcx_FixAccepted'|
 |ASSIGNED_ISSUE_LABEL| the label name for assigned, should be one of the label configured in topcoder x ui| 'tcx_Assigned'|
