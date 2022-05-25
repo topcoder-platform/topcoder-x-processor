@@ -16,6 +16,7 @@ module.exports = {
   LOG_LEVEL: process.env.LOG_LEVEL || 'debug',
   PARTITION: process.env.PARTITION || 0,
   TOPIC: process.env.TOPIC || 'tc-x-events',
+  TOPIC_NOTIFICATION: process.env.TOPIC_NOTIFICATION || 'notifications.action.create',
   KAFKA_OPTIONS: {
     connectionString: process.env.KAFKA_URL || 'localhost:9092',
     groupId: process.env.KAFKA_GROUP_ID || 'topcoder-x-processor',
@@ -24,6 +25,11 @@ module.exports = {
       key: process.env.KAFKA_CLIENT_CERT_KEY || fs.readFileSync('./kafka_client.key'), // eslint-disable-line no-sync
       passphrase: 'secret', // NOTE:* This configuration specifies the private key passphrase used while creating it.
     }
+  },
+  MAIL_NOTICIATION: {
+    type: 'tcx.mail_notification',
+    sendgridTemplateId: 'xxxxxx',
+    subject: 'Topcoder X Alert'
   },
   NEW_CHALLENGE_TEMPLATE: process.env.NEW_CHALLENGE_TEMPLATE || {
     status: 'Draft'
