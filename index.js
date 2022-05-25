@@ -22,7 +22,9 @@ process.on('unhandledRejection', (err) => {
 });
 
 // dump the configuration to logger
-const ignoreConfigLog = ['cert', 'key', 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AUTH0_CLIENT_ID', 'AUTH0_CLIENT_SECRET'];
+const ignoreConfigLog = ['cert', 'key', 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AUTH0_CLIENT_ID', 'AUTH0_CLIENT_SECRET',
+  'GITLAB_CLIENT_ID', 'GITLAB_CLIENT_SECRET'];
+
 /**
  * Print configs to logger
  * @param {Object} params the config params

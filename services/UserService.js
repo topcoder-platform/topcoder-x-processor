@@ -97,6 +97,8 @@ async function getRepositoryCopilotOrOwner(provider, repoFullName) {
 
   return {
     accessToken: user.accessToken,
+    accessTokenExpiration: user.accessTokenExpiration,
+    refreshToken: user.refreshToken,
     userProviderId: user.userProviderId,
     topcoderUsername: userMapping.topcoderUsername
   };
