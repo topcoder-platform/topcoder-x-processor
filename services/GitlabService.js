@@ -37,7 +37,7 @@ async function _authenticate(accessToken) {
     });
     return gitlab;
   } catch (err) {
-    throw errors.convertGitLabError(err, 'Failed to during authenticate to Github using access token of copilot.');
+    throw errors.handleGitLabError(err, 'Failed to during authenticate to Github using access token of copilot.');
   }
 }
 
@@ -55,25 +55,37 @@ async function _removeAssignees(gitlab, projectId, issueId, assignees) {
     const oldAssignees = _.difference(issue.assignee_ids, assignees);
     await gitlab.projects.issues.edit(projectId, issueId, {assignee_ids: oldAssignees});
   } catch (err) {
-    throw errors.convertGitLabError(err, 'Error occurred during remove assignees from issue.');
+    throw errors.handleGitLabError(err, 'Error occurred during remove assignees from issue.');
   }
+}
+
+/**
+ * Get gitlab issue url
+ * @param {String} repoPath the repo path
+ * @param {Number} issueId the issue number
+ * @returns {String} the url
+ * @private
+ */
+function _getIssueUrl(repoPath, issueId) {
+  return `https://gitlab.com/${repoPath}/issues/${issueId}`;
 }
 
 /**
  * creates the comments on gitlab issue
  * @param {Object} copilot the copilot
- * @param {Number} projectId the project id
+ * @param {Object} project the project object
  * @param {Number} issueId the issue number
  * @param {string} body the comment body text
  */
-async function createComment(copilot, projectId, issueId, body) {
+async function createComment(copilot, project, issueId, body) {
+  const projectId = project.id;
   Joi.attempt({copilot, projectId, issueId, body}, createComment.schema);
   const gitlab = await _authenticate(copilot.accessToken);
   try {
     body = helper.prepareAutomatedComment(body, copilot);
     await gitlab.projects.issues.notes.create(projectId, issueId, {body});
   } catch (err) {
-    throw errors.convertGitLabError(err, 'Error occurred during creating comment on issue.');
+    throw errors.handleGitLabError(err, 'Error occurred during creating comment on issue.', copilot.topcoderUsername, _getIssueUrl(project.full_name, issueId));
   }
   logger.debug(`Gitlab comment is added on issue with message: "${body}"`);
 }
@@ -88,17 +100,18 @@ createComment.schema = {
 /**
  * updates the title of gitlab issue
  * @param {Object} copilot the copilot
- * @param {Number} projectId the project id
+ * @param {Object} project the project object
  * @param {Number} issueId the issue number
  * @param {string} title new title
  */
-async function updateIssue(copilot, projectId, issueId, title) {
+async function updateIssue(copilot, project, issueId, title) {
+  const projectId = project.id;
   Joi.attempt({copilot, projectId, issueId, title}, updateIssue.schema);
   const gitlab = await _authenticate(copilot.accessToken);
   try {
     await gitlab.projects.issues.edit(projectId, issueId, {title});
   } catch (err) {
-    throw errors.convertGitLabError(err, 'Error occurred during updating issue.');
+    throw errors.handleGitLabError(err, 'Error occurred during updating issue.', copilot.topcoderUsername, _getIssueUrl(project.full_name, issueId));
   }
   logger.debug(`Gitlab issue title is updated for issue number ${issueId}`);
 }
@@ -113,11 +126,12 @@ updateIssue.schema = {
 /**
  * Assigns the issue to user login
  * @param {Object} copilot the copilot
- * @param {Number} projectId the project id
+ * @param {Object} project the project object
  * @param {Number} issueId the issue number
  * @param {Number} userId the user id of assignee
  */
-async function assignUser(copilot, projectId, issueId, userId) {
+async function assignUser(copilot, project, issueId, userId) {
+  const projectId = project.id;
   Joi.attempt({copilot, projectId, issueId, userId}, assignUser.schema);
   const gitlab = await _authenticate(copilot.accessToken);
   try {
@@ -128,7 +142,7 @@ async function assignUser(copilot, projectId, issueId, userId) {
     }
     await gitlab.projects.issues.edit(projectId, issueId, {assignee_ids: [userId]});
   } catch (err) {
-    throw errors.convertGitLabError(err, 'Error occurred during assigning issue user.');
+    throw errors.handleGitLabError(err, 'Error occurred during assigning issue user.', copilot.topcoderUsername, _getIssueUrl(project.full_name, issueId));
   }
   logger.debug(`Gitlab issue with number ${issueId} is assigned to ${issueId}`);
 }
@@ -143,11 +157,12 @@ assignUser.schema = {
 /**
  * Removes an assignee from the issue
  * @param {Object} copilot the copilot
- * @param {Number} projectId the project id
+ * @param {Object} project the project object
  * @param {Number} issueId the issue number
  * @param {Number} userId the user id of assignee to remove
  */
-async function removeAssign(copilot, projectId, issueId, userId) {
+async function removeAssign(copilot, project, issueId, userId) {
+  const projectId = project.id;
   Joi.attempt({copilot, projectId, issueId, userId}, removeAssign.schema);
   const gitlab = await _authenticate(copilot.accessToken);
   await _removeAssignees(gitlab, projectId, issueId, [userId]);
@@ -195,14 +210,15 @@ getUserIdByLogin.schema = {
 /**
  * updates the gitlab issue as paid and fix accepted
  * @param {Object} copilot the copilot
- * @param {Number} projectId the project id
+ * @param {Object} project the project object
  * @param {Number} issueId the issue number
  * @param {String} challengeUUID the challenge uuid
  * @param {Array} existLabels the issue labels
  * @param {String} winner the winner topcoder handle
  * @param {Boolean} createCopilotPayments the option to create copilot payments or not
  */
-async function markIssueAsPaid(copilot, projectId, issueId, challengeUUID, existLabels, winner, createCopilotPayments) { // eslint-disable-line max-params
+async function markIssueAsPaid(copilot, project, issueId, challengeUUID, existLabels, winner, createCopilotPayments) { // eslint-disable-line max-params
+  const projectId = project.id;
   Joi.attempt({copilot, projectId, issueId, challengeUUID, existLabels, winner, createCopilotPayments}, markIssueAsPaid.schema);
   const gitlab = await _authenticate(copilot.accessToken);
   const labels = _(existLabels).filter((i) => i !== config.FIX_ACCEPTED_ISSUE_LABEL)
@@ -222,7 +238,7 @@ async function markIssueAsPaid(copilot, projectId, issueId, challengeUUID, exist
     const body = helper.prepareAutomatedComment(commentMessage, copilot);
     await gitlab.projects.issues.notes.create(projectId, issueId, {body});
   } catch (err) {
-    throw errors.convertGitLabError(err, 'Error occurred during updating issue as paid.');
+    throw errors.handleGitLabError(err, 'Error occurred during updating issue as paid.', copilot.topcoderUsername, _getIssueUrl(project.full_name, issueId));
   }
   logger.debug(`Gitlab issue is updated for as paid and fix accepted for ${issueId}`);
 }
@@ -240,17 +256,18 @@ markIssueAsPaid.schema = {
 /**
  * change the state of gitlab issue
  * @param {Object} copilot the copilot
- * @param {string} projectId the project id
+ * @param {Object} project the project object
  * @param {Number} issueId the issue issue id
  * @param {string} state new state
  */
-async function changeState(copilot, projectId, issueId, state) {
+async function changeState(copilot, project, issueId, state) {
+  const projectId = project.id;
   Joi.attempt({copilot, projectId, issueId, state}, changeState.schema);
   const gitlab = await _authenticate(copilot.accessToken);
   try {
     await gitlab.projects.issues.edit(projectId, issueId, {state_event: state});
   } catch (err) {
-    throw errors.convertGitLabError(err, 'Error occurred during updating status of issue.');
+    throw errors.handleGitLabError(err, 'Error occurred during updating status of issue.', copilot.topcoderUsername, _getIssueUrl(project.full_name, issueId));
   }
   logger.debug(`Gitlab issue state is updated to '${state}' for issue number ${issueId}`);
 }
@@ -265,17 +282,18 @@ changeState.schema = {
 /**
  * updates the gitlab issue with new labels
  * @param {Object} copilot the copilot
- * @param {string} projectId the project id
+ * @param {Object} project the project object
  * @param {Number} issueId the issue issue id
  * @param {Number} labels the labels
  */
-async function addLabels(copilot, projectId, issueId, labels) {
+async function addLabels(copilot, project, issueId, labels) {
+  const projectId = project.id;
   Joi.attempt({copilot, projectId, issueId, labels}, addLabels.schema);
   const gitlab = await _authenticate(copilot.accessToken);
   try {
     await gitlab.projects.issues.edit(projectId, issueId, {labels: _.join(labels, ',')});
   } catch (err) {
-    throw errors.convertGitLabError(err, 'Error occurred during adding label in issue.');
+    throw errors.handleGitLabError(err, 'Error occurred during adding label in issue.', copilot.topcoderUsername, _getIssueUrl(project.full_name, issueId));
   }
   logger.debug(`Gitlab issue is updated with new labels for ${issueId}`);
 }

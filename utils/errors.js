@@ -12,6 +12,7 @@
 
 const _ = require('lodash');
 const constants = require('../constants');
+const notification = require('./notification');
 
 // the error class wrapper
 class ProcessorError extends Error {
@@ -27,12 +28,17 @@ class ProcessorError extends Error {
 const errors = {};
 
 /**
-* Convert github api error.
+* Handle github api error. Return converted error.
 * @param {Error} err the github api error
 * @param {String} message the error message
+* @param {String} copilotHandle the handle name of the copilot
+* @param {String} repoPath the link to related github page
 * @returns {Error} converted error
 */
-errors.convertGitHubError = function convertGitHubError(err, message) {
+errors.handleGitHubError = function handleGitHubError(err, message, copilotHandle, repoPath) {
+  if (err.statusCode === 401 && copilotHandle && repoPath) { // eslint-disable-line no-magic-numbers
+    notification.sendTokenExpiredAlert(copilotHandle, repoPath, 'Github');
+  }
   let resMsg = `${message}. ${err.message}.`;
   const detail = _.get(err, 'response.body.message');
   if (detail) {
@@ -47,12 +53,17 @@ errors.convertGitHubError = function convertGitHubError(err, message) {
 };
 
 /**
- * Convert gitlab api error.
+ * Handle gitlab api error. Return converted error.
  * @param {Error} err the gitlab api error
  * @param {String} message the error message
+* @param {String} copilotHandle the handle name of the copilot
+* @param {String} repoPath the link to related gitlab page
  * @returns {Error} converted error
  */
-errors.convertGitLabError = function convertGitLabError(err, message) {
+errors.handleGitLabError = function handleGitLabError(err, message, copilotHandle, repoPath) {
+  if (err.statusCode === 401 && copilotHandle && repoPath) { // eslint-disable-line no-magic-numbers
+    notification.sendTokenExpiredAlert(copilotHandle, repoPath, 'Gitlab');
+  }
   let resMsg = `${message}. ${err.message}.`;
   const detail = _.get(err, 'response.body.message');
   if (detail) {

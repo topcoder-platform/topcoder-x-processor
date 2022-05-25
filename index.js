@@ -5,7 +5,7 @@
 
 const config = require('config');
 const _ = require('lodash');
-const kafka = require('./utils/kafka');
+const kafkaConsumer = require('./utils/kafka-consumer');
 const logger = require('./utils/logger');
 
 process.on('uncaughtException', (err) => {
@@ -55,4 +55,4 @@ dumpConfigs(config, 0);
 logger.debug('--- End of List of Configurations ---');
 
 // run the server
-kafka.run();
+kafkaConsumer.run();

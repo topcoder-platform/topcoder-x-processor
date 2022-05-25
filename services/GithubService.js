@@ -53,7 +53,7 @@ async function _authenticate(accessToken) {
     });
     return octokit.rest;
   } catch (err) {
-    throw errors.convertGitHubError(err, 'Failed to authenticate to Github using access token of copilot.');
+    throw errors.handleGitHubError(err, 'Failed to authenticate to Github using access token of copilot.');
   }
 }
 
@@ -75,7 +75,7 @@ async function _removeAssignees(github, owner, repo, number, assignees) {
       assignees
     });
   } catch (err) {
-    throw errors.convertGitHubError(err, 'Error occurred during remove assignees from issue.');
+    throw errors.handleGitHubError(err, 'Error occurred during remove assignees from issue.');
   }
 }
 
@@ -94,6 +94,17 @@ async function _getUsernameById(id) {
 }
 
 /**
+ * Get github issue url
+ * @param {String} repoPath the repo path
+ * @param {Number} number the issue number
+ * @returns {String} the url
+ * @private
+ */
+function _getIssueUrl(repoPath, number) {
+  return `https://github.com/${repoPath}/issues/${number}`;
+}
+
+/**
  * updates the title of github issue
  * @param {Object} copilot the copilot
  * @param {string} repoFullName the repository
@@ -107,7 +118,7 @@ async function updateIssue(copilot, repoFullName, number, title) {
   try {
     await github.issues.update({owner, repo, issue_number: number, title});
   } catch (err) {
-    throw errors.convertGitHubError(err, 'Error occurred during updating issue.');
+    throw errors.handleGitHubError(err, 'Error occurred during updating issue.', copilot.topcoderUsername, _getIssueUrl(repoFullName, number));
   }
   logger.debug(`Github issue title is updated for issue number ${number}`);
 }
@@ -139,7 +150,7 @@ async function assignUser(copilot, repoFullName, number, user) {
     }
     await github.issues.addAssignees({owner, repo, issue_number: number, assignees: [user]});
   } catch (err) {
-    throw errors.convertGitHubError(err, 'Error occurred during assigning issue user.');
+    throw errors.handleGitHubError(err, 'Error occurred during assigning issue user.', copilot.topcoderUsername, _getIssueUrl(repoFullName, number));
   }
   logger.debug(`Github issue with number ${number} is assigned to ${user}`);
 }
@@ -184,7 +195,7 @@ async function createComment(copilot, repoFullName, number, body) {
     body = helper.prepareAutomatedComment(body, copilot);
     await github.issues.createComment({owner, repo, issue_number: number, body});
   } catch (err) {
-    throw errors.convertGitHubError(err, 'Error occurred during creating comment on issue.');
+    throw errors.handleGitHubError(err, 'Error occurred during creating comment on issue.', copilot.topcoderUsername, _getIssueUrl(repoFullName, number));
   }
   logger.debug(`Github comment is added on issue with message: "${body}"`);
 }
@@ -262,7 +273,7 @@ async function markIssueAsPaid(copilot, repoFullName, number, challengeUUID, exi
     const body = helper.prepareAutomatedComment(commentMessage, copilot);
     await github.issues.createComment({owner, repo, issue_number: number, body});
   } catch (err) {
-    throw errors.convertGitHubError(err, 'Error occurred during updating issue as paid.');
+    throw errors.handleGitHubError(err, 'Error occurred during updating issue as paid.', copilot.topcoderUsername, _getIssueUrl(repoFullName, number));
   }
   logger.debug(`Github issue title is updated for as paid and fix accepted for ${number}`);
 }
@@ -291,7 +302,7 @@ async function changeState(copilot, repoFullName, number, state) {
   try {
     await github.issues.update({owner, repo, issue_number: number, state});
   } catch (err) {
-    throw errors.convertGitHubError(err, 'Error occurred during updating status of issue.');
+    throw errors.handleGitHubError(err, 'Error occurred during updating status of issue.', copilot.topcoderUsername, _getIssueUrl(repoFullName, number));
   }
   logger.debug(`Github issue state is updated to '${state}' for issue number ${number}`);
 }
@@ -317,7 +328,7 @@ async function addLabels(copilot, repoFullName, number, labels) {
   try {
     await github.issues.update({owner, repo, issue_number: number, labels});
   } catch (err) {
-    throw errors.convertGitHubError(err, 'Error occurred during adding label in issue.');
+    throw errors.handleGitHubError(err, 'Error occurred during adding label in issue.', copilot.topcoderUsername, _getIssueUrl(repoFullName, number));
   }
   logger.debug(`Github issue is updated with new labels for ${number}`);
 }
