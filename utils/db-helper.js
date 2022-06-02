@@ -83,8 +83,10 @@ async function queryOneIssue(model, repositoryId, number, provider) {
 async function queryOneActiveProject(model, repoUrl) {
   return await new Promise((resolve, reject) => {
     queryOneActiveRepository(models.Repository, repoUrl).then((repo) => {
-      if (!repo) resolve(null);
-      else model.queryOne('id').eq(repo.projectId).consistent()
+      if (!repo) {
+        resolve(null);
+      } else {
+        model.queryOne('id').eq(repo.projectId).consistent()
         .exec((err, result) => {
           if (err) {
             logger.debug(`queryOneActiveProject. Error. ${err}`);
@@ -92,6 +94,7 @@ async function queryOneActiveProject(model, repoUrl) {
           }
           return resolve(result);
         });
+      }
     });
   });
 }
@@ -355,7 +358,7 @@ async function queryChallengeUUIDsByRepoUrl(repoUrl) {
         if (err) {
           return reject(err);
         }
-        return resolve(results.map({challengeUUID} => challengeUUID));
+        return resolve(results.map(({challengeUUID}) => challengeUUID));
       });
   });
 }
