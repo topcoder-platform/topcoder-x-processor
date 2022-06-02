@@ -12,6 +12,7 @@ const _ = require('lodash');
 const healthcheck = require('topcoder-healthcheck-dropin');
 const IssueService = require('../services/IssueService');
 const CopilotPaymentService = require('../services/CopilotPaymentService');
+const ChallengeService = require('../services/ChallengeService');
 const logger = require('./logger');
 const kafka = require('./kafka');
 
@@ -44,6 +45,12 @@ function messageHandler(messageSet) {
     if (event && _.includes(['copilotPayment.add', 'copilotPayment.update', 'copilotPayment.delete', 'copilotPayment.checkUpdates']
       , event.event)) {
       CopilotPaymentService
+      .process(event)
+      .catch(logger.error);
+    }
+    if (event && _.includes(['challengeUUIDTags.update']
+      , event.event)) {
+      ChallengeService
       .process(event)
       .catch(logger.error);
     }

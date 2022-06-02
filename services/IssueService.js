@@ -636,6 +636,7 @@ async function handleIssueCreate(event, issue, forceAssign = false) {
     issue.challengeUUID = await topcoderApiHelper.createChallenge({
       name: issue.title,
       projectId,
+      tags: project.tags,
       detailedRequirements: issue.body,
       prizes: issue.prizes
     });
