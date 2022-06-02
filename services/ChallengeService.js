@@ -20,7 +20,7 @@ const dbHelper = require('../utils/db-helper');
  * @param {Object} event the event
  */
 async function handleChallengeTagsUpdate(event) {
-  const tags = event.data.tags;
+  const tags = event.data.tags.split(',');
   await Promise.all(
     event.data.challengeUUIDsList.map(async (challengeUUIDs) => {
       if (_.isString(challengeUUIDs)) { // repoUrl
@@ -54,7 +54,7 @@ process.schema = Joi.object().keys({
     challengeUUIDsList: Joi.array().items(
       Joi.alternatives().try(Joi.string(), Joi.array().items(Joi.string()))
     ).required(),
-    tags: Joi.array().items(Joi.string().required()).min(1).required()
+    tags: Joi.string().required()
   }).required(),
   retryCount: Joi.number().integer().default(0).optional()
 });
