@@ -194,6 +194,7 @@ async function handlePaymentAdd(event, payment) {
       const newChallenge = {
         name: challengeTitle,
         projectId: project.tcDirectId,
+        tags: project.tags,
         detailedRequirements: challengeRequirements,
         prizes: [payment.amount],
         reviewType: 'INTERNAL'

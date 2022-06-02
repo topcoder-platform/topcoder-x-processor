@@ -342,6 +342,24 @@ async function queryOneActiveRepository(model, url) {
   });
 }
 
+/**
+ * Get Issue's challengeUUID by repoUrl
+ * @param {String} repoUrl The repo url
+ * @returns {Promise<Object>}
+ */
+async function queryChallengeUUIDsByRepoUrl(repoUrl) {
+  return await new Promise((resolve, reject) => {
+    models.Issue.scan('repoUrl').eq(repoUrl)
+      .attributes(['challengeUUID'])
+      .exec((err, results) => {
+        if (err) {
+          return reject(err);
+        }
+        return resolve(results.map({challengeUUID} => challengeUUID));
+      });
+  });
+}
+
 module.exports = {
   getById,
   scan,
@@ -357,6 +375,7 @@ module.exports = {
   queryOneUserMappingByGithubUsername,
   queryOneUserMappingByGitlabUsername,
   queryOneUserMappingByTCUsername,
+  queryChallengeUUIDsByRepoUrl,
   removeCopilotPayment,
   removeIssue
 };
