@@ -15,6 +15,7 @@ const Joi = require('joi');
 const GitlabAPI = require('node-gitlab-api');
 const logger = require('../utils/logger');
 const errors = require('../utils/errors');
+const models = require('../models');
 const helper = require('../utils/helper');
 const dbHelper = require('../utils/db-helper');
 const superagent = require('superagent');
@@ -338,15 +339,15 @@ async function _refreshGitlabUserAccessToken(copilot) {
         client_secret: config.GITLAB_CLIENT_SECRET,
         refresh_token: copilot.refreshToken,
         grant_type: 'refresh_token',
-        redirect_uri: config.GITLAB_OWNER_USER_CALLBACK_URL,
+        redirect_uri: config.GITLAB_OWNER_USER_CALLBACK_URL
       })
       .end();
       // save user token data
     const expiresIn = refreshTokenResult.body.expires_in || config.GITLAB_ACCESS_TOKEN_DEFAULT_EXPIRATION;
-    return await dbHelper.update(User, copilot.id, {
+    return await dbHelper.update(models.User, copilot.id, {
       accessToken: refreshTokenResult.body.access_token,
       accessTokenExpiration: new Date(new Date().getTime() + expiresIn * MS_PER_SECOND),
-      refreshToken: refreshTokenResult.body.refresh_token,
+      refreshToken: refreshTokenResult.body.refresh_token
     });
   }
   return copilot;
