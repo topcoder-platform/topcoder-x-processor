@@ -48,7 +48,7 @@ function messageHandler(messageSet) {
       .process(event)
       .catch(logger.error);
     }
-    if (event && _.includes(['challengeUUIDTags.update']
+    if (event && _.includes(['challengeTags.update']
       , event.event)) {
       ChallengeService
       .process(event)

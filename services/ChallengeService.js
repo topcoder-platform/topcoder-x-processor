@@ -49,7 +49,7 @@ async function process(event) {
 }
 
 process.schema = Joi.object().keys({
-  event: Joi.string().valid('challengeUUIDTags.update').required(),
+  event: Joi.string().valid('challengeTags.update').required(),
   data: Joi.object().keys({
     challengeUUIDsList: Joi.array().items(
       Joi.alternatives().try(Joi.string(), Joi.array().items(Joi.string()))
