@@ -15,12 +15,25 @@ const logger = require('./logger');
 
 const notification = {};
 
-const content = `Hi {handle},
-You made an update to ticket {link}, but Topcoder-X couldn't process it properly because your {provider} token has expired. To fix this, please login to x.topcoder.com, click your handle in the upper right and then "Settings" to refresh your token. You will need to redo the action that failed in {provider}.`; // eslint-disable-line max-len
+/**
+ * get content template to send
+ * @param {String} repoPath the repo path
+ * @returns {String}
+ */
+function getContent(repoPath) {
+  return repoPath
+    ?
+    `Hi {handle},
+    You made an update to ticket {link}, but Topcoder-X couldn't process it properly because your {provider} token has expired. To fix this, please login to x.topcoder.com, click your handle in the upper right and then "Settings" to refresh your token. You will need to redo the action that failed in {provider}.` // eslint-disable-line max-len
+    :
+    `Hi {handle},
+    You made an operation on {provider}, but Topcoder-X couldn't process it properly because your {provider} token has expired. To fix this, please login to x.topcoder.com, click your handle in the upper right and then "Settings" to refresh your token. You will need to redo the action that failed in {provider}.`; // eslint-disable-line max-len
+}
 
 notification.sendTokenExpiredAlert = async function sendTokenExpiredAlert(copilotHandle, repoPath, provider) {
   const copilotId = await topcoderApiHelper.getTopcoderMemberId(copilotHandle);
   const notificationConfigs = config.MAIL_NOTICIATION;
+  const content = getContent(repoPath);
   logger.debug(`Sending mail notification to copilot ${copilotHandle} Repo: ${repoPath} Provider: ${provider}`);
   await kafkaSender.sendNotification({
     serviceId: 'email',
