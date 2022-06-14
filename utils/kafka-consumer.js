@@ -13,6 +13,7 @@ const healthcheck = require('topcoder-healthcheck-dropin');
 const IssueService = require('../services/IssueService');
 const CopilotPaymentService = require('../services/CopilotPaymentService');
 const ChallengeService = require('../services/ChallengeService');
+const NotificationService = require('../services/NotificationService');
 const logger = require('./logger');
 const kafka = require('./kafka');
 
@@ -51,6 +52,12 @@ function messageHandler(messageSet) {
     if (event && _.includes(['challengeTags.update']
       , event.event)) {
       ChallengeService
+      .process(event)
+      .catch(logger.error);
+    }
+    if (event && _.includes(['notification.tokenExpired']
+      , event.event)) {
+      NotificationService
       .process(event)
       .catch(logger.error);
     }
