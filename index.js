@@ -5,7 +5,7 @@
 
 const config = require('config');
 const _ = require('lodash');
-const kafka = require('./utils/kafka');
+const kafkaConsumer = require('./utils/kafka-consumer');
 const logger = require('./utils/logger');
 
 process.on('uncaughtException', (err) => {
@@ -22,7 +22,9 @@ process.on('unhandledRejection', (err) => {
 });
 
 // dump the configuration to logger
-const ignoreConfigLog = ['cert', 'key', 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AUTH0_CLIENT_ID', 'AUTH0_CLIENT_SECRET'];
+const ignoreConfigLog = ['cert', 'key', 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AUTH0_CLIENT_ID', 'AUTH0_CLIENT_SECRET',
+  'GITLAB_CLIENT_ID', 'GITLAB_CLIENT_SECRET'];
+
 /**
  * Print configs to logger
  * @param {Object} params the config params
@@ -55,4 +57,4 @@ dumpConfigs(config, 0);
 logger.debug('--- End of List of Configurations ---');
 
 // run the server
-kafka.run();
+kafkaConsumer.run();

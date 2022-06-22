@@ -83,8 +83,10 @@ async function queryOneIssue(model, repositoryId, number, provider) {
 async function queryOneActiveProject(model, repoUrl) {
   return await new Promise((resolve, reject) => {
     queryOneActiveRepository(models.Repository, repoUrl).then((repo) => {
-      if (!repo) resolve(null);
-      else model.queryOne('id').eq(repo.projectId).consistent()
+      if (!repo) {
+        resolve(null);
+      } else {
+        model.queryOne('id').eq(repo.projectId).consistent()
         .exec((err, result) => {
           if (err) {
             logger.debug(`queryOneActiveProject. Error. ${err}`);
@@ -92,6 +94,7 @@ async function queryOneActiveProject(model, repoUrl) {
           }
           return resolve(result);
         });
+      }
     });
   });
 }
@@ -342,6 +345,24 @@ async function queryOneActiveRepository(model, url) {
   });
 }
 
+/**
+ * Get Issue's challengeUUID by repoUrl
+ * @param {String} repoUrl The repo url
+ * @returns {Promise<Object>}
+ */
+async function queryChallengeUUIDsByRepoUrl(repoUrl) {
+  return await new Promise((resolve, reject) => {
+    models.Issue.scan('repoUrl').eq(repoUrl)
+      .attributes(['challengeUUID'])
+      .exec((err, results) => {
+        if (err) {
+          return reject(err);
+        }
+        return resolve(results.map(({challengeUUID}) => challengeUUID));
+      });
+  });
+}
+
 module.exports = {
   getById,
   scan,
@@ -357,6 +378,7 @@ module.exports = {
   queryOneUserMappingByGithubUsername,
   queryOneUserMappingByGitlabUsername,
   queryOneUserMappingByTCUsername,
+  queryChallengeUUIDsByRepoUrl,
   removeCopilotPayment,
   removeIssue
 };
