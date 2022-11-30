@@ -1,5 +1,5 @@
 # Use the base image with Node.js
-FROM node:8.12
+FROM node:8.17.0
 
 # Copy the current directory into the Docker image
 COPY . /topcoder-x-processor
