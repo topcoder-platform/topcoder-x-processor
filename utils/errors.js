@@ -45,10 +45,10 @@ errors.handleGitHubError = function handleGitHubError(err, message, copilotHandl
     resMsg += ` Detail: ${detail}`;
   }
   const apiError = new ProcessorError(
-        _.get(err, 'response.status', constants.SERVICE_ERROR_STATUS),
-        resMsg,
-        'github'
-    );
+    _.get(err, 'response.status', constants.SERVICE_ERROR_STATUS),
+    resMsg,
+    'github'
+  );
   return apiError;
 };
 
@@ -70,10 +70,10 @@ errors.handleGitLabError = function handleGitLabError(err, message, copilotHandl
     resMsg += ` Detail: ${detail}`;
   }
   const apiError = new ProcessorError(
-        err.status || _.get(err, 'response.status', constants.SERVICE_ERROR_STATUS),
-        resMsg,
-        'gitlab'
-    );
+    err.status || _.get(err, 'response.status', constants.SERVICE_ERROR_STATUS),
+    resMsg,
+    'gitlab'
+  );
   return apiError;
 };
 
@@ -105,10 +105,10 @@ errors.convertTopcoderApiError = function convertTopcoderApiError(err, message) 
 errors.internalDependencyError = function internalDependencyError(message) {
   const resMsg = `${message}`;
   const apiError = new ProcessorError(
-        constants.SERVICE_ERROR_STATUS,
-        resMsg,
-        'processor'
-    );
+    constants.SERVICE_ERROR_STATUS,
+    resMsg,
+    'processor'
+  );
   return apiError;
 };
 
