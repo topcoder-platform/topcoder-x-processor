@@ -60,7 +60,6 @@ async function process(payload) {
   logger.debug(`${logPrefix}Project: ${JSON.stringify(project)}`);
   // Get Repositories
   const repositories = await dbHelper.queryAllRepositoriesByProjectId(Repository, project.id);
-  console.log(repositories);
   if (!repositories || repositories.length === 0) {
     logger.info(`${logPrefix}Repository not found for projectId: ${project.id}`);
     return;
