@@ -58,19 +58,19 @@ async function scan(model, scanParams) {
 async function queryOneIssue(model, repositoryId, number, provider) {
   return await new Promise((resolve, reject) => {
     model.query('repositoryId').eq(repositoryId)
-    .where('number')
-    .eq(number)
-    .filter('provider')
-    .eq(provider)
-    .all()
-    .exec((err, result) => {
-      if (err || !result) {
-        logger.debug(`queryOne. Error. ${err}`);
-        return reject(err);
-      }
+      .where('number')
+      .eq(number)
+      .filter('provider')
+      .eq(provider)
+      .all()
+      .exec((err, result) => {
+        if (err || !result) {
+          logger.debug(`queryOne. Error. ${err}`);
+          return reject(err);
+        }
 
-      return resolve(result.count === 0 ? null : result[0]);
-    });
+        return resolve(result.count === 0 ? null : result[0]);
+      });
   });
 }
 
@@ -87,13 +87,13 @@ async function queryOneActiveProject(model, repoUrl) {
         resolve(null);
       } else {
         model.queryOne('id').eq(repo.projectId).consistent()
-        .exec((err, result) => {
-          if (err) {
-            logger.debug(`queryOneActiveProject. Error. ${err}`);
-            return reject(err);
-          }
-          return resolve(result);
-        });
+          .exec((err, result) => {
+            if (err) {
+              logger.debug(`queryOneActiveProject. Error. ${err}`);
+              return reject(err);
+            }
+            return resolve(result);
+          });
       }
     });
   });
@@ -109,16 +109,16 @@ async function queryOneActiveProject(model, repoUrl) {
 async function queryOneUserByType(model, username, type) {
   return await new Promise((resolve, reject) => {
     model.query('username').eq(username)
-    .where('type')
-    .eq(type)
-    .all()
-    .exec((err, result) => {
-      if (err || !result) {
-        logger.debug(`queryOneUserByType. Error. ${err}`);
-        return reject(err);
-      }
-      return resolve(result.count === 0 ? null : result[0]);
-    });
+      .where('type')
+      .eq(type)
+      .all()
+      .exec((err, result) => {
+        if (err || !result) {
+          logger.debug(`queryOneUserByType. Error. ${err}`);
+          return reject(err);
+        }
+        return resolve(result.count === 0 ? null : result[0]);
+      });
   });
 }
 
@@ -131,14 +131,14 @@ async function queryOneUserByType(model, username, type) {
 async function queryOneUserMappingByTCUsername(model, tcusername) {
   return await new Promise((resolve, reject) => {
     model.queryOne('topcoderUsername').eq(tcusername)
-    .all()
-    .exec((err, result) => {
-      if (err) {
-        logger.debug(`queryOneUserMappingByTCUsername. Error. ${err}`);
-        return reject(err);
-      }
-      return resolve(result);
-    });
+      .all()
+      .exec((err, result) => {
+        if (err) {
+          logger.debug(`queryOneUserMappingByTCUsername. Error. ${err}`);
+          return reject(err);
+        }
+        return resolve(result);
+      });
   });
 }
 
@@ -151,14 +151,14 @@ async function queryOneUserMappingByTCUsername(model, tcusername) {
 async function queryOneUserMappingByGithubUsername(model, username) {
   return await new Promise((resolve, reject) => {
     model.queryOne('githubUsername').eq(username)
-    .all()
-    .exec((err, result) => {
-      if (err || !result) {
-        logger.debug(`queryOneUserMappingByGithubUsername. Error. ${err}`);
-        return reject(err);
-      }
-      return resolve(result);
-    });
+      .all()
+      .exec((err, result) => {
+        if (err || !result) {
+          logger.debug(`queryOneUserMappingByGithubUsername. Error. ${err}`);
+          return reject(err);
+        }
+        return resolve(result);
+      });
   });
 }
 
@@ -171,14 +171,14 @@ async function queryOneUserMappingByGithubUsername(model, username) {
 async function queryOneUserMappingByGitlabUsername(model, username) {
   return await new Promise((resolve, reject) => {
     model.queryOne('gitlabUsername').eq(username)
-    .all()
-    .exec((err, result) => {
-      if (err || !result) {
-        logger.debug(`queryOneUserMappingByGitlabUsername. Error. ${err}`);
-        return reject(err);
-      }
-      return resolve(result);
-    });
+      .all()
+      .exec((err, result) => {
+        if (err || !result) {
+          logger.debug(`queryOneUserMappingByGitlabUsername. Error. ${err}`);
+          return reject(err);
+        }
+        return resolve(result);
+      });
   });
 }
 
@@ -191,14 +191,14 @@ async function queryOneUserMappingByGitlabUsername(model, username) {
 async function queryOneUserMappingByGithubUserId(model, userId) {
   return await new Promise((resolve, reject) => {
     model.queryOne('githubUserId').eq(userId)
-    .all()
-    .exec((err, result) => {
-      if (err || !result) {
-        logger.debug(`queryOneUserMappingByGithubUserId. Error. ${err}`);
-        return reject(err);
-      }
-      return resolve(result);
-    });
+      .all()
+      .exec((err, result) => {
+        if (err || !result) {
+          logger.debug(`queryOneUserMappingByGithubUserId. Error. ${err}`);
+          return reject(err);
+        }
+        return resolve(result);
+      });
   });
 }
 
@@ -211,14 +211,34 @@ async function queryOneUserMappingByGithubUserId(model, userId) {
 async function queryOneUserMappingByGitlabUserId(model, userId) {
   return await new Promise((resolve, reject) => {
     model.queryOne('gitlabUserId').eq(userId)
-    .all()
-    .exec((err, result) => {
-      if (err || !result) {
-        logger.debug(`queryOneUserMappingByGitlabUserId. Error. ${err}`);
-        return reject(err);
-      }
-      return resolve(result);
-    });
+      .all()
+      .exec((err, result) => {
+        if (err || !result) {
+          logger.debug(`queryOneUserMappingByGitlabUserId. Error. ${err}`);
+          return reject(err);
+        }
+        return resolve(result);
+      });
+  });
+}
+
+/**
+ * Get all repositories by project id
+ * @param {import('dynamoose').ModelConstructor<any, any>} model The dynamoose model to query
+ * @param {String} projectId The project id
+ * @returns {Promise<import('dynamoose').ScanResult<any>>}
+ */
+async function queryAllRepositoriesByProjectId(model, projectId) {
+  return await new Promise((resolve, reject) => {
+    model.scan({projectId: {eq: projectId}})
+      .all()
+      .exec((err, result) => {
+        if (err || !result) {
+          logger.debug(`queryAllRepositoriesByProjectId. Error. ${err}`);
+          return reject(err);
+        }
+        return resolve(result);
+      });
   });
 }
 
@@ -335,13 +355,13 @@ async function queryOneActiveRepository(model, url) {
       url,
       archived: 'false'
     })
-    .all()
-    .exec((err, result) => {
-      if (err) {
-        return reject(err);
-      }
-      return resolve(result);
-    });
+      .all()
+      .exec((err, result) => {
+        if (err) {
+          return reject(err);
+        }
+        return resolve(result);
+      });
   });
 }
 
@@ -379,6 +399,7 @@ module.exports = {
   queryOneUserMappingByGitlabUsername,
   queryOneUserMappingByTCUsername,
   queryChallengeUUIDsByRepoUrl,
+  queryAllRepositoriesByProjectId,
   removeCopilotPayment,
   removeIssue
 };

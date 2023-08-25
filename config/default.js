@@ -16,11 +16,12 @@ module.exports = {
   LOG_LEVEL: process.env.LOG_LEVEL || 'debug',
   PARTITION: process.env.PARTITION || 0,
   TOPIC: process.env.TOPIC || 'tc-x-events',
+  TOPIC_CHALLENGE_ACTION_RESOURCE_CREATE: process.env.TOPIC_CHALLENGE_ACTION_RESOURCE_CREATE || 'challenge.action.resource.create',
   TOPIC_NOTIFICATION: process.env.TOPIC_NOTIFICATION || 'notifications.action.create',
   KAFKA_OPTIONS: {
     connectionString: process.env.KAFKA_URL || 'localhost:9092',
     groupId: process.env.KAFKA_GROUP_ID || 'topcoder-x-processor',
-    ssl: {
+    ssl: process.env.KAFKA_DISABLE_SSL ? false : {
       cert: process.env.KAFKA_CLIENT_CERT || fs.readFileSync('./kafka_client.cer'), // eslint-disable-line no-sync
       key: process.env.KAFKA_CLIENT_CERT_KEY || fs.readFileSync('./kafka_client.key'), // eslint-disable-line no-sync
       passphrase: 'secret', // NOTE:* This configuration specifies the private key passphrase used while creating it.

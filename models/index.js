@@ -37,6 +37,7 @@ if (process.env.CREATE_DB) {
 const models = {
   Issue: dynamoose.model('Topcoder_X.Issue', require('./Issue')),
   Project: dynamoose.model('Topcoder_X.Project', require('./Project')),
+  ProjectChallengeMapping: dynamoose.model('Topcoder_X.ProjectChallengeMapping', require('./ProjectChallengeMapping')),
   User: dynamoose.model('Topcoder_X.User', require('./User')),
   CopilotPayment: dynamoose.model('Topcoder_X.CopilotPayment', require('./CopilotPayment')),
   GithubUserMapping: dynamoose.model('Topcoder_X.GithubUserMapping', require('./GithubUserMapping')),
