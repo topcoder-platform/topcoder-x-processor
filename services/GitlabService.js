@@ -345,7 +345,17 @@ async function getRepository(user, repoURL) {
 async function addUserToRepository(copilot, repository, user, accessLevel) {
   const refreshedCopilot = await _refreshGitlabUserAccessToken(copilot);
   const gitlab = await _authenticate(refreshedCopilot.accessToken);
-  const member = await gitlab.ProjectMembers.show(repository.id, user.userProviderId);
+  const member = await new Promise((resolve, reject) => {
+    gitlab.ProjectMembers.show(repository.id, user.userProviderId)
+      .then((result) => resolve(result))
+      .catch((err) => {
+        // eslint-disable-next-line no-magic-numbers
+        if (_.get(err, 'cause.response.status') === 404) {
+          return resolve(null);
+        }
+        return reject(err);
+      });
+  });
   if (!member) {
     await gitlab.ProjectMembers.add(repository.id, user.userProviderId, accessLevel);
     return;
@@ -386,15 +396,16 @@ async function _refreshGitlabUserAccessToken(copilot) {
       .end();
       // save user token data
     const expiresIn = refreshTokenResult.body.expires_in || config.GITLAB_ACCESS_TOKEN_DEFAULT_EXPIRATION;
-    return await dbHelper.update(models.User, copilot.id, {
+    const updates = {
       accessToken: refreshTokenResult.body.access_token,
       accessTokenExpiration: new Date(new Date().getTime() + expiresIn * MS_PER_SECOND),
       refreshToken: refreshTokenResult.body.refresh_token
-    });
+    };
+    copilot = _.assign(copilot, updates);
+    return await dbHelper.update(models.User, copilot.id, updates);
   }
   return copilot;
 }
-
 
 module.exports = {
   createComment,
