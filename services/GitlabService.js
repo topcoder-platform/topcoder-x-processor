@@ -30,23 +30,59 @@ const copilotUserSchema = Joi.object().keys({
   accessTokenExpiration: Joi.date().required(),
   refreshToken: Joi.string().required(),
   userProviderId: Joi.number().required(),
-  topcoderUsername: Joi.string()
+  topcoderUsername: Joi.string(),
+  username: Joi.string().optional(),
+  type: Joi.string().optional(),
+  id: Joi.string().optional(),
+  role: Joi.string().optional()
 }).required();
 
 /**
+ * Refresh the user access token if needed
+ * @param {Object} user the copilot
+ * @returns {Promise} the promise result of copilot with refreshed token
+ */
+async function _refreshAccessToken(user) {
+  if (user.accessTokenExpiration && new Date().getTime() > user.accessTokenExpiration.getTime() -
+    (config.GITLAB_REFRESH_TOKEN_BEFORE_EXPIRATION * MS_PER_SECOND)) {
+    const refreshTokenResult = await request
+      .post(`${config.GITLAB_API_BASE_URL}/oauth/token`)
+      .query({
+        client_id: config.GITLAB_CLIENT_ID,
+        client_secret: config.GITLAB_CLIENT_SECRET,
+        refresh_token: user.refreshToken,
+        grant_type: 'refresh_token',
+        redirect_uri: config.GITLAB_OWNER_USER_CALLBACK_URL
+      })
+      .end();
+    // save user token data
+    const expiresIn = refreshTokenResult.body.expires_in || config.GITLAB_ACCESS_TOKEN_DEFAULT_EXPIRATION;
+    const updates = {
+      accessToken: refreshTokenResult.body.access_token,
+      accessTokenExpiration: new Date(new Date().getTime() + expiresIn * MS_PER_SECOND),
+      refreshToken: refreshTokenResult.body.refresh_token
+    };
+    _.assign(user, updates);
+    await dbHelper.update(models.User, user.id, updates);
+  }
+  return user;
+}
+
+/**
  * authenticate the gitlab using access token
- * @param {String} accessToken the access token of copilot
+ * @param {Object} user the user
  * @private
  */
-async function _authenticate(accessToken) {
+async function _getClient(user) {
   try {
+    const refreshedUser = await _refreshAccessToken(user);
     const gitlab = new Gitlab({
       host: config.GITLAB_API_BASE_URL,
-      oauthToken: accessToken
+      oauthToken: refreshedUser.accessToken
     });
     return gitlab;
   } catch (err) {
-    throw errors.handleGitLabError(err, 'Failed to during authenticate to Github using access token of copilot.');
+    throw errors.handleGitLabError(err, 'Failed to authenticate to Gitlab using access token of copilot.', err);
   }
 }
 
@@ -89,8 +125,7 @@ function _getIssueUrl(repoPath, issueId) {
 async function createComment(copilot, project, issueId, body) {
   const projectId = project.id;
   Joi.attempt({copilot, projectId, issueId, body}, createComment.schema);
-  const refreshedCopilot = await _refreshGitlabUserAccessToken(copilot);
-  const gitlab = await _authenticate(refreshedCopilot.accessToken);
+  const gitlab = await _getClient(copilot);
   try {
     body = helper.prepareAutomatedComment(body, copilot);
     await gitlab.IssueNotes.create(projectId, issueId, body);
@@ -117,8 +152,7 @@ createComment.schema = {
 async function updateIssue(copilot, project, issueId, title) {
   const projectId = project.id;
   Joi.attempt({copilot, projectId, issueId, title}, updateIssue.schema);
-  const refreshedCopilot = await _refreshGitlabUserAccessToken(copilot);
-  const gitlab = await _authenticate(refreshedCopilot.accessToken);
+  const gitlab = await _getClient(copilot);
   try {
     await gitlab.Issues.edit(projectId, issueId, {title});
   } catch (err) {
@@ -144,8 +178,7 @@ updateIssue.schema = {
 async function assignUser(copilot, project, issueId, userId) {
   const projectId = project.id;
   Joi.attempt({copilot, projectId, issueId, userId}, assignUser.schema);
-  const refreshedCopilot = await _refreshGitlabUserAccessToken(copilot);
-  const gitlab = await _authenticate(refreshedCopilot.accessToken);
+  const gitlab = await _getClient(copilot);
   try {
     const issue = await gitlab.Issues.show(issueId, {projectId});
     const oldAssignees = _.without(issue.assignees.map((a) => a.id), userId);
@@ -176,8 +209,7 @@ assignUser.schema = {
 async function removeAssign(copilot, project, issueId, userId) {
   const projectId = project.id;
   Joi.attempt({copilot, projectId, issueId, userId}, removeAssign.schema);
-  const refreshedCopilot = await _refreshGitlabUserAccessToken(copilot);
-  const gitlab = await _authenticate(refreshedCopilot.accessToken);
+  const gitlab = await _getClient(copilot);
   await _removeAssignees(gitlab, projectId, issueId, [userId]);
   logger.debug(`Gitlab user ${userId} is unassigned from issue number ${issueId}`);
 }
@@ -192,8 +224,7 @@ removeAssign.schema = assignUser.schema;
  */
 async function getUsernameById(copilot, userId) {
   Joi.attempt({copilot, userId}, getUsernameById.schema);
-  const refreshedCopilot = await _refreshGitlabUserAccessToken(copilot);
-  const gitlab = await _authenticate(refreshedCopilot.accessToken);
+  const gitlab = await _getClient(copilot);
   const user = await gitlab.Users.show(userId);
   return user ? user.username : null;
 }
@@ -211,8 +242,7 @@ getUsernameById.schema = {
  */
 async function getUserIdByLogin(copilot, login) {
   Joi.attempt({copilot, login}, getUserIdByLogin.schema);
-  const refreshedCopilot = await _refreshGitlabUserAccessToken(copilot);
-  const gitlab = await _authenticate(refreshedCopilot.accessToken);
+  const gitlab = await _getClient(copilot);
   const user = await gitlab.Users.all({username: login});
   return user.length ? user[0].id : null;
 }
@@ -235,8 +265,7 @@ getUserIdByLogin.schema = {
 async function markIssueAsPaid(copilot, project, issueId, challengeUUID, existLabels, winner, createCopilotPayments) { // eslint-disable-line max-params
   const projectId = project.id;
   Joi.attempt({copilot, projectId, issueId, challengeUUID, existLabels, winner, createCopilotPayments}, markIssueAsPaid.schema);
-  const refreshedCopilot = await _refreshGitlabUserAccessToken(copilot);
-  const gitlab = await _authenticate(refreshedCopilot.accessToken);
+  const gitlab = await _getClient(copilot);
   const labels = _(existLabels).filter((i) => i !== config.FIX_ACCEPTED_ISSUE_LABEL)
     .push(config.FIX_ACCEPTED_ISSUE_LABEL, config.PAID_ISSUE_LABEL).value();
   try {
@@ -279,8 +308,7 @@ markIssueAsPaid.schema = {
 async function changeState(copilot, project, issueId, state) {
   const projectId = project.id;
   Joi.attempt({copilot, projectId, issueId, state}, changeState.schema);
-  const refreshedCopilot = await _refreshGitlabUserAccessToken(copilot);
-  const gitlab = await _authenticate(refreshedCopilot.accessToken);
+  const gitlab = await _getClient(copilot);
   try {
     await gitlab.Issues.edit(projectId, issueId, {stateEvent: state});
   } catch (err) {
@@ -306,8 +334,7 @@ changeState.schema = {
 async function addLabels(copilot, project, issueId, labels) {
   const projectId = project.id;
   Joi.attempt({copilot, projectId, issueId, labels}, addLabels.schema);
-  const refreshedCopilot = await _refreshGitlabUserAccessToken(copilot);
-  const gitlab = await _authenticate(refreshedCopilot.accessToken);
+  const gitlab = await _getClient(copilot);
   try {
     await gitlab.Issues.edit(projectId, issueId, {labels: _.join(labels, ',')});
   } catch (err) {
@@ -329,11 +356,16 @@ addLabels.schema = {
  * @param {Object} repoURL The repository URL
  */
 async function getRepository(user, repoURL) {
-  const refreshedUser = await _refreshGitlabUserAccessToken(user);
-  const gitlab = await _authenticate(refreshedUser.accessToken);
+  Joi.attempt({user, repoURL}, getRepository.schema);
+  const gitlab = await _getClient(user);
   const _repoURL = repoURL.replace(`${config.GITLAB_API_BASE_URL}/`, '');
   return await gitlab.Projects.show(_repoURL);
 }
+
+getRepository.schema = {
+  user: Joi.object().required(),
+  repoURL: Joi.string().required()
+};
 
 /**
  * Add a user to a gitlab repository
@@ -343,18 +375,19 @@ async function getRepository(user, repoURL) {
  * @param {import('@gitbeaker/rest').AccessLevel} accessLevel The user role
  */
 async function addUserToRepository(copilot, repository, user, accessLevel) {
-  const refreshedCopilot = await _refreshGitlabUserAccessToken(copilot);
-  const gitlab = await _authenticate(refreshedCopilot.accessToken);
-  const member = await new Promise((resolve, reject) => {
-    gitlab.ProjectMembers.show(repository.id, user.userProviderId)
-      .then((result) => resolve(result))
-      .catch((err) => {
-        // eslint-disable-next-line no-magic-numbers
-        if (_.get(err, 'cause.response.status') === 404) {
-          return resolve(null);
-        }
-        return reject(err);
-      });
+  Joi.attempt({copilot, repository, user, accessLevel}, addUserToRepository.schema);
+  const gitlab = await _getClient(copilot);
+  const member = await new Promise(async (resolve, reject) => {
+    try {
+      const res = await gitlab.ProjectMembers.show(repository.id, user.userProviderId);
+      resolve(res);
+    } catch (err) {
+      // eslint-disable-next-line no-magic-numbers
+      if (_.get(err, 'cause.response.status') === 404) {
+        resolve(null);
+      }
+      reject(err);
+    }
   });
   if (!member) {
     await gitlab.ProjectMembers.add(repository.id, user.userProviderId, accessLevel);
@@ -365,47 +398,28 @@ async function addUserToRepository(copilot, repository, user, accessLevel) {
   }
 }
 
+addUserToRepository.schema = {
+  copilot: copilotUserSchema,
+  repository: Joi.object().required(),
+  user: Joi.object().required(),
+  accessLevel: Joi.number().required()
+};
+
 /**
  * Fork a gitlab repository
  * @param {Object} user The user
  * @param {ProjectSchema} repository The repository
  */
 async function forkRepository(user, repository) {
-  const refreshedUser = await _refreshGitlabUserAccessToken(user);
-  const gitlab = await _authenticate(refreshedUser.accessToken);
+  Joi.attempt({user, repository}, forkRepository.schema);
+  const gitlab = await _getClient(user);
   await gitlab.Projects.fork(repository.id);
 }
 
-/**
- * Refresh the copilot access token if token is needed
- * @param {Object} copilot the copilot
- * @returns {Promise} the promise result of copilot with refreshed token
- */
-async function _refreshGitlabUserAccessToken(copilot) {
-  if (copilot.accessTokenExpiration && new Date().getTime() > copilot.accessTokenExpiration.getTime() -
-    (config.GITLAB_REFRESH_TOKEN_BEFORE_EXPIRATION * MS_PER_SECOND)) {
-    const refreshTokenResult = await request
-      .post(`${config.GITLAB_API_BASE_URL}/oauth/token`)
-      .query({
-        client_id: config.GITLAB_CLIENT_ID,
-        client_secret: config.GITLAB_CLIENT_SECRET,
-        refresh_token: copilot.refreshToken,
-        grant_type: 'refresh_token',
-        redirect_uri: config.GITLAB_OWNER_USER_CALLBACK_URL
-      })
-      .end();
-      // save user token data
-    const expiresIn = refreshTokenResult.body.expires_in || config.GITLAB_ACCESS_TOKEN_DEFAULT_EXPIRATION;
-    const updates = {
-      accessToken: refreshTokenResult.body.access_token,
-      accessTokenExpiration: new Date(new Date().getTime() + expiresIn * MS_PER_SECOND),
-      refreshToken: refreshTokenResult.body.refresh_token
-    };
-    copilot = _.assign(copilot, updates);
-    return await dbHelper.update(models.User, copilot.id, updates);
-  }
-  return copilot;
-}
+forkRepository.schema = {
+  user: Joi.object().required(),
+  repository: Joi.object().required()
+};
 
 module.exports = {
   createComment,
