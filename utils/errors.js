@@ -65,9 +65,9 @@ errors.handleGitLabError = function handleGitLabError(err, message, copilotHandl
     notification.sendTokenExpiredAlert(copilotHandle, repoPath, 'Gitlab');
   }
   let resMsg = `${message}. ${err.message}.`;
-  const detail = _.get(err, 'response.body.message');
+  const detail = _.get(err, 'response.body') || _.get(err, 'cause.response.body');
   if (detail) {
-    resMsg += ` Detail: ${detail}`;
+    resMsg += ` Response Body: ${JSON.stringify(detail)}`;
   }
   const apiError = new ProcessorError(
     err.status || _.get(err, 'response.status', constants.SERVICE_ERROR_STATUS),

@@ -7,7 +7,7 @@
         "jsdoc"
     ],
     "parserOptions": {
-        "ecmaVersion": 8,
+        "ecmaVersion": 2023,
         "ecmaFeatures": {
             "experimentalObjectRestSpread": true
         }
@@ -45,6 +45,8 @@
                 "functions": "ignore"
             }
         ],
+        "import/no-unresolved": 0,
+        "max-params": 0,
         "max-lines": 0,
         "max-statements": 0,
         "valid-jsdoc": 0
