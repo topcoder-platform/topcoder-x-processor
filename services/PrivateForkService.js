@@ -6,12 +6,12 @@ const uuid = require('uuid').v4;
 const models = require('../models');
 const dbHelper = require('../utils/db-helper');
 const logger = require('../utils/logger');
+const errors = require('../utils/errors');
 const GitlabService = require('../services/GitlabService');
-const {GITLAB_ACCESS_LEVELS} = require('../constants');
+const {GITLAB_ACCESS_LEVELS, USER_ROLES, USER_TYPES} = require('../constants');
 
 const ProjectChallengeMapping = models.ProjectChallengeMapping;
 const Project = models.Project;
-const Repository = models.Repository;
 const User = models.User;
 const GitlabUserMapping = models.GitlabUserMapping;
 
@@ -25,7 +25,7 @@ const GitlabUserMapping = models.GitlabUserMapping;
 async function process(payload) {
   const {challengeId, memberId, memberHandle} = payload;
   const correlationId = uuid();
-  const logPrefix = `[${correlationId}][PullRequestService#process]`;
+  const logPrefix = `[Correlation ID: ${correlationId}][PullRequestService#process]`;
   logger.debug(`${logPrefix}: Challenge ID: ${challengeId}`);
   logger.debug(`${logPrefix}: Member ID: ${memberId}`);
   logger.debug(`${logPrefix}: Member Handle: ${memberHandle}`);
@@ -55,7 +55,7 @@ async function process(payload) {
   }
   logger.debug(`${logPrefix} Project: ${JSON.stringify(project)}`);
   // Get Repositories
-  const repositories = await dbHelper.queryAllRepositoriesByProjectId(Repository, project.id);
+  const repositories = await dbHelper.queryAllRepositoriesByProjectId(project.id);
   if (!repositories || repositories.length === 0) {
     logger.info(`${logPrefix} Repository not found for projectId: ${project.id}`);
     return;
@@ -69,9 +69,9 @@ async function process(payload) {
   }
   logger.debug(`${logPrefix} GitlabUserMapping[Copilot]: ${JSON.stringify(copilotGitlabUserMapping)}`);
   // Get Gitlab User
-  const copilotGitlabUser = await dbHelper.queryOneUserByType(User, copilotGitlabUserMapping.gitlabUsername, 'gitlab');
+  const copilotGitlabUser = await dbHelper.queryOneUserByTypeAndRole(User, copilotGitlabUserMapping.gitlabUsername, USER_TYPES.GITLAB, USER_ROLES.OWNER);
   if (!copilotGitlabUser) {
-    logger.info(`${logPrefix} GitlabUser not found for copilot: ${project.copilot}`);
+    logger.info(`${logPrefix} User[Type=${USER_TYPES.GITLAB}, Role=${USER_ROLES.OWNER}] not found for copilot: ${project.copilot}`);
     return;
   }
   logger.debug(`${logPrefix} GitlabUser[Copilot]: ${JSON.stringify(copilotGitlabUser)}`);
@@ -85,7 +85,7 @@ async function process(payload) {
   }
   logger.debug(`${logPrefix} GitlabUserMapping[Member]: ${JSON.stringify(memberGitlabUserMapping)}`);
   // Get Gitlab User
-  const memberGitlabUser = await dbHelper.queryOneUserByType(User, memberGitlabUserMapping.gitlabUsername, 'gitlab');
+  const memberGitlabUser = await dbHelper.queryOneUserByTypeAndRole(User, memberGitlabUserMapping.gitlabUsername, USER_TYPES.GITLAB, USER_ROLES.GUEST);
   if (!memberGitlabUser) {
     logger.info(`${logPrefix} GitlabUser not found for memberHandle: ${memberHandle}`);
     return;
@@ -102,10 +102,12 @@ async function process(payload) {
       }
       // Add user as a guest to the repo
       await copilotGitlabService.addUserToRepository(repository, memberGitlabUser, GITLAB_ACCESS_LEVELS.DEVELOPER);
+      logger.debug(`${logPrefix} User (${memberGitlabUser.username}) added to repository (${repo.url})`);
       // Fork the repository
       await memberGitlabService.forkRepository(repository);
+      logger.debug(`${logPrefix} Repository (${repo.url}) forked for user: ${memberGitlabUser.username}`);
     } catch (err) {
-      logger.error(`${logPrefix} Error: ${err.message}`, err);
+      throw errors.handleGitLabError(err, 'Error occurred while forking repository to user\'s namespace in GitLab');
     }
   }));
 }

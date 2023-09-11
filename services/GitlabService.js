@@ -8,8 +8,8 @@
  * @author TCSCODER
  * @version 1.0
  */
-
 const config = require('config');
+const uuid = require('uuid').v4;
 const _ = require('lodash');
 const Joi = require('joi');
 const {Gitlab} = require('@gitbeaker/rest');
@@ -26,11 +26,11 @@ const request = superagentPromise(superagent, Promise);
 // milliseconds per second
 const MS_PER_SECOND = 1000;
 
+const LOCK_TTL_SECONDS = 20;
 
-const USER_ROLE_TO_REDIRECT_URI_MAP = {
-  owner: config.GITLAB_OWNER_USER_CALLBACK_URL,
-  guest: config.GITLAB_GUEST_USER_CALLBACK_URL
-};
+const MAX_RETRY_COUNT = 30;
+
+const COOLDOWN_TIME = 1000;
 
 /**
  * A schema for a Gitlab user, as stored in the TCX database.
@@ -55,7 +55,9 @@ const USER_SCHEMA = Joi.object().keys({
   username: Joi.string().optional(),
   type: Joi.string().valid('gitlab').required(),
   id: Joi.string().optional(),
-  role: Joi.string().valid('owner', 'guest').required()
+  role: Joi.string().valid('owner', 'guest').required(),
+  lockId: Joi.string().optional(),
+  lockExpiration: Joi.date().optional()
 }).required();
 
 /**
@@ -107,31 +109,51 @@ class GitlabService {
    * Refresh the user access token if needed
    */
   async refreshAccessToken() {
-    const user = this.#user;
-    if (user.accessTokenExpiration && new Date().getTime() > user.accessTokenExpiration.getTime() -
-      (config.GITLAB_REFRESH_TOKEN_BEFORE_EXPIRATION * MS_PER_SECOND)) {
-      const query = {
-        client_id: config.GITLAB_CLIENT_ID,
-        client_secret: config.GITLAB_CLIENT_SECRET,
-        refresh_token: user.refreshToken,
-        grant_type: 'refresh_token',
-        redirect_uri: USER_ROLE_TO_REDIRECT_URI_MAP[user.role]
-      };
-      const refreshTokenResult = await request
-        .post(`${config.GITLAB_API_BASE_URL}/oauth/token`)
-        .query(query)
-        .end();
-      // save user token data
-      const expiresIn = refreshTokenResult.body.expires_in || config.GITLAB_ACCESS_TOKEN_DEFAULT_EXPIRATION;
-      const updates = {
-        accessToken: refreshTokenResult.body.access_token,
-        accessTokenExpiration: new Date(new Date().getTime() + expiresIn * MS_PER_SECOND),
-        refreshToken: refreshTokenResult.body.refresh_token
-      };
-      _.assign(user, updates);
-      await dbHelper.update(models.User, user.id, updates);
+    const lockId = uuid().replace(/-/g, '');
+    let lockedUser;
+    let tries = 0;
+    try {
+      // eslint-disable-next-line no-constant-condition, no-restricted-syntax
+      while ((tries < MAX_RETRY_COUNT) && !(lockedUser && lockedUser.lockId === lockId)) {
+        logger.debug(`[Lock ID: ${lockId}][Attempt #${tries + 1}] Acquiring lock on user ${this.#user.username}.`);
+        lockedUser = await dbHelper.acquireLockOnUser(this.#user.id, lockId, LOCK_TTL_SECONDS * MS_PER_SECOND);
+        await new Promise((resolve) => setTimeout(resolve, COOLDOWN_TIME));
+        tries += 1;
+      }
+      if (!lockedUser) {
+        throw new Error(`Failed to acquire lock on user ${this.#user.id} after ${tries} attempts.`);
+      }
+      logger.debug(`[Lock ID: ${lockId}] Acquired lock on user ${this.#user.id}.`);
+      if (lockedUser.accessTokenExpiration && new Date().getTime() > lockedUser.accessTokenExpiration.getTime() -
+        (config.GITLAB_REFRESH_TOKEN_BEFORE_EXPIRATION * MS_PER_SECOND)) {
+        logger.debug(`[Lock ID: ${lockId}] Refreshing access token for user ${this.#user.id}.`);
+        const query = {
+          client_id: config.GITLAB_CLIENT_ID,
+          client_secret: config.GITLAB_CLIENT_SECRET,
+          refresh_token: lockedUser.refreshToken,
+          grant_type: 'refresh_token'
+        };
+        const refreshTokenResult = await request
+          .post(`${config.GITLAB_API_BASE_URL}/oauth/token`)
+          .query(query)
+          .end();
+        // save user token data
+        const expiresIn = refreshTokenResult.body.expires_in || config.GITLAB_ACCESS_TOKEN_DEFAULT_EXPIRATION;
+        const updates = {
+          accessToken: refreshTokenResult.body.access_token,
+          accessTokenExpiration: new Date(new Date().getTime() + expiresIn * MS_PER_SECOND),
+          refreshToken: refreshTokenResult.body.refresh_token
+        };
+        _.assign(lockedUser, updates);
+        await dbHelper.update(models.User, lockedUser.id, updates);
+      }
+      return lockedUser;
+    } finally {
+      if (lockedUser) {
+        logger.debug(`[Lock ID: ${lockId}] Releasing lock on user ${this.#user.id}.`);
+        await dbHelper.releaseLockOnUser(this.#user.id, lockId);
+      }
     }
-    return user;
   }
 
   /**
@@ -432,6 +454,60 @@ class GitlabService {
   async forkRepository(repository) {
     Joi.attempt({repository}, {repository: Joi.object().required()});
     await this.#gitlab.Projects.fork(repository.id);
+  }
+
+  /**
+   * Get the diff patch for a gitlab merge request
+   * @param {import('@gitbeaker/rest').MergeRequestSchemaWithBasicLabels} mergeRequest The merge request
+   * @returns {Promise<String>} The diff patch
+   */
+  async getMergeRequestDiffPatches(mergeRequest) {
+    Joi.attempt({mergeRequest}, {
+      mergeRequest: Joi.object().keys({
+        web_url: Joi.string().required()
+      }).unknown(true).required()
+    });
+    const diff = await this.#gitlab.MergeRequests.allDiffs(mergeRequest.target_project_id, mergeRequest.iid);
+    const patchFile = diff.reduce((acc, file) => {
+      // Header
+      acc += `diff --git a/${file.old_path} b/${file.new_path}\n`;
+      // Index
+      if (file.new_file) {
+        acc += `new file mode ${file.b_mode}\n`;
+      }
+      if (file.deleted_file) {
+        acc += `deleted file mode ${file.a_mode}\n`;
+      }
+      if (file.diff && file.diff !== '') {
+        acc += `--- a/${file.new_file ? '/dev/null' : file.old_path}\n`;
+        acc += `+++ b/${file.deleted_file ? '/dev/null' : file.new_path}\n`;
+        acc += file.diff;
+      } else if (file.renamed_file) {
+        acc += 'similarity index 100%\n';
+        acc += `rename from ${file.old_path}\n`;
+        acc += `rename to ${file.new_path}\n`;
+      }
+      return acc;
+    }, '');
+    console.log(patchFile);
+    return patchFile;
+  }
+
+  /**
+   * Get a list of all merge requests for a gitlab repository
+   * @param {ProjectSchema} repository The repository
+   * @param {Number} userId
+   */
+  async getOpenMergeRequestsByUser(repository, userId) {
+    Joi.attempt({repository, userId}, {
+      repository: Joi.object().required(),
+      userId: Joi.number().required()
+    });
+    return this.#gitlab.MergeRequests.all({
+      projectId: repository.id,
+      state: 'opened',
+      authorId: userId
+    });
   }
 }
 

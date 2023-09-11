@@ -19,7 +19,8 @@ const USER_TYPES = {
 
 // The user roles
 const USER_ROLES = {
-  OWNER: 'owner'
+  OWNER: 'owner',
+  GUEST: 'guest'
 };
 
 // The challenge status
