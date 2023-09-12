@@ -96,7 +96,7 @@ class GitlabService {
       await svc.refreshAccessToken();
       svc.#gitlab = new Gitlab({
         host: config.GITLAB_API_BASE_URL,
-        oauthToken: user.accessToken
+        oauthToken: svc.#user.accessToken
       });
       return svc;
     } catch (err) {
@@ -123,10 +123,10 @@ class GitlabService {
       if (!lockedUser) {
         throw new Error(`Failed to acquire lock on user ${this.#user.id} after ${tries} attempts.`);
       }
-      logger.debug(`[Lock ID: ${lockId}] Acquired lock on user ${this.#user.id}.`);
+      logger.debug(`[Lock ID: ${lockId}] Acquired lock on user ${this.#user.username}.`);
       if (lockedUser.accessTokenExpiration && new Date().getTime() > lockedUser.accessTokenExpiration.getTime() -
         (config.GITLAB_REFRESH_TOKEN_BEFORE_EXPIRATION * MS_PER_SECOND)) {
-        logger.debug(`[Lock ID: ${lockId}] Refreshing access token for user ${this.#user.id}.`);
+        logger.debug(`[Lock ID: ${lockId}] Refreshing access token for user ${this.#user.username}.`);
         const query = {
           client_id: config.GITLAB_CLIENT_ID,
           client_secret: config.GITLAB_CLIENT_SECRET,
@@ -147,11 +147,10 @@ class GitlabService {
         _.assign(lockedUser, updates);
         await dbHelper.update(models.User, lockedUser.id, updates);
       }
-      return lockedUser;
     } finally {
       if (lockedUser) {
-        logger.debug(`[Lock ID: ${lockId}] Releasing lock on user ${this.#user.id}.`);
-        await dbHelper.releaseLockOnUser(this.#user.id, lockId);
+        logger.debug(`[Lock ID: ${lockId}] Releasing lock on user ${this.#user.username}.`);
+        this.#user = await dbHelper.releaseLockOnUser(this.#user.id, lockId);
       }
     }
   }
