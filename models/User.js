@@ -49,7 +49,9 @@ const schema = new Schema({
   // gitlab token data
   accessToken: {type: String, required: false},
   accessTokenExpiration: {type: Date, required: false},
-  refreshToken: {type: String, required: false}
+  refreshToken: {type: String, required: false},
+  lockId: {type: String, required: false},
+  lockExpiration: {type: Date, required: false}
 });
 
 module.exports = schema;

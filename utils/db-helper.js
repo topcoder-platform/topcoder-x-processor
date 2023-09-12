@@ -125,6 +125,67 @@ async function queryOneUserByType(model, username, type) {
 /**
  * Get single data by query parameters
  * @param {Object} model The dynamoose model to query
+ * @param {String} username The user username
+ * @param {String} type The type of user
+ * @param {String} role The role of user
+ * @returns {Promise<void>}
+ */
+async function queryOneUserByTypeAndRole(model, username, type, role) {
+  return await new Promise((resolve, reject) => {
+    model.query('username').eq(username)
+      .where('type')
+      .eq(type)
+      .all()
+      .exec((err, result) => {
+        if (err || !result) {
+          logger.debug(`queryOneUserByType. Error. ${err}`);
+          return reject(err);
+        }
+        const filteredResult = result.filter((item) => item.role === role);
+        return resolve(filteredResult.count === 0 ? null : filteredResult[0]);
+      });
+  });
+}
+
+/**
+ * Query project by repository url
+ * @param {String} repoUrl the repo url
+ * @returns {Promise<Object>}
+ */
+async function queryOneProjectByRepositoryLink(repoUrl) {
+  const projectId = await new Promise((resolve, reject) => {
+    models.Repository.query('url')
+      .eq(repoUrl)
+      .all()
+      .exec((err, result) => {
+        if (err) {
+          return reject(err);
+        }
+        return resolve(result);
+      });
+  });
+  if (!projectId || projectId.length === 0) {
+    return null;
+  }
+  return await new Promise((resolve, reject) => {
+    models.Project.queryOne('id')
+      .eq(projectId[0].projectId)
+      .all()
+      .exec((err, result) => {
+        if (err) {
+          return reject(err);
+        }
+        if (!result || result.length === 0) {
+          return resolve(null);
+        }
+        return resolve(result);
+      });
+  });
+}
+
+/**
+ * Get single data by query parameters
+ * @param {Object} model The dynamoose model to query
  * @param {String} tcusername The tc username
  * @returns {Promise<void>}
  */
@@ -224,13 +285,12 @@ async function queryOneUserMappingByGitlabUserId(model, userId) {
 
 /**
  * Get all repositories by project id
- * @param {import('dynamoose').ModelConstructor<any, any>} model The dynamoose model to query
  * @param {String} projectId The project id
  * @returns {Promise<import('dynamoose').ScanResult<any>>}
  */
-async function queryAllRepositoriesByProjectId(model, projectId) {
+async function queryAllRepositoriesByProjectId(projectId) {
   return await new Promise((resolve, reject) => {
-    model.scan({projectId: {eq: projectId}})
+    models.Repository.scan({projectId: {eq: projectId}})
       .all()
       .exec((err, result) => {
         if (err || !result) {
@@ -383,6 +443,53 @@ async function queryChallengeUUIDsByRepoUrl(repoUrl) {
   });
 }
 
+/**
+ * Acquire lock on user to prevent concurrent updates
+ * @param {String} userId ID of the user
+ * @param {String} lockId ID of the lock
+ * @param {Number} ttl Time to live (in milliseconds)
+ * @returns {Promise<Object>} The lock object
+ */
+async function acquireLockOnUser(userId, lockId, ttl) {
+  const lockExpiration = Date.now() + ttl;
+  return await new Promise(async (resolve) => {
+    try {
+      const res = await models.User.update(
+        {id: userId},
+        {lockId, lockExpiration},
+        {
+          condition: 'attribute_not_exists(lockId) OR (lockExpiration < :lockExpiration)',
+          conditionValues: {lockExpiration: new Date()},
+          returnValues: 'ALL_NEW'
+        },
+      );
+      return resolve(res);
+    } catch (err) {
+      if (err.code === 'ConditionalCheckFailedException') {
+        return resolve(null);
+      }
+      throw err;
+    }
+  });
+}
+/**
+ * Release lock on user
+ * @param {String} id ID of the user
+ * @param {String} lockId ID of the lock
+ * @returns {Promise<Object>} The lock object
+ */
+async function releaseLockOnUser(id, lockId) {
+  const res = await models.User.update(
+    {id},
+    {lockId: null, lockExpiration: null},
+    {
+      condition: 'lockId = :lockId',
+      conditionValues: {lockId}
+    },
+  );
+  return res;
+}
+
 module.exports = {
   getById,
   scan,
@@ -397,9 +504,13 @@ module.exports = {
   queryOneUserMappingByGitlabUserId,
   queryOneUserMappingByGithubUsername,
   queryOneUserMappingByGitlabUsername,
+  queryOneUserByTypeAndRole,
+  queryOneProjectByRepositoryLink,
   queryOneUserMappingByTCUsername,
   queryChallengeUUIDsByRepoUrl,
   queryAllRepositoriesByProjectId,
   removeCopilotPayment,
-  removeIssue
+  removeIssue,
+  acquireLockOnUser,
+  releaseLockOnUser
 };

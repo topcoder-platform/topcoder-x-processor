@@ -465,6 +465,9 @@ async function getProjectByDirectId(id, directId) {
   });
 }
 
+async function createSubmission(challengeId, submissionFileStream, submissionFileName, submissionType) {
+  // TODO: Implement submission creation
+}
 
 module.exports = {
   createProject,
