@@ -479,7 +479,7 @@ async function acquireLockOnUser(userId, lockId, ttl) {
  * @returns {Promise<Object>} The lock object
  */
 async function releaseLockOnUser(id, lockId) {
-  const res = await models.User.update(
+  const user = await models.User.update(
     {id},
     {lockId: null, lockExpiration: null},
     {
@@ -487,7 +487,7 @@ async function releaseLockOnUser(id, lockId) {
       conditionValues: {lockId}
     },
   );
-  return res;
+  return user;
 }
 
 module.exports = {
