@@ -12,6 +12,24 @@ const logger = require('./logger');
  */
 
 /**
+ * @typedef {Object} GitlabUserMapping
+ * @property {String} id the id
+ * @property {Number} gitlabUserId the gitlab user id
+ * @property {String} topcoderUsername the topcoder username
+ * @property {String} gitlabUsername the gitlab username
+ */
+
+/**
+ * @typedef {Object} Repository
+ * @property {String} id the id
+ * @property {String} projectId the project id
+ * @property {String} url the repository url
+ * @property {String} archived the archived flag
+ * @property {String} repoId the repository id
+ * @property {String} registeredWebhookId the registered webhook id
+ */
+
+/**
  * Get Data by model id
  * @param {Object} model The dynamoose model to query
  * @param {String} id The id value
@@ -150,7 +168,7 @@ async function queryOneUserByTypeAndRole(model, username, type, role) {
 /**
  * Query project by repository url
  * @param {String} repoUrl the repo url
- * @returns {Promise<Object>}
+ * @returns {Promise<Repository>}
  */
 async function queryOneProjectByRepositoryLink(repoUrl) {
   const projectId = await new Promise((resolve, reject) => {
@@ -187,7 +205,7 @@ async function queryOneProjectByRepositoryLink(repoUrl) {
  * Get single data by query parameters
  * @param {Object} model The dynamoose model to query
  * @param {String} tcusername The tc username
- * @returns {Promise<void>}
+ * @returns {Promise<GitlabUserMapping>}
  */
 async function queryOneUserMappingByTCUsername(model, tcusername) {
   return await new Promise((resolve, reject) => {
@@ -267,7 +285,7 @@ async function queryOneUserMappingByGithubUserId(model, userId) {
  * Get single data by query parameters
  * @param {Object} model The dynamoose model to query
  * @param {Number} userId The  The user id
- * @returns {Promise<void>}
+ * @returns {Promise<GitlabUserMapping>}
  */
 async function queryOneUserMappingByGitlabUserId(model, userId) {
   return await new Promise((resolve, reject) => {
@@ -490,6 +508,56 @@ async function releaseLockOnUser(id, lockId) {
   return user;
 }
 
+/**
+ * Find the TC Challenge ID for a given TCX project ID
+ * @param {String} projectId Project ID
+ * @returns {Promise<String | null>} Challenge ID
+ */
+async function queryChallengeIdByProjectId(projectId) {
+  const filter = {
+    FilterExpression: '#projectId = :projectId',
+    ExpressionAttributeNames: {
+      '#projectId': 'projectId'
+    },
+    ExpressionAttributeValues: {
+      ':projectId': projectId
+    }
+  };
+  return new Promise((resolve, reject) => {
+    models.ProjectChallengeMapping.scan(filter, (err, result) => {
+      if (err) {
+        return reject(err);
+      }
+      return resolve(result.count === 0 ? null : result[0].challengeId);
+    });
+  });
+}
+
+/**
+ * Find the TCX Project ID for a given TC Challenge ID
+ * @param {String} challengeId Challenge ID
+ * @returns {Promise<String | null>} Project ID
+ */
+async function queryProjectIdByChallengeId(challengeId) {
+  const filter = {
+    FilterExpression: '#challengeId = :challengeId',
+    ExpressionAttributeNames: {
+      '#challengeId': 'challengeId'
+    },
+    ExpressionAttributeValues: {
+      ':challengeId': challengeId
+    }
+  };
+  return new Promise((resolve, reject) => {
+    models.ProjectChallengeMapping.scan(filter, (err, result) => {
+      if (err) {
+        return reject(err);
+      }
+      return resolve(result.count === 0 ? null : result[0].projectId);
+    });
+  });
+}
+
 module.exports = {
   getById,
   scan,
@@ -512,5 +580,7 @@ module.exports = {
   removeCopilotPayment,
   removeIssue,
   acquireLockOnUser,
-  releaseLockOnUser
+  releaseLockOnUser,
+  queryChallengeIdByProjectId,
+  queryProjectIdByChallengeId
 };

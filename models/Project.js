@@ -12,6 +12,23 @@ const dynamoose = require('dynamoose');
 
 const Schema = dynamoose.Schema;
 
+/**
+ * @typedef {Object} ProjectChallengeMapping
+ * @property {String} id The id.
+ * @property {String} title The title.
+ * @property {Number} tcDirectId The tc direct id.
+ * @property {String} tags The tags.
+ * @property {String} rocketChatWebhook The rocket chat webhook.
+ * @property {String} rocketChatChannelName The rocket chat channel name.
+ * @property {String} archived The archived.
+ * @property {String} owner The owner.
+ * @property {String} secretWebhookKey The secret webhook key.
+ * @property {String} copilot The copilot.
+ * @property {Date} updatedAt The updated at.
+ * @property {String} createCopilotPayments The create copilot payments.
+ * @property {Boolean} isConnect Is Topcoder connect.
+ */
+
 const schema = new Schema({
   id: {
     type: String,

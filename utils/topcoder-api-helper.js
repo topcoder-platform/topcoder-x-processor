@@ -13,9 +13,10 @@
 'use strict';
 
 const config = require('config');
-const axios = require('axios');
+const axios = require('axios').default;
 const _ = require('lodash');
 const circularJSON = require('circular-json');
+const FormData = require('form-data');
 
 const m2mAuth = require('tc-core-library-js').auth.m2m;
 
@@ -465,8 +466,43 @@ async function getProjectByDirectId(id, directId) {
   });
 }
 
-async function createSubmission(challengeId, submissionFileStream, submissionFileName, submissionType) {
-  // TODO: Implement submission creation
+/**
+ * Create a new submission.
+ * @param {String} challengeId Challenge ID
+ * @param {Number} memberId Member ID
+ * @param {Buffer} submissionFile Submission file
+ * @param {String} submissionFileName Submission file name
+ */
+async function createSubmission(challengeId, memberId, submissionFile, submissionFileName) {
+  try {
+    const formData = new FormData();
+    formData.append('submission', submissionFile, {
+      filename: submissionFileName,
+      contentType: 'application/zip',
+      knownLength: submissionFile.length
+    });
+    formData.append('type', 'Contest Submission');
+    formData.append('memberId', memberId);
+    formData.append('challengeId', challengeId);
+    const apiKey = await getM2Mtoken();
+    const res = await axios.post(`${config.TC_API_URL}/submissions`, formData, {
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        accept: 'application/json',
+        ...formData.getHeaders()
+      }
+    });
+    return res;
+  } catch (error) {
+    logger.error('createSubmission ERROR.');
+    if (error.isAxiosError) {
+      logger.error(`Request: ${JSON.stringify(error.config)}`);
+      logger.error(`Response Data: ${JSON.stringify(error.response.data)}`);
+    } else {
+      logger.error(`${error.message}`, error);
+    }
+    throw errors.convertTopcoderApiError(error, 'Failed to create submission.');
+  }
 }
 
 module.exports = {
@@ -485,5 +521,6 @@ module.exports = {
   cancelPrivateContent,
   assignUserAsRegistrant,
   removeResourceToChallenge,
-  getProjectByDirectId
+  getProjectByDirectId,
+  createSubmission
 };

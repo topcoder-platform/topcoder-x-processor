@@ -10,7 +10,6 @@ const errors = require('../utils/errors');
 const GitlabService = require('../services/GitlabService');
 const {GITLAB_ACCESS_LEVELS, USER_ROLES, USER_TYPES} = require('../constants');
 
-const ProjectChallengeMapping = models.ProjectChallengeMapping;
 const Project = models.Project;
 const User = models.User;
 const GitlabUserMapping = models.GitlabUserMapping;
@@ -30,24 +29,13 @@ async function process(payload) {
   logger.debug(`${logPrefix}: Member ID: ${memberId}`);
   logger.debug(`${logPrefix}: Member Handle: ${memberHandle}`);
   // Check if there are projects mapped to the challenge
-  const filterValues = {};
-  const filter = {
-    FilterExpression: '#challengeId = :challengeId',
-    ExpressionAttributeNames: {
-      '#challengeId': 'challengeId'
-    },
-    ExpressionAttributeValues: {
-      ':challengeId': challengeId
-    }
-  };
-  const projectChallengeMapping = await dbHelper.scan(ProjectChallengeMapping, filter, filterValues);
-  if (projectChallengeMapping.length === 0) {
+  const projectId = await dbHelper.queryProjectIdByChallengeId(challengeId);
+  if (!projectId) {
     logger.info(`${logPrefix} ProjectChallengeMapping not found for challengeId: ${challengeId}`);
     return;
   }
-  logger.debug(`${logPrefix} ProjectChallengeMapping: ${JSON.stringify(projectChallengeMapping)}`);
+  logger.debug(`${logPrefix} TCX ProjectId: ${projectId}`);
   // Get Project
-  const projectId = projectChallengeMapping[0].projectId;
   const project = await dbHelper.getById(Project, projectId);
   if (!project) {
     logger.info(`${logPrefix} Project not found for projectId: ${projectId}`);

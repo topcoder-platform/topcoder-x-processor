@@ -73,7 +73,7 @@ class GitlabService {
   /** @type {User} */
   #user = null;
 
-  /** @type {Gitlab} */
+  /** @type {import('@gitbeaker/rest').Gitlab} */
   #gitlab = null;
 
   constructor(user) {
@@ -82,6 +82,15 @@ class GitlabService {
     }
     Joi.attempt(user, USER_SCHEMA);
     this.#user = user;
+  }
+
+  /**
+   * Get the full URL for a Gitlab repository from its full name.
+   * @param {String} repoFullName Repo full name
+   * @returns {String}
+   */
+  static getRepoUrl(repoFullName) {
+    return `${config.GITLAB_API_BASE_URL}/${repoFullName}`;
   }
 
   /**
@@ -478,8 +487,8 @@ class GitlabService {
         acc += `deleted file mode ${file.a_mode}\n`;
       }
       if (file.diff && file.diff !== '') {
-        acc += `--- a/${file.new_file ? '/dev/null' : file.old_path}\n`;
-        acc += `+++ b/${file.deleted_file ? '/dev/null' : file.new_path}\n`;
+        acc += `--- ${file.new_file ? '/dev/null' : `a/${file.old_path}`}\n`;
+        acc += `+++ ${file.deleted_file ? '/dev/null' : `b/${file.new_path}`}\n`;
         acc += file.diff;
       } else if (file.renamed_file) {
         acc += 'similarity index 100%\n';
@@ -488,7 +497,9 @@ class GitlabService {
       }
       return acc;
     }, '');
+    console.log(`PATCH FILE STARTS::${mergeRequest.web_url}`);
     console.log(patchFile);
+    console.log(`PATCH FILE ENDS::${mergeRequest.web_url}`);
     return patchFile;
   }
 
