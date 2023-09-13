@@ -287,7 +287,7 @@ class GitlabService {
   /**
    * Gets the user name by user id
    * @param {Number} userId the user id
-   * @returns {string} the username if found else null
+   * @returns {Promise<string>} the username if found else null
    */
   async getUsernameById(userId) {
     Joi.attempt({userId}, {userId: Joi.number().required()});
@@ -298,7 +298,7 @@ class GitlabService {
   /**
    * Gets the user id by username
    * @param {String} login the username
-   * @returns {Number} the user id if found else null
+   * @returns {Promise<Number>} the user id if found else null
    */
   async getUserIdByLogin(login) {
     Joi.attempt({login}, {login: Joi.string().required()});
