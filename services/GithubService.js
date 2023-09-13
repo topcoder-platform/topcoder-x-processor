@@ -43,7 +43,7 @@ function _parseRepoUrl(fullName) {
 /**
  * authenticate the github using access token
  * @param {String} accessToken the access token of copilot
- * @returns {Object} the github instance
+ * @returns {Promise<Object>} the github instance
  * @private
  */
 async function _authenticate(accessToken) {
@@ -82,7 +82,7 @@ async function _removeAssignees(github, owner, repo, number, assignees) {
 /**
  * gets the username of given user id
  * @param {Number} id the user id
- * @returns {string} username if found
+ * @returns {Promise<string>} username if found
  */
 async function _getUsernameById(id) {
   const user = await request
@@ -211,7 +211,7 @@ createComment.schema = {
  * Gets the user name by user id
  * @param {Object} copilot the copilot
  * @param {Number} userId the user id
- * @returns {string} the username if found else null
+ * @returns {Promise<string>} the username if found else null
  */
 async function getUsernameById(copilot, userId) {
   Joi.attempt({copilot, userId}, getUsernameById.schema);
@@ -228,7 +228,7 @@ getUsernameById.schema = {
  * Gets the user id by username
  * @param {Object} copilot the copilot
  * @param {string} login the username
- * @returns {Number} the user id if found else null
+ * @returns {Promise<Number>} the user id if found else null
  */
 async function getUserIdByLogin(copilot, login) {
   Joi.attempt({copilot, login}, getUserIdByLogin.schema);
