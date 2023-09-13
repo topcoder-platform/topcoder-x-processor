@@ -3,12 +3,23 @@
 const _ = require('lodash');
 const Joi = require('joi');
 const uuid = require('uuid').v4;
+const archiver = require('archiver');
 const models = require('../models');
 const dbHelper = require('../utils/db-helper');
 const logger = require('../utils/logger');
 const GitlabService = require('../services/GitlabService');
+const TopcoderApiHelper = require('../utils/topcoder-api-helper');
 
 const GitlabUserMapping = models.GitlabUserMapping;
+
+/**
+ * Normalizes a string to be used as a file name.
+ * @param {String} fileName File name to normalize
+ * @returns {String} Normalized file name
+ */
+function normalizeFileName(fileName) {
+  return fileName.replace(/[^a-zA-Z0-9_\-.]/g, '_');
+}
 
 /**
  * Handles a pull request creation event.
@@ -59,44 +70,53 @@ async function process(payload) {
     return;
   }
   logger.debug(`${logPrefix} Project: ${JSON.stringify(project)}`);
-  // 4. Find all repositories corresponding to the TCX project
+  // 4. Find the challenge ID for the TCX project
+  const challengeId = await dbHelper.queryChallengeIdByProjectId(project.id);
+  if (!challengeId) {
+    logger.info(`${logPrefix} ProjectChallengeMapping not found for projectId: ${project.id}`);
+    return;
+  }
+  logger.debug(`${logPrefix} Challenge ID: ${challengeId}`);
+  // 5. Find all repositories corresponding to the TCX project
   const repositories = await dbHelper.queryAllRepositoriesByProjectId(project.id);
   if (!repositories || repositories.length === 0) {
     logger.info(`${logPrefix} Repositories not found for projectId: ${project.id}`);
     return;
   }
   logger.debug(`${logPrefix} Repositories: ${JSON.stringify(repositories)}`);
-  // 5. Get co-pilot's GitlabUserMapping
+  // 6. Get co-pilot's GitlabUserMapping
   const copilot = await dbHelper.queryOneUserMappingByTCUsername(GitlabUserMapping, project.copilot);
   if (!copilot) {
     logger.info(`${logPrefix} GitlabUserMapping not found for copilot: ${project.copilot}`);
     return;
   }
   logger.debug(`${logPrefix} GitlabUserMapping[Copilot]: ${JSON.stringify(copilot)}`);
-  // 6. Get co-pilot's Gitlab user
+  // 7. Get co-pilot's Gitlab user
   const copilotGitlabUser = await dbHelper.queryOneUserByType(models.User, copilot.gitlabUsername, 'gitlab');
   if (!copilotGitlabUser) {
     logger.info(`${logPrefix} GitlabUser not found for copilot: ${project.copilot}`);
     return;
   }
   logger.debug(`${logPrefix} GitlabUser[Copilot]: ${JSON.stringify(copilotGitlabUser)}`);
-  // 7. For each project, get the repositories
-  const gitRepositories = await Promise.all(repositories.map((repo) => GitlabService.getRepository(copilotGitlabUser, repo.url)));
+  // 8. Init the Gitlab service for co-pilot
+  const copilotGitlabService = await GitlabService.create(copilotGitlabUser);
+  // 9. For each project, get the repositories
+  const gitRepositories = await Promise.all(repositories.map((repo) => copilotGitlabService.getRepository(repo.url)));
   if (!gitRepositories || gitRepositories.length === 0) {
     logger.info(`${logPrefix} Git repositories not found for repositories: ${JSON.stringify(repositories)}`);
     return;
   }
   logger.debug(`${logPrefix} Git repositories: ${JSON.stringify(gitRepositories)}`);
-  // 8. For each repository, get the merge requests
+  // 10. For each repository, get the merge requests
   const mergeRequests = await Promise.all(
-    gitRepositories.map((repo) => GitlabService.getOpenMergeRequestsByUser(copilotGitlabUser, repo, submitter.gitlabUserId))
+    gitRepositories.map((repo) => copilotGitlabService.getOpenMergeRequestsByUser(repo, submitter.gitlabUserId))
   );
   if (!mergeRequests || mergeRequests.length === 0) {
     logger.info(`${logPrefix} Merge requests not found for repositories: ${JSON.stringify(gitRepositories)}`);
     return;
   }
   logger.debug(`${logPrefix} Merge requests: ${JSON.stringify(mergeRequests)}`);
-  // 9. Ensure that there exists a merge request by the same member as the pull request for each project (if not, return)
+  // 11. Ensure that there exists a merge request by the same member as the pull request for each project (if not, return)
   // eslint-disable-next-line no-restricted-syntax
   for (let i = 0; i < mergeRequests.length; i += 1) {
     const mr = mergeRequests[i];
@@ -105,21 +125,54 @@ async function process(payload) {
       return;
     }
   }
-  // 10. Get the latest merge request for each project
+  // 12. Get the latest merge request for each project
   const latestMergeRequests = mergeRequests.map((mrs) => _.maxBy(mrs, (mr) => new Date(mr.created_at).getTime()));
   logger.debug(`${logPrefix} Latest merge requests: ${JSON.stringify(latestMergeRequests)}`);
-  // 11. Create patch files for each merge request
+  // 13. Create patch files for each merge request
   const patches = await Promise.all(
-    latestMergeRequests.map((mr) => GitlabService.getMergeRequestDiffPatches(copilotGitlabUser, mr))
+    latestMergeRequests.map((mr) => copilotGitlabService.getMergeRequestDiffPatches(mr))
   );
   if (!patches || patches.length !== latestMergeRequests.length) {
     logger.info(`${logPrefix} Patches not found for merge requests.`);
     return;
   }
   logger.debug(`${logPrefix} Patches: ${JSON.stringify(patches)}`);
-  // 11. Get the topcoder M2M token
-  // 10. Create a zip file containing all patch files
-  // 11. Use the submission API to submit the zip file
+  // 14. Create a zip file containing all patch files
+  logger.debug(`${logPrefix} Creating zip file...`);
+  const zipStream = archiver('zip');
+  const zipBufferPromise = new Promise((resolve, reject) => {
+    const buffers = [];
+    zipStream.on('data', (data) => {
+      buffers.push(data);
+    });
+    zipStream.on('end', () => {
+      resolve(Buffer.concat(buffers));
+    });
+    zipStream.on('error', reject);
+  });
+  patches.forEach((patch) => {
+    const buffer = Buffer.from(patch);
+    zipStream.append(buffer, {name: `${normalizeFileName(repoFullName)}.patch`});
+  });
+  await zipStream.finalize();
+  const zipBuffer = await zipBufferPromise;
+  logger.debug(`${logPrefix} Zip file size: ${zipBuffer.length}`);
+  // 15. Get the Topcoder user's member ID
+  const memberId = await TopcoderApiHelper.getTopcoderMemberId(submitter.topcoderUsername);
+  if (!memberId) {
+    logger.info(`${logPrefix} Member ID not found for topcoderUsername: ${submitter.topcoderUsername}`);
+    return;
+  }
+  logger.debug(`${logPrefix} Member ID: ${memberId}`);
+  // 16. Use the submission API to submit the zip file
+  logger.debug(`${logPrefix} Submitting the zip file...`);
+  const submission = await TopcoderApiHelper.createSubmission(
+    challengeId,
+    memberId,
+    zipBuffer,
+    `${correlationId}.zip`,
+  );
+  logger.debug(`${logPrefix} Submission: ${JSON.stringify(submission.data)}`);
 }
 
 process.schema = Joi.object().keys({

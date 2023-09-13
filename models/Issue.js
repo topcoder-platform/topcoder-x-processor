@@ -12,6 +12,27 @@ const dynamoose = require('dynamoose');
 
 const Schema = dynamoose.Schema;
 
+/**
+ * @typedef {Object} Issue
+ * @property {String} id The id.
+ * @property {Number} number From the receiver service.
+ * @property {String} title The title.
+ * @property {String} body The body.
+ * @property {Number[]} prizes Prizes extracted from title.
+ * @property {String} provider Provider (github or gitlab).
+ * @property {Number} repositoryId Repository ID.
+ * @property {String} repoUrl Repository URL.
+ * @property {String} repositoryIdStr Repository ID as a String.
+ * @property {Array} labels Labels associated with the issue.
+ * @property {String} assignee Assignee for the issue.
+ * @property {Date} updatedAt Date when the issue was last updated.
+ * @property {Number} challengeId Challenge ID from topcoder API.
+ * @property {String} challengeUUID Challenge UUID.
+ * @property {String} projectId Project ID.
+ * @property {String} status Status of the issue.
+ * @property {Date} assignedAt Date when the issue was assigned (if applicable).
+ */
+
 const schema = new Schema({
   id: {type: String, hashKey: true, required: true},
   // From the receiver service

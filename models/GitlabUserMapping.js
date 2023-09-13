@@ -7,6 +7,14 @@ const dynamoose = require('dynamoose');
 
 const Schema = dynamoose.Schema;
 
+/**
+ * @typedef {Object} GitlabUserMapping
+ * @property {String} id The unique identifier for the GitlabUserMapping entity.
+ * @property {String} topcoderUsername The Topcoder username associated with the GitLab user.
+ * @property {String} gitlabUsername The GitLab username.
+ * @property {Number} gitlabUserId The GitLab user's numeric identifier.
+ */
+
 const schema = new Schema({
   id: {
     type: String,

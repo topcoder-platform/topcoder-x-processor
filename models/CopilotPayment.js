@@ -14,6 +14,19 @@ const dynamoose = require('dynamoose');
 
 const Schema = dynamoose.Schema;
 
+/**
+ * @typedef {Object} CopilotPayment
+ * @property {String} id The unique identifier for the CopilotPayment entity.
+ * @property {String} project The project associated with the payment.
+ * @property {Number} amount The payment amount.
+ * @property {String} description The description of the payment.
+ * @property {Number} challengeId The ID of the associated challenge (if applicable).
+ * @property {String} challengeUUID The UUID of the associated challenge (if applicable).
+ * @property {String} closed Indicates whether the payment is closed or not (default is 'false').
+ * @property {String} username The username of the Copilot receiving the payment.
+ * @property {String} status The status of the payment.
+ */
+
 const schema = new Schema({
   id: {
     type: String,

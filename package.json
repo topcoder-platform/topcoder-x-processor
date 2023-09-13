@@ -29,10 +29,12 @@
   "dependencies": {
     "@gitbeaker/rest": "^39.13.0",
     "@octokit/rest": "^18.9.0",
+    "archiver": "^6.0.1",
     "axios": "^0.19.0",
     "circular-json": "^0.5.7",
     "config": "^1.30.0",
     "dynamoose": "^1.11.1",
+    "form-data": "^4.0.0",
     "fs-extra": "^7.0.0",
     "get-parameter-names": "^0.3.0",
     "global-request-logger": "^0.1.1",

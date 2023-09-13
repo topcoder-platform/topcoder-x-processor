@@ -10,6 +10,13 @@ const dynamoose = require('dynamoose');
 
 const Schema = dynamoose.Schema;
 
+/**
+ * @typedef {Object} ProjectChallengeMapping
+ * @property {String} id the id
+ * @property {String} projectId the project id
+ * @property {String} challengeId the challenge id
+ */
+
 const schema = new Schema({
   id: {
     type: String,
