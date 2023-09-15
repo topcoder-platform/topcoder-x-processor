@@ -159,7 +159,10 @@ class GitlabService {
     } finally {
       if (lockedUser) {
         logger.debug(`[Lock ID: ${lockId}] Releasing lock on user ${this.#user.username}.`);
-        this.#user = await dbHelper.releaseLockOnUser(this.#user.id, lockId);
+        const newUser = await dbHelper.releaseLockOnUser(this.#user.id, lockId);
+        // Not assigning directly because the old object sometimes has properties
+        // that are not in the new one
+        _.assign(this.#user, newUser);
       }
     }
   }
