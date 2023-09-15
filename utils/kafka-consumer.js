@@ -46,7 +46,6 @@ function tcxMessageHandler(messageSet, topic) {
     // The event should be a JSON object
     event = parsePayload(event);
     try {
-      console.log(event);
       event.message.value.payload.value = JSON.parse(event.message.value.payload.value);
     } catch (e) {
       logger.error('Invalid message payload', e);

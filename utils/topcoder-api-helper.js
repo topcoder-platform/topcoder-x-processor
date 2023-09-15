@@ -62,7 +62,7 @@ async function createProject(projectName) {
 /**
  * Create a new challenge.
  * @param {Object} challenge the challenge to create
- * @returns {Number} the created challenge id
+ * @returns {Promise<Number>} the created challenge id
  */
 async function createChallenge(challenge) {
   const apiKey = await getM2Mtoken();
@@ -268,7 +268,7 @@ async function getProjectBillingAccountId(id) {
 /**
  * gets the topcoder user id from handle
  * @param {String} handle the topcoder handle
- * @returns {Number} the user id
+ * @returns {Promise<Number>} the user id
  */
 async function getTopcoderMemberId(handle) {
   try {

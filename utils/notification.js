@@ -10,7 +10,6 @@
 const config = require('config');
 
 const kafkaSender = require('./kafka-sender');
-const topcoderApiHelper = require('./topcoder-api-helper');
 const logger = require('./logger');
 
 const notification = {};
@@ -31,6 +30,7 @@ function getContent(repoPath) {
 }
 
 notification.sendTokenExpiredAlert = async function sendTokenExpiredAlert(copilotHandle, repoPath, provider) {
+  const topcoderApiHelper = await import('./topcoder-api-helper');
   const copilotId = await topcoderApiHelper.getTopcoderMemberId(copilotHandle);
   const notificationConfigs = config.MAIL_NOTICIATION;
   const content = getContent(repoPath);
