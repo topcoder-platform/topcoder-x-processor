@@ -32,7 +32,7 @@ logger.logFullError = function logFullError(err, signature) {
   if (!err || err.logged) {
     return;
   }
-  logger.error(`Error happened in ${signature}\n${err.stack}`);
+  logger.error(`Error happened in ${signature}\n${err.stack || err.message}`);
   err.logged = true;
 };
 

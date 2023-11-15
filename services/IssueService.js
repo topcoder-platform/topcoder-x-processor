@@ -635,10 +635,13 @@ async function handleIssueCreate(event, issue, forceAssign = false) {
     issue.challengeUUID = await topcoderApiHelper.createChallenge({
       name: issue.title,
       projectId,
-      tags: project.tags ? project.tags.split(',') : [],
+      tags: project.tags ? project.tags.map((tag) => tag.name) : [],
       detailedRequirements: issue.body,
       prizes: issue.prizes
     });
+
+    // Apply skills to the challenge
+    await topcoderApiHelper.applySkillsSetToChallenge(issue.challengeUUID, project.tags);
 
     // Save
     // update db payment

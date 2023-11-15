@@ -76,7 +76,7 @@ async function createChallenge(challenge) {
     }],
     timelineTemplateId: config.DEFAULT_TIMELINE_TEMPLATE_ID,
     projectId: challenge.projectId,
-    tags: challenge.tags,
+    tags: challenge.tags.map((tag) => tag.name),
     trackId: config.DEFAULT_TRACK_ID,
     legacy: {
       pureV5Task: true
@@ -160,6 +160,41 @@ async function activateChallenge(id) {
     loggerFile.info(`EndPoint: PATCH /challenges/${id},  PATCH parameters: { status: '${constants.CHALLENGE_STATUS.ACTIVE}' }, Status Code:null,
     Error: 'Failed to activate challenge.', Details: ${circularJSON.stringify(err)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to activate challenge.');
+  }
+}
+
+/**
+ * Apply skills set to the challenge
+ * @param {String} challengeId the challenge id
+ * @param {Array<{id: string, name: string}>} tags the list of tags applied to the challenge
+ */
+async function applySkillsSetToChallenge(challengeId, tags) {
+  const apiKey = await getM2Mtoken();
+  logger.debug(`Applying skills set to the challenge ${challengeId}`);
+  const url = `${config.TC_API_URL}/standardized-skills/work-skills`;
+  const payload = {
+    workId: challengeId,
+    workTypeId: config.WORK_TYPE_ID,
+    skillIds: tags.map((tag) => tag.id)
+  };
+  const params = {
+    headers: {
+      authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    }
+  };
+  try {
+    const response = await axios.post(url, payload, params);
+    const statusCode = response.status ? response.status : null;
+    loggerFile.info(`EndPoint: POST /standardized-skills/work-skills,
+    POST parameters: ${circularJSON.stringify(payload)}, Status Code:${statusCode}, Response: ${circularJSON.stringify(response.data)}`);
+    logger.debug(`Skills set applied successfully to the challenge ${challengeId}`);
+    return response.data;
+  } catch (err) {
+    loggerFile.info(`EndPoint: POST /standardized-skills/work-skills,  POST parameters: ${circularJSON.stringify(payload)}, Status Code:null,
+    Error: 'Failed to apply skills set to the challenge.', Details: ${circularJSON.stringify(err)}`);
+    logger.error(`Response Data: ${JSON.stringify(err.response.data)}`);
+    throw errors.convertTopcoderApiError(err, 'Failed to apply skills set to the challenge.');
   }
 }
 
@@ -511,6 +546,7 @@ module.exports = {
   createChallenge,
   updateChallenge,
   activateChallenge,
+  applySkillsSetToChallenge,
   closeChallenge,
   getProjectBillingAccountId,
   getTopcoderMemberId,

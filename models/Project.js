@@ -17,7 +17,7 @@ const Schema = dynamoose.Schema;
  * @property {String} id The id.
  * @property {String} title The title.
  * @property {Number} tcDirectId The tc direct id.
- * @property {String} tags The tags.
+ * @property {Array<{id: string, name: string}>} tags The tags.
  * @property {String} rocketChatWebhook The rocket chat webhook.
  * @property {String} rocketChatChannelName The rocket chat channel name.
  * @property {String} archived The archived.
@@ -41,9 +41,33 @@ const schema = new Schema({
     required: true
   },
   tags: {
-    type: String,
+    type: 'list',
+    list: [{
+      type: 'map',
+      map: {
+        id: {type: String, required: true},
+        name: {type: String, required: true}
+      }
+    }],
     required: true,
-    default: ''
+    default: [],
+    fromDynamo(value) {
+      if (value.S) {
+        return value.S;
+      }
+      if (value.L) {
+        return value.L.map((item) => {
+          if (item.M && item.M.name && item.M.id) {
+            return {
+              id: item.M.id.S,
+              name: item.M.name.S
+            };
+          }
+          return null;
+        });
+      }
+      return [];
+    }
   },
   rocketChatWebhook: {type: String, required: false},
   rocketChatChannelName: {type: String, required: false},

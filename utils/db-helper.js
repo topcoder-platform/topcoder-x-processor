@@ -490,6 +490,7 @@ async function acquireLockOnUser(userId, lockId, ttl) {
     }
   });
 }
+
 /**
  * Release lock on user
  * @param {String} id ID of the user

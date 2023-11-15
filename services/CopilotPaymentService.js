@@ -194,7 +194,7 @@ async function handlePaymentAdd(event, payment) {
       const newChallenge = {
         name: challengeTitle,
         projectId: project.tcDirectId,
-        tags: !!project.tags ? project.tags.split(',') : [],
+        tags: project.tags ? project.tags.map((tag) => tag.name) : [],
         detailedRequirements: challengeRequirements,
         prizes: [payment.amount],
         reviewType: 'INTERNAL'
@@ -202,6 +202,9 @@ async function handlePaymentAdd(event, payment) {
 
       // Create a new challenge
       const challengeUUID = await topcoderApiHelper.createChallenge(newChallenge);
+
+      // Apply skills to the challenge
+      await topcoderApiHelper.applySkillsSet(challengeUUID, project.tags);
 
       logger.debug(`updating database payment with new challenge id:${challengeUUID}`);
 
