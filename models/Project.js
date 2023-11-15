@@ -17,7 +17,7 @@ const Schema = dynamoose.Schema;
  * @property {String} id The id.
  * @property {String} title The title.
  * @property {Number} tcDirectId The tc direct id.
- * @property {String} tags The tags.
+ * @property {Array<{id: string, name: string}>} tags The tags.
  * @property {String} rocketChatWebhook The rocket chat webhook.
  * @property {String} rocketChatChannelName The rocket chat channel name.
  * @property {String} archived The archived.

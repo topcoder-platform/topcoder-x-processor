@@ -640,6 +640,9 @@ async function handleIssueCreate(event, issue, forceAssign = false) {
       prizes: issue.prizes
     });
 
+    // Apply skills to the challenge
+    await topcoderApiHelper.applySkillsSetToChallenge(issue.challengeUUID, project.tags);
+
     // Save
     // update db payment
     await dbHelper.update(models.Issue, dbIssue.id, {

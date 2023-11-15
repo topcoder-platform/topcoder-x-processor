@@ -203,6 +203,9 @@ async function handlePaymentAdd(event, payment) {
       // Create a new challenge
       const challengeUUID = await topcoderApiHelper.createChallenge(newChallenge);
 
+      // Apply skills to the challenge
+      await topcoderApiHelper.applySkillsSet(challengeUUID, project.tags);
+
       logger.debug(`updating database payment with new challenge id:${challengeUUID}`);
 
       // update db payment

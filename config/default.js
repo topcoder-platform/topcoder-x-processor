@@ -68,7 +68,7 @@ module.exports = {
   GRANT_TYPE: 'client_credentials',
 
   // used as base to construct various URLs
-  WEBSITE_SECURE: process.env.WEBSITE_SECURE || 'https://topcoderx.topcoder-dev.com',
+  WEBSITE_SECURE: process.env.WEBSITE_SECURE || 'http://topcoderx.topcoder-dev.com',
 
   ROLE_ID_COPILOT: process.env.ROLE_ID_COPILOT || 'cfe12b3f-2a24-4639-9d8b-ec86726f76bd',
   ROLE_ID_ITERATIVE_REVIEWER: process.env.ROLE_ID_ITERATIVE_REVIEWER || 'f6df7212-b9d6-4193-bfb1-b383586fce63',  
@@ -76,6 +76,7 @@ module.exports = {
   TYPE_ID_TASK: process.env.TYPE_ID_TASK || 'ecd58c69-238f-43a4-a4bb-d172719b9f31',
   DEFAULT_TIMELINE_TEMPLATE_ID: process.env.DEFAULT_TIMELINE_TEMPLATE_ID || '53a307ce-b4b3-4d6f-b9a1-3741a58f77e6',
   DEFAULT_TRACK_ID: process.env.DEFAULT_TRACK_ID || '9b6fc876-f4d9-4ccb-9dfd-419247628825',
+  WORK_TYPE_ID: process.env.WORK_TYPE_ID || 'b658b280-6c4d-11e5-9d70-22000b2c9aef',
   GITLAB_ACCESS_TOKEN_DEFAULT_EXPIRATION: 3600 * 2,
   GITLAB_REFRESH_TOKEN_BEFORE_EXPIRATION: 300,
   GITLAB_CLIENT_ID: process.env.GITLAB_CLIENT_ID,
