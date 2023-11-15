@@ -6,4 +6,4 @@ COPY package.json package-lock.json ./
 RUN npm ci --silent --legacy-peer-deps
 COPY . .
 
-CMD npm start
+CMD node ./index.js
