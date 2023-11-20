@@ -171,10 +171,8 @@ async function activateChallenge(id) {
 async function applySkillsSetToChallenge(challengeId, tags) {
   const apiKey = await getM2Mtoken();
   logger.debug(`Applying skills set to the challenge ${challengeId}`);
-  const url = `${config.TC_API_URL}/standardized-skills/work-skills`;
+  const url = `${config.TC_API_URL}/standardized-skills/challenge-skills/${challengeId}`;
   const payload = {
-    workId: challengeId,
-    workTypeId: config.WORK_TYPE_ID,
     skillIds: tags.map((tag) => tag.id)
   };
   const params = {
@@ -186,12 +184,12 @@ async function applySkillsSetToChallenge(challengeId, tags) {
   try {
     const response = await axios.post(url, payload, params);
     const statusCode = response.status ? response.status : null;
-    loggerFile.info(`EndPoint: POST /standardized-skills/work-skills,
+    loggerFile.info(`EndPoint: POST /standardized-skills/challenge-skills/${challengeId},
     POST parameters: ${circularJSON.stringify(payload)}, Status Code:${statusCode}, Response: ${circularJSON.stringify(response.data)}`);
     logger.debug(`Skills set applied successfully to the challenge ${challengeId}`);
     return response.data;
   } catch (err) {
-    loggerFile.info(`EndPoint: POST /standardized-skills/work-skills,  POST parameters: ${circularJSON.stringify(payload)}, Status Code:null,
+    loggerFile.info(`EndPoint: POST /standardized-skills/challenge-skills/${challengeId},  POST parameters: ${circularJSON.stringify(payload)}, Status Code:null,
     Error: 'Failed to apply skills set to the challenge.', Details: ${circularJSON.stringify(err)}`);
     logger.error(`Response Data: ${JSON.stringify(err.response.data)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to apply skills set to the challenge.');
