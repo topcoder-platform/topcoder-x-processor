@@ -76,7 +76,7 @@ async function createChallenge(challenge) {
     }],
     timelineTemplateId: config.DEFAULT_TIMELINE_TEMPLATE_ID,
     projectId: challenge.projectId,
-    tags: challenge.tags.map((tag) => tag.name),
+    tags: challenge.tags,
     trackId: config.DEFAULT_TRACK_ID,
     legacy: {
       pureV5Task: true
