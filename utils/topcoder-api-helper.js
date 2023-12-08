@@ -76,7 +76,7 @@ async function createChallenge(challenge) {
     }],
     timelineTemplateId: config.DEFAULT_TIMELINE_TEMPLATE_ID,
     projectId: challenge.projectId,
-    tags: challenge.tags,
+    tags: [],
     trackId: config.DEFAULT_TRACK_ID,
     legacy: {
       pureV5Task: true
@@ -189,6 +189,7 @@ async function applySkillsSetToChallenge(challengeId, tags) {
     logger.debug(`Skills set applied successfully to the challenge ${challengeId}`);
     return response.data;
   } catch (err) {
+    // eslint-disable-next-line max-len
     loggerFile.info(`EndPoint: POST /standardized-skills/challenge-skills/${challengeId},  POST parameters: ${circularJSON.stringify(payload)}, Status Code:null,
     Error: 'Failed to apply skills set to the challenge.', Details: ${circularJSON.stringify(err)}`);
     logger.error(`Response Data: ${JSON.stringify(err.response.data)}`);
