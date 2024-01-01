@@ -142,6 +142,7 @@ class GitlabService {
           refresh_token: lockedUser.refreshToken,
           grant_type: 'refresh_token'
         };
+        logger.info(`Refresh request  POST ${config.GITLAB_API_BASE_URL}/oauth/token BODY: ${JSON.stringify(query)} `);
         const refreshTokenResult = await request
           .post(`${config.GITLAB_API_BASE_URL}/oauth/token`)
           .query(query)
