@@ -146,6 +146,7 @@ class GitlabService {
           .post(`${config.GITLAB_API_BASE_URL}/oauth/token`)
           .query(query)
           .end();
+        logger.info(`Gitlab refresh token result: ${JSON.stringify(refreshTokenResult)}`);
         // save user token data
         const expiresIn = refreshTokenResult.body.expires_in || config.GITLAB_ACCESS_TOKEN_DEFAULT_EXPIRATION;
         const updates = {
