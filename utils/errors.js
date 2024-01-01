@@ -13,6 +13,7 @@
 const _ = require('lodash');
 const constants = require('../constants');
 const notification = require('./notification');
+const logger = require ('./logger');
 
 // the error class wrapper
 class ProcessorError extends Error {
@@ -49,6 +50,7 @@ errors.handleGitHubError = function handleGitHubError(err, message, copilotHandl
     resMsg,
     'github'
   );
+  logger.error(`Github error thrown: ${JSON.stringify(apiError)}`);
   return apiError;
 };
 
@@ -74,6 +76,7 @@ errors.handleGitLabError = function handleGitLabError(err, message, copilotHandl
     resMsg,
     'gitlab'
   );
+  logger.error(`Gitlab error thrown: ${JSON.stringify(apiError)}`);
   return apiError;
 };
 
@@ -94,6 +97,7 @@ errors.convertTopcoderApiError = function convertTopcoderApiError(err, message) 
     resMsg,
     'topcoder'
   );
+  logger.error(`Topcoder error thrown: ${JSON.stringify(apiError)}`);
   return apiError;
 };
 
@@ -109,6 +113,7 @@ errors.internalDependencyError = function internalDependencyError(message) {
     resMsg,
     'processor'
   );
+  logger.error(`Internal API error thrown: ${JSON.stringify(apiError)}`);
   return apiError;
 };
 
