@@ -20,13 +20,15 @@ const dbHelper = require('../utils/db-helper');
  * @param {Object} event the event
  */
 async function handleChallengeTagsUpdate(event) {
-  const tags = event.data.tags.split(',');
+  const tags = event.data.tags;
   await Promise.all(
     event.data.challengeUUIDsList.map(async (challengeUUIDs) => {
       if (_.isString(challengeUUIDs)) { // repoUrl
         challengeUUIDs = await dbHelper.queryChallengeUUIDsByRepoUrl(challengeUUIDs);
       }
-      return challengeUUIDs.map(async (challengeUUID) => await topcoderApiHelper.updateChallenge(challengeUUID, {tags}));
+      return challengeUUIDs.map(
+        async (challengeUUID) => await topcoderApiHelper.applySkillsSetToChallenge(challengeUUID, tags)
+      );
     }).reduce((a, b) => _.concat(a, b), [])
   ).then((resps) => {
     logger.debug(`handleChallengeTagsUpdate updated ${_.size(resps)} challenges successfully.`);
@@ -54,7 +56,12 @@ process.schema = Joi.object().keys({
     challengeUUIDsList: Joi.array().items(
       Joi.alternatives().try(Joi.string(), Joi.array().items(Joi.string()))
     ).required(),
-    tags: Joi.string().required()
+    tags: Joi.array().items(
+      Joi.object().keys({
+        id: Joi.string().required(),
+        name: Joi.string().required()
+      })
+    ).required()
   }).required(),
   retryCount: Joi.number().integer().default(0).optional()
 });

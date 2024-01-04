@@ -25,23 +25,21 @@ const models = require('../models');
  */
 async function getTCUserName(provider, gitUser) {
   Joi.attempt({provider, gitUser}, getTCUserName.schema);
-  const criteria = {};
   if (_.isNumber(gitUser) || v.isUUID(gitUser)) {
     if (provider === 'github') {
       return await dbHelper.queryOneUserMappingByGithubUserId(models.GithubUserMapping, gitUser);
     } else if (provider === 'gitlab') {
       return await dbHelper.queryOneUserMappingByGitlabUserId(models.GitlabUserMapping, gitUser);
     }
-  } else if (_.isString(gitUser) || v.isEmail(gitUser)) {
+  }
+  if (_.isString(gitUser) || v.isEmail(gitUser)) {
     if (provider === 'github') {
       return await dbHelper.queryOneUserMappingByGithubUsername(models.GithubUserMapping, gitUser);
     } else if (provider === 'gitlab') {
       return await dbHelper.queryOneUserMappingByGitlabUsername(models.GitlabUserMapping, gitUser);
     }
   }
-  if (_.isEmpty(criteria)) {
-    throw new Error('Can\'t find the TCUserName. Invalid gitUser.');
-  }
+  throw new Error('Can\'t find the TCUserName. Invalid gitUser.');
 }
 
 getTCUserName.schema = {
@@ -54,7 +52,7 @@ getTCUserName.schema = {
  * gets the access token of repository's copilot/owner captured by Topcoder x tool
  * @param {String} provider the repo provider
  * @param {String} repoFullName the full name of repository
- * @returns {String} the copilot/owner if exists
+ * @returns {Promise<String>} the copilot/owner if exists
  */
 async function getRepositoryCopilotOrOwner(provider, repoFullName) {
   Joi.attempt({provider, repoFullName}, getRepositoryCopilotOrOwner.schema);
@@ -96,10 +94,7 @@ async function getRepositoryCopilotOrOwner(provider, repoFullName) {
   }
 
   return {
-    accessToken: user.accessToken,
-    accessTokenExpiration: user.accessTokenExpiration,
-    refreshToken: user.refreshToken,
-    userProviderId: user.userProviderId,
+    ...user,
     topcoderUsername: userMapping.topcoderUsername
   };
 }

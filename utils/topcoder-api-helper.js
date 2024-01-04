@@ -13,9 +13,10 @@
 'use strict';
 
 const config = require('config');
-const axios = require('axios');
+const axios = require('axios').default;
 const _ = require('lodash');
 const circularJSON = require('circular-json');
+const FormData = require('form-data');
 
 const m2mAuth = require('tc-core-library-js').auth.m2m;
 
@@ -61,7 +62,7 @@ async function createProject(projectName) {
 /**
  * Create a new challenge.
  * @param {Object} challenge the challenge to create
- * @returns {Number} the created challenge id
+ * @returns {Promise<Number>} the created challenge id
  */
 async function createChallenge(challenge) {
   const apiKey = await getM2Mtoken();
@@ -75,7 +76,7 @@ async function createChallenge(challenge) {
     }],
     timelineTemplateId: config.DEFAULT_TIMELINE_TEMPLATE_ID,
     projectId: challenge.projectId,
-    tags: challenge.tags,
+    tags: [],
     trackId: config.DEFAULT_TRACK_ID,
     legacy: {
       pureV5Task: true
@@ -159,6 +160,40 @@ async function activateChallenge(id) {
     loggerFile.info(`EndPoint: PATCH /challenges/${id},  PATCH parameters: { status: '${constants.CHALLENGE_STATUS.ACTIVE}' }, Status Code:null,
     Error: 'Failed to activate challenge.', Details: ${circularJSON.stringify(err)}`);
     throw errors.convertTopcoderApiError(err, 'Failed to activate challenge.');
+  }
+}
+
+/**
+ * Apply skills set to the challenge
+ * @param {String} challengeId the challenge id
+ * @param {Array<{id: string, name: string}>} tags the list of tags applied to the challenge
+ */
+async function applySkillsSetToChallenge(challengeId, tags) {
+  const apiKey = await getM2Mtoken();
+  logger.debug(`Applying skills set to the challenge ${challengeId}`);
+  const url = `${config.TC_API_URL}/standardized-skills/challenge-skills/${challengeId}`;
+  const payload = {
+    skillIds: tags.map((tag) => tag.id)
+  };
+  const params = {
+    headers: {
+      authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    }
+  };
+  try {
+    const response = await axios.post(url, payload, params);
+    const statusCode = response.status ? response.status : null;
+    loggerFile.info(`EndPoint: POST /standardized-skills/challenge-skills/${challengeId},
+    POST parameters: ${circularJSON.stringify(payload)}, Status Code:${statusCode}, Response: ${circularJSON.stringify(response.data)}`);
+    logger.debug(`Skills set applied successfully to the challenge ${challengeId}`);
+    return response.data;
+  } catch (err) {
+    // eslint-disable-next-line max-len
+    loggerFile.info(`EndPoint: POST /standardized-skills/challenge-skills/${challengeId},  POST parameters: ${circularJSON.stringify(payload)}, Status Code:null,
+    Error: 'Failed to apply skills set to the challenge.', Details: ${circularJSON.stringify(err)}`);
+    logger.error(`Response Data: ${JSON.stringify(err.response.data)}`);
+    throw errors.convertTopcoderApiError(err, 'Failed to apply skills set to the challenge.');
   }
 }
 
@@ -267,7 +302,7 @@ async function getProjectBillingAccountId(id) {
 /**
  * gets the topcoder user id from handle
  * @param {String} handle the topcoder handle
- * @returns {Number} the user id
+ * @returns {Promise<Number>} the user id
  */
 async function getTopcoderMemberId(handle) {
   try {
@@ -465,6 +500,44 @@ async function getProjectByDirectId(id, directId) {
   });
 }
 
+/**
+ * Create a new submission.
+ * @param {String} challengeId Challenge ID
+ * @param {Number} memberId Member ID
+ * @param {Buffer} submissionFile Submission file
+ * @param {String} submissionFileName Submission file name
+ */
+async function createSubmission(challengeId, memberId, submissionFile, submissionFileName) {
+  try {
+    const formData = new FormData();
+    formData.append('submission', submissionFile, {
+      filename: submissionFileName,
+      contentType: 'application/zip',
+      knownLength: submissionFile.length
+    });
+    formData.append('type', 'Contest Submission');
+    formData.append('memberId', memberId);
+    formData.append('challengeId', challengeId);
+    const apiKey = await getM2Mtoken();
+    const res = await axios.post(`${config.TC_API_URL}/submissions`, formData, {
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        accept: 'application/json',
+        ...formData.getHeaders()
+      }
+    });
+    return res;
+  } catch (error) {
+    logger.error('createSubmission ERROR.');
+    if (error.isAxiosError) {
+      logger.error(`Request: ${JSON.stringify(error.config)}`);
+      logger.error(`Response Data: ${JSON.stringify(error.response.data)}`);
+    } else {
+      logger.error(`${error.message}`, error);
+    }
+    throw errors.convertTopcoderApiError(error, 'Failed to create submission.');
+  }
+}
 
 module.exports = {
   createProject,
@@ -472,6 +545,7 @@ module.exports = {
   createChallenge,
   updateChallenge,
   activateChallenge,
+  applySkillsSetToChallenge,
   closeChallenge,
   getProjectBillingAccountId,
   getTopcoderMemberId,
@@ -482,5 +556,6 @@ module.exports = {
   cancelPrivateContent,
   assignUserAsRegistrant,
   removeResourceToChallenge,
-  getProjectByDirectId
+  getProjectByDirectId,
+  createSubmission
 };

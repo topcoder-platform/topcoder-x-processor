@@ -13,6 +13,7 @@
 const _ = require('lodash');
 const constants = require('../constants');
 const notification = require('./notification');
+const logger = require ('./logger');
 
 // the error class wrapper
 class ProcessorError extends Error {
@@ -45,10 +46,11 @@ errors.handleGitHubError = function handleGitHubError(err, message, copilotHandl
     resMsg += ` Detail: ${detail}`;
   }
   const apiError = new ProcessorError(
-        _.get(err, 'response.status', constants.SERVICE_ERROR_STATUS),
-        resMsg,
-        'github'
-    );
+    _.get(err, 'response.status', constants.SERVICE_ERROR_STATUS),
+    resMsg,
+    'github'
+  );
+  logger.error(`Github error thrown: ${JSON.stringify(apiError)}`);
   return apiError;
 };
 
@@ -64,16 +66,17 @@ errors.handleGitLabError = function handleGitLabError(err, message, copilotHandl
   if (err.statusCode === 401 && copilotHandle && repoPath) { // eslint-disable-line no-magic-numbers
     notification.sendTokenExpiredAlert(copilotHandle, repoPath, 'Gitlab');
   }
-  let resMsg = `${message}. ${err.message}.`;
-  const detail = _.get(err, 'response.body.message');
+  let resMsg = `${message}: ${err.message}.`;
+  const detail = _.get(err, 'response.body') || _.get(err, 'cause.response.body');
   if (detail) {
-    resMsg += ` Detail: ${detail}`;
+    resMsg += ` Response Body: ${JSON.stringify(detail)}`;
   }
   const apiError = new ProcessorError(
-        err.status || _.get(err, 'response.status', constants.SERVICE_ERROR_STATUS),
-        resMsg,
-        'gitlab'
-    );
+    err.status || _.get(err, 'response.status', constants.SERVICE_ERROR_STATUS),
+    resMsg,
+    'gitlab'
+  );
+  logger.error(`Gitlab error thrown: ${JSON.stringify(apiError)}`);
   return apiError;
 };
 
@@ -94,6 +97,7 @@ errors.convertTopcoderApiError = function convertTopcoderApiError(err, message) 
     resMsg,
     'topcoder'
   );
+  logger.error(`Topcoder error thrown: ${JSON.stringify(apiError)}`);
   return apiError;
 };
 
@@ -105,10 +109,11 @@ errors.convertTopcoderApiError = function convertTopcoderApiError(err, message) 
 errors.internalDependencyError = function internalDependencyError(message) {
   const resMsg = `${message}`;
   const apiError = new ProcessorError(
-        constants.SERVICE_ERROR_STATUS,
-        resMsg,
-        'processor'
-    );
+    constants.SERVICE_ERROR_STATUS,
+    resMsg,
+    'processor'
+  );
+  logger.error(`Internal API error thrown: ${JSON.stringify(apiError)}`);
   return apiError;
 };
 

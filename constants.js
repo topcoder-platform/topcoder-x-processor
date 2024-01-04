@@ -19,7 +19,8 @@ const USER_TYPES = {
 
 // The user roles
 const USER_ROLES = {
-  OWNER: 'owner'
+  OWNER: 'owner',
+  GUEST: 'guest'
 };
 
 // The challenge status
@@ -43,10 +44,20 @@ const ISSUE_STATUS = {
   CHALLENGE_PAYMENT_FAILED: 'challenge_payment_failed'
 };
 
+const GITLAB_ACCESS_LEVELS = {
+  NO_ACCESS: 0,
+  GUEST: 10,
+  REPORTER: 20,
+  DEVELOPER: 30,
+  MAINTAINER: 40,
+  OWNER: 50
+};
+
 module.exports = {
   USER_ROLES,
   USER_TYPES,
   SERVICE_ERROR_STATUS,
   CHALLENGE_STATUS,
-  ISSUE_STATUS
+  ISSUE_STATUS,
+  GITLAB_ACCESS_LEVELS
 };

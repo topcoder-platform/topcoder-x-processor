@@ -32,7 +32,7 @@ logger.logFullError = function logFullError(err, signature) {
   if (!err || err.logged) {
     return;
   }
-  logger.error(`Error happened in ${signature}\n${err.stack}`);
+  logger.error(`Error happened in ${signature}\n${err.stack || err.message}`);
   err.logged = true;
 };
 
@@ -64,12 +64,12 @@ function sanitizeObject(obj) {
  * Decorate all functions of a service and log debug information if DEBUG is enabled
  * @param {Object} service the service
  */
-logger.decorateWithLogging = function decorateWithLogging(service) {
+logger.decorateWithLogging = function decorateWithLogging(service, isClass = false) {
   if (config.LOG_LEVEL !== 'debug') {
     return;
   }
-  _.forEach(service, (method, name) => {
-    service[name] = async function serviceMethodWithLogging() {
+  const forEachIteratee = (method, name, obj) => {
+    obj[name] = async function serviceMethodWithLogging() {
       try {
         const result = await method.apply(this, arguments); // eslint-disable-line
         return result;
@@ -78,15 +78,21 @@ logger.decorateWithLogging = function decorateWithLogging(service) {
         throw e;
       }
     };
-  });
+  };
+  if (isClass) {
+    _.forEach(service.prototype, forEachIteratee);
+  } else {
+    _.forEach(service, forEachIteratee);
+  }
 };
 
 /**
  * Apply logger and validation decorators
  * @param {Object} service the service to wrap
+ * @param {Boolean} isClass whether the service is an ES6 class
  */
-logger.buildService = function buildService(service) {
-  logger.decorateWithLogging(service);
+logger.buildService = function buildService(service, isClass = false) {
+  logger.decorateWithLogging(service, isClass);
 };
 
 /**

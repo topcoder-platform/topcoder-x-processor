@@ -18,7 +18,7 @@ function send(message) {
   const data = JSON.stringify({
     topic: config.TOPIC,
     originator: 'topcoder-x-processor',
-    timestamp: (new Date()).toISOString(),
+    timestamp: new Date().toISOString(),
     'mime-type': 'application/json',
     payload: {
       value: message
@@ -41,7 +41,7 @@ function sendNotification(notification) {
   const data = JSON.stringify({
     topic: config.TOPIC_NOTIFICATION,
     originator: 'topcoder-x-processor',
-    timestamp: (new Date()).toISOString(),
+    timestamp: new Date().toISOString(),
     'mime-type': 'application/json',
     payload: {
       notifications: [notification]

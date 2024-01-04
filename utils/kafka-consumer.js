@@ -13,74 +13,90 @@ const healthcheck = require('topcoder-healthcheck-dropin');
 const IssueService = require('../services/IssueService');
 const CopilotPaymentService = require('../services/CopilotPaymentService');
 const ChallengeService = require('../services/ChallengeService');
+const PrivateForkService = require('../services/PrivateForkService');
 const NotificationService = require('../services/NotificationService');
+const PullRequestService = require('../services/PullRequestService');
 const logger = require('./logger');
 const kafka = require('./kafka');
 
 /**
- * Handle the message from kafka
- * @param {Object} messageSet object to handle
+ * Parses the raw payload from a Kafka message
+ * @param {import('no-kafka').Message} event the message
+ * @returns {import('no-kafka').Message}
  */
-function messageHandler(messageSet) {
-  logger.debug(` topics ======= ${JSON.stringify(messageSet)}`);
-  messageSet.forEach((item) => {
-  // The event should be a JSON object
-    let event;
+function parsePayload(event) {
+  try {
+    const _message = JSON.parse(event.message.value.toString('utf8'));
+    event.message.value = _message;
+    logger.debug(`Decoded message from kafka: ${JSON.stringify(_.omit(event, 'payload.value.data.issue.body'))}`);
+    return event;
+  } catch (err) {
+    logger.error('"message" is not a valid JSON-formatted string.', err);
+    return null;
+  }
+}
+
+/**
+ * Handle the messages published to Topcoder-X topic of kafka
+ * @param {import('no-kafka').Message[]} messageSet the message set
+ */
+function tcxMessageHandler(messageSet, topic) {
+  logger.debug('Incoming message', {messageSet, topic});
+  messageSet.forEach((event) => {
+    // The event should be a JSON object
+    event = parsePayload(event);
     try {
-      const message = JSON.parse(item.message.value.toString('utf8'));
-      event = JSON.parse(message.payload.value);
-      message.payload.value = event;
-      logger.debug(`received message from kafka: ${JSON.stringify(_.omit(message, 'payload.value.data.issue.body'))}`);
-    } catch (err) {
-      logger.error(`"message" is not a valid JSON-formatted string: ${err.message}`);
+      event.message.value.payload.value = JSON.parse(event.message.value.payload.value);
+    } catch (e) {
+      logger.error('Invalid message payload', e);
       return;
     }
-
-    if (event && _.includes(['issue.created', 'issue.updated', 'issue.closed', 'issue.recreated',
-      'comment.created', 'comment.updated', 'issue.assigned', 'issue.labelUpdated', 'issue.unassigned']
-    , event.event)) {
+    const payload = event.message.value.payload.value;
+    logger.debug(`[kafka-consumer#tcxMessageHandler] Decoded Payload  ${JSON.stringify(payload)}`);
+    if (_.includes(['issue.created', 'issue.updated', 'issue.closed', 'issue.recreated',
+      'comment.created', 'comment.updated', 'issue.assigned', 'issue.labelUpdated', 'issue.unassigned'], payload.event)) {
       IssueService
-      .process(event)
-      .catch(logger.error);
+        .process(payload)
+        .catch(logger.error);
     }
-    if (event && _.includes(['copilotPayment.add', 'copilotPayment.update', 'copilotPayment.delete', 'copilotPayment.checkUpdates']
-      , event.event)) {
+    if (_.includes(['copilotPayment.add', 'copilotPayment.update', 'copilotPayment.delete', 'copilotPayment.checkUpdates']
+      , payload.event)) {
       CopilotPaymentService
-      .process(event)
-      .catch(logger.error);
+        .process(payload)
+        .catch(logger.error);
     }
-    if (event && _.includes(['challengeTags.update']
-      , event.event)) {
+    if (_.includes(['challengeTags.update']
+      , payload.event)) {
       ChallengeService
-      .process(event)
-      .catch(logger.error);
+        .process(payload)
+        .catch(logger.error);
     }
-    if (event && _.includes(['notification.tokenExpired']
-      , event.event)) {
+    if (_.includes(['notification.tokenExpired']
+      , payload.event)) {
       NotificationService
-      .process(event)
-      .catch(logger.error);
+        .process(payload)
+        .catch(logger.error);
+    }
+    if (_.includes(['pull_request.created'], payload.event)) {
+      PullRequestService
+        .process(payload)
+        .catch(logger.error);
     }
   });
 }
 
 /**
- * check if there is kafka connection alive
- * @returns {Boolean} true
+ * Handle the message published to Challenge-Action-Resource-Created topic of Kafka
+ * @param {import('no-kafka').Message[]} messageSet the message set
  */
-function check() {
-  // if (!this.consumer.client.initialBrokers && !this.consumer.client.initialBrokers.length) {
-  //   logger.info(`Brokers Exist Check Failed ${this.consumer.client.initialBrokers} ${this.consumer.client.initialBrokers.length}`)
-  //   return false;
-  // }
-  // let connected = true;
-  // this.consumer.client.initialBrokers.forEach((conn) => {
-  //   logger.info(`Brokers Check Failed ${conn.connected}`)
-  //   connected = conn.connected && connected;
-  // });
-
-  // return connected;
-  return true;
+function challengeResourceCreationHandler(messageSet, topic) {
+  logger.debug('Incoming message', {messageSet, topic});
+  messageSet.forEach((event) => {
+    event = parsePayload(event);
+    const payload = event.message.value.payload;
+    logger.debug(`[kafka-consumer#challengeResourceCreationHandler] Decoded Payload  ${JSON.stringify(payload)}`);
+    PrivateForkService.process(payload);
+  });
 }
 
 /**
@@ -89,8 +105,9 @@ function check() {
 function run() {
   kafka.consumer.init().then(() => {
     logger.info('kafka consumer is ready');
-    healthcheck.init([check]);
-    kafka.consumer.subscribe(config.TOPIC, {}, messageHandler);
+    healthcheck.init();
+    kafka.consumer.subscribe(config.TOPIC, {}, tcxMessageHandler);
+    kafka.consumer.subscribe(config.TOPIC_CHALLENGE_ACTION_RESOURCE_CREATE, {}, challengeResourceCreationHandler);
   }).catch((err) => {
     logger.error(`kafka consumer is not connected. ${err.stack}`);
   });

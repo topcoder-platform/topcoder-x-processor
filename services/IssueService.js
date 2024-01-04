@@ -20,9 +20,9 @@ const models = require('../models');
 const dbHelper = require('../utils/db-helper');
 const helper = require('../utils/helper');
 const gitHelper = require('../utils/git-helper');
+const constants = require('../constants');
 const userService = require('./UserService');
 const eventService = require('./EventService');
-const constants = require('../constants');
 
 
 // A variable to store issue creation lock to prevent duplicate creation process.
@@ -80,7 +80,7 @@ async function ensureChallengeExists(event, issue, create = true) {
     logger.debugWithContext('dbIssue is PENDING', event, issue);
     throw errors.internalDependencyError(`Challenge for the updated issue ${issue.number} is creating, rescheduling this event`);
   }
-  const hasOpenForPickupLabel = _(issue.labels).includes(config.OPEN_FOR_PICKUP_ISSUE_LABEL);
+  const hasOpenForPickupLabel = _.includes(issue.labels, config.OPEN_FOR_PICKUP_ISSUE_LABEL);
   if (dbIssue && dbIssue.status === constants.ISSUE_STATUS.CHALLENGE_CREATION_FAILED && hasOpenForPickupLabel) {
     // remove issue from db
     await dbHelper.removeIssue(models.Issue, issue.repositoryId, issue.number, issue.provider);
@@ -437,7 +437,7 @@ async function handleIssueClose(event, issue) { // eslint-disable-line
 
       if (closeChallenge) {
         logger.debugWithContext(`The associated challenge ${dbIssue.challengeUUID} is being scheduled for cancellation since no payment will be given`,
-            event, issue);
+          event, issue);
         await dbHelper.update(models.Issue, dbIssue.id, {
           status: constants.ISSUE_STATUS.CHALLENGE_CANCELLED,
           updatedAt: new Date()
@@ -500,7 +500,7 @@ async function handleIssueClose(event, issue) { // eslint-disable-line
       if (createCopilotPayments) {
         logger.debugWithContext('Setting copilot payment');
 
-        const updateBody = {
+        const _updateBody = {
           prizeSets: [{
             type: 'placement',
             prizes: _.map(issue.prizes, (prize) => ({type: 'USD', value: prize}))
@@ -511,7 +511,7 @@ async function handleIssueClose(event, issue) { // eslint-disable-line
           }
           ]
         };
-        await topcoderApiHelper.updateChallenge(dbIssue.challengeUUID, updateBody);
+        await topcoderApiHelper.updateChallenge(dbIssue.challengeUUID, _updateBody);
       } else {
         logger.debugWithContext('Create copilot payments is unchecked on the Topcoder-X project setup, so skipping', event, issue);
       }
@@ -575,7 +575,6 @@ async function handleIssueClose(event, issue) { // eslint-disable-line
   }
 }
 
-
 /**
  * handles the issue create event
  * @param {Object} event the event
@@ -636,10 +635,12 @@ async function handleIssueCreate(event, issue, forceAssign = false) {
     issue.challengeUUID = await topcoderApiHelper.createChallenge({
       name: issue.title,
       projectId,
-      tags: !!project.tags ? project.tags.split(',') : [],
       detailedRequirements: issue.body,
       prizes: issue.prizes
     });
+
+    // Apply skills to the challenge
+    await topcoderApiHelper.applySkillsSetToChallenge(issue.challengeUUID, project.tags);
 
     // Save
     // update db payment
@@ -676,7 +677,7 @@ async function handleIssueCreate(event, issue, forceAssign = false) {
     }
     delete issueCreationLock[creationLockKey];
   } catch (err) {
-    logger.error(`Comment creation failure: ${err}`);
+    logger.error(`Comment creation failure: ${err}`, err);
     delete issueCreationLock[creationLockKey];
     logger.debugWithContext(`new challenge created with id ${issue.challengeUUID} for issue ${issue.number}`, event, issue);
   }

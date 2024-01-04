@@ -14,7 +14,7 @@ const logger = require('../utils/logger');
 const models = require('../models');
 const dbHelper = require('../utils/db-helper');
 const gitHubService = require('./GithubService');
-const gitlabService = require('./GitlabService');
+const GitlabService = require('./GitlabService');
 
 const timeoutMapper = {};
 
@@ -27,7 +27,8 @@ async function reOpenIssue(event, issue) {
   if (event.provider === 'github') {
     await gitHubService.changeState(event.copilot, event.data.repository.full_name, issue.number, 'open');
   } else if (event.provider === 'gitlab') {
-    await gitlabService.changeState(event.copilot, event.data.repository.id, issue.number, 'reopen');
+    const gitlabService = await GitlabService.create(event.copilot);
+    await gitlabService.changeState(event.data.repository.id, issue.number, 'reopen');
   }
 }
 
@@ -37,7 +38,7 @@ async function reOpenIssue(event, issue) {
  * @param {Object} data the issue data or the copilot payment data
  * @param {Object} err the error
  */
-async function handleEventGracefully(event, data, err) {
+async function handleEventGracefully(event, data, err) { // eslint-disable-line complexity
   if (err.errorAt === 'topcoder' || err.errorAt === 'processor') {
     event.retryCount = _.toInteger(event.retryCount);
     let keyName = '';
@@ -64,7 +65,7 @@ async function handleEventGracefully(event, data, err) {
     if (event.retryCount === config.RETRY_COUNT) {
       // Clear out the kafka queue of any queued messages (assignment, label changes, etc...)
       const timeoutsToClear = timeoutMapper[keyName];
-      for (let i = 0; i < timeoutsToClear.length; i++) {  // eslint-disable-line no-restricted-syntax
+      for (let i = 0; i < timeoutsToClear.length; i++) { // eslint-disable-line no-restricted-syntax
         clearTimeout(timeoutsToClear[i]);
       }
       let comment = `[${err.statusCode}]: ${err.message}`;
@@ -95,7 +96,8 @@ async function handleEventGracefully(event, data, err) {
       if (event.provider === 'github') {
         await gitHubService.createComment(event.copilot, event.data.repository.full_name, data.number, comment);
       } else if (event.provider === 'gitlab') {
-        await gitlabService.createComment(event.copilot, event.data.repository.id, data.number, comment);
+        const gitlabService = await GitlabService.create(event.copilot);
+        await gitlabService.createComment(event.data.repository.id, data.number, comment);
       }
 
       if (event.event === 'issue.closed') {

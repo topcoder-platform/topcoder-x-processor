@@ -12,6 +12,16 @@ const dynamoose = require('dynamoose');
 
 const Schema = dynamoose.Schema;
 
+/**
+ * @typedef {Object} Repository
+ * @property {String} id The unique identifier for the Repository entity.
+ * @property {String} projectId The project ID associated with the repository.
+ * @property {String} url The URL of the repository.
+ * @property {String} archived Indicates whether the repository is archived or not.
+ * @property {String} repoId The repository ID (if applicable).
+ * @property {String} registeredWebhookId The ID of the registered webhook (if applicable).
+ */
+
 const schema = new Schema({
   id: {
     type: String,

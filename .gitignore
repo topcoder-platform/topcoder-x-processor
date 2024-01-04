@@ -6,3 +6,6 @@
 *.cer
 *.key
 .idea
+
+.env
+.envrc

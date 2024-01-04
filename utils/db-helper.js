@@ -12,6 +12,24 @@ const logger = require('./logger');
  */
 
 /**
+ * @typedef {Object} GitlabUserMapping
+ * @property {String} id the id
+ * @property {Number} gitlabUserId the gitlab user id
+ * @property {String} topcoderUsername the topcoder username
+ * @property {String} gitlabUsername the gitlab username
+ */
+
+/**
+ * @typedef {Object} Repository
+ * @property {String} id the id
+ * @property {String} projectId the project id
+ * @property {String} url the repository url
+ * @property {String} archived the archived flag
+ * @property {String} repoId the repository id
+ * @property {String} registeredWebhookId the registered webhook id
+ */
+
+/**
  * Get Data by model id
  * @param {Object} model The dynamoose model to query
  * @param {String} id The id value
@@ -58,19 +76,19 @@ async function scan(model, scanParams) {
 async function queryOneIssue(model, repositoryId, number, provider) {
   return await new Promise((resolve, reject) => {
     model.query('repositoryId').eq(repositoryId)
-    .where('number')
-    .eq(number)
-    .filter('provider')
-    .eq(provider)
-    .all()
-    .exec((err, result) => {
-      if (err || !result) {
-        logger.debug(`queryOne. Error. ${err}`);
-        return reject(err);
-      }
+      .where('number')
+      .eq(number)
+      .filter('provider')
+      .eq(provider)
+      .all()
+      .exec((err, result) => {
+        if (err || !result) {
+          logger.debug(`queryOne. Error. ${err}`);
+          return reject(err);
+        }
 
-      return resolve(result.count === 0 ? null : result[0]);
-    });
+        return resolve(result.count === 0 ? null : result[0]);
+      });
   });
 }
 
@@ -87,13 +105,13 @@ async function queryOneActiveProject(model, repoUrl) {
         resolve(null);
       } else {
         model.queryOne('id').eq(repo.projectId).consistent()
-        .exec((err, result) => {
-          if (err) {
-            logger.debug(`queryOneActiveProject. Error. ${err}`);
-            return reject(err);
-          }
-          return resolve(result);
-        });
+          .exec((err, result) => {
+            if (err) {
+              logger.debug(`queryOneActiveProject. Error. ${err}`);
+              return reject(err);
+            }
+            return resolve(result);
+          });
       }
     });
   });
@@ -109,16 +127,77 @@ async function queryOneActiveProject(model, repoUrl) {
 async function queryOneUserByType(model, username, type) {
   return await new Promise((resolve, reject) => {
     model.query('username').eq(username)
-    .where('type')
-    .eq(type)
-    .all()
-    .exec((err, result) => {
-      if (err || !result) {
-        logger.debug(`queryOneUserByType. Error. ${err}`);
-        return reject(err);
-      }
-      return resolve(result.count === 0 ? null : result[0]);
-    });
+      .where('type')
+      .eq(type)
+      .all()
+      .exec((err, result) => {
+        if (err || !result) {
+          logger.debug(`queryOneUserByType. Error. ${err}`);
+          return reject(err);
+        }
+        return resolve(result.count === 0 ? null : result[0]);
+      });
+  });
+}
+
+/**
+ * Get single data by query parameters
+ * @param {Object} model The dynamoose model to query
+ * @param {String} username The user username
+ * @param {String} type The type of user
+ * @param {String} role The role of user
+ * @returns {Promise<void>}
+ */
+async function queryOneUserByTypeAndRole(model, username, type, role) {
+  return await new Promise((resolve, reject) => {
+    model.query('username').eq(username)
+      .where('type')
+      .eq(type)
+      .all()
+      .exec((err, result) => {
+        if (err || !result) {
+          logger.debug(`queryOneUserByType. Error. ${err}`);
+          return reject(err);
+        }
+        const filteredResult = result.filter((item) => item.role === role);
+        return resolve(filteredResult.count === 0 ? null : filteredResult[0]);
+      });
+  });
+}
+
+/**
+ * Query project by repository url
+ * @param {String} repoUrl the repo url
+ * @returns {Promise<Repository>}
+ */
+async function queryOneProjectByRepositoryLink(repoUrl) {
+  const projectId = await new Promise((resolve, reject) => {
+    models.Repository.query('url')
+      .eq(repoUrl)
+      .all()
+      .exec((err, result) => {
+        if (err) {
+          return reject(err);
+        }
+        return resolve(result);
+      });
+  });
+  if (!projectId || projectId.length === 0) {
+    return null;
+  }
+  return await new Promise((resolve, reject) => {
+    models.Project.queryOne('id')
+      .eq(projectId[0].projectId)
+      .all()
+      .exec((err, result) => {
+        if (err) {
+          return reject(err);
+        }
+        if (!result || result.length === 0) {
+          return resolve(null);
+        }
+        return resolve(result);
+      });
   });
 }
 
@@ -126,19 +205,19 @@ async function queryOneUserByType(model, username, type) {
  * Get single data by query parameters
  * @param {Object} model The dynamoose model to query
  * @param {String} tcusername The tc username
- * @returns {Promise<void>}
+ * @returns {Promise<GitlabUserMapping>}
  */
 async function queryOneUserMappingByTCUsername(model, tcusername) {
   return await new Promise((resolve, reject) => {
     model.queryOne('topcoderUsername').eq(tcusername)
-    .all()
-    .exec((err, result) => {
-      if (err) {
-        logger.debug(`queryOneUserMappingByTCUsername. Error. ${err}`);
-        return reject(err);
-      }
-      return resolve(result);
-    });
+      .all()
+      .exec((err, result) => {
+        if (err) {
+          logger.debug(`queryOneUserMappingByTCUsername. Error. ${err}`);
+          return reject(err);
+        }
+        return resolve(result);
+      });
   });
 }
 
@@ -151,14 +230,14 @@ async function queryOneUserMappingByTCUsername(model, tcusername) {
 async function queryOneUserMappingByGithubUsername(model, username) {
   return await new Promise((resolve, reject) => {
     model.queryOne('githubUsername').eq(username)
-    .all()
-    .exec((err, result) => {
-      if (err || !result) {
-        logger.debug(`queryOneUserMappingByGithubUsername. Error. ${err}`);
-        return reject(err);
-      }
-      return resolve(result);
-    });
+      .all()
+      .exec((err, result) => {
+        if (err || !result) {
+          logger.debug(`queryOneUserMappingByGithubUsername. Error. ${err}`);
+          return reject(err);
+        }
+        return resolve(result);
+      });
   });
 }
 
@@ -171,14 +250,14 @@ async function queryOneUserMappingByGithubUsername(model, username) {
 async function queryOneUserMappingByGitlabUsername(model, username) {
   return await new Promise((resolve, reject) => {
     model.queryOne('gitlabUsername').eq(username)
-    .all()
-    .exec((err, result) => {
-      if (err || !result) {
-        logger.debug(`queryOneUserMappingByGitlabUsername. Error. ${err}`);
-        return reject(err);
-      }
-      return resolve(result);
-    });
+      .all()
+      .exec((err, result) => {
+        if (err || !result) {
+          logger.debug(`queryOneUserMappingByGitlabUsername. Error. ${err}`);
+          return reject(err);
+        }
+        return resolve(result);
+      });
   });
 }
 
@@ -191,14 +270,14 @@ async function queryOneUserMappingByGitlabUsername(model, username) {
 async function queryOneUserMappingByGithubUserId(model, userId) {
   return await new Promise((resolve, reject) => {
     model.queryOne('githubUserId').eq(userId)
-    .all()
-    .exec((err, result) => {
-      if (err || !result) {
-        logger.debug(`queryOneUserMappingByGithubUserId. Error. ${err}`);
-        return reject(err);
-      }
-      return resolve(result);
-    });
+      .all()
+      .exec((err, result) => {
+        if (err || !result) {
+          logger.debug(`queryOneUserMappingByGithubUserId. Error. ${err}`);
+          return reject(err);
+        }
+        return resolve(result);
+      });
   });
 }
 
@@ -206,19 +285,38 @@ async function queryOneUserMappingByGithubUserId(model, userId) {
  * Get single data by query parameters
  * @param {Object} model The dynamoose model to query
  * @param {Number} userId The  The user id
- * @returns {Promise<void>}
+ * @returns {Promise<GitlabUserMapping>}
  */
 async function queryOneUserMappingByGitlabUserId(model, userId) {
   return await new Promise((resolve, reject) => {
     model.queryOne('gitlabUserId').eq(userId)
-    .all()
-    .exec((err, result) => {
-      if (err || !result) {
-        logger.debug(`queryOneUserMappingByGitlabUserId. Error. ${err}`);
-        return reject(err);
-      }
-      return resolve(result);
-    });
+      .all()
+      .exec((err, result) => {
+        if (err || !result) {
+          logger.debug(`queryOneUserMappingByGitlabUserId. Error. ${err}`);
+          return reject(err);
+        }
+        return resolve(result);
+      });
+  });
+}
+
+/**
+ * Get all repositories by project id
+ * @param {String} projectId The project id
+ * @returns {Promise<import('dynamoose').ScanResult<any>>}
+ */
+async function queryAllRepositoriesByProjectId(projectId) {
+  return await new Promise((resolve, reject) => {
+    models.Repository.scan({projectId: {eq: projectId}})
+      .all()
+      .exec((err, result) => {
+        if (err || !result) {
+          logger.debug(`queryAllRepositoriesByProjectId. Error. ${err}`);
+          return reject(err);
+        }
+        return resolve(result);
+      });
   });
 }
 
@@ -335,13 +433,13 @@ async function queryOneActiveRepository(model, url) {
       url,
       archived: 'false'
     })
-    .all()
-    .exec((err, result) => {
-      if (err) {
-        return reject(err);
-      }
-      return resolve(result);
-    });
+      .all()
+      .exec((err, result) => {
+        if (err) {
+          return reject(err);
+        }
+        return resolve(result);
+      });
   });
 }
 
@@ -363,6 +461,104 @@ async function queryChallengeUUIDsByRepoUrl(repoUrl) {
   });
 }
 
+/**
+ * Acquire lock on user to prevent concurrent updates
+ * @param {String} userId ID of the user
+ * @param {String} lockId ID of the lock
+ * @param {Number} ttl Time to live (in milliseconds)
+ * @returns {Promise<Object>} The lock object
+ */
+async function acquireLockOnUser(userId, lockId, ttl) {
+  const lockExpiration = Date.now() + ttl;
+  return await new Promise(async (resolve) => {
+    try {
+      const res = await models.User.update(
+        {id: userId},
+        {lockId, lockExpiration},
+        {
+          condition: 'attribute_not_exists(lockId) OR (lockExpiration < :lockExpiration)',
+          conditionValues: {lockExpiration: new Date()},
+          returnValues: 'ALL_NEW'
+        },
+      );
+      return resolve(res);
+    } catch (err) {
+      if (err.code === 'ConditionalCheckFailedException') {
+        return resolve(null);
+      }
+      throw err;
+    }
+  });
+}
+
+/**
+ * Release lock on user
+ * @param {String} id ID of the user
+ * @param {String} lockId ID of the lock
+ * @returns {Promise<Object>} The lock object
+ */
+async function releaseLockOnUser(id, lockId) {
+  const user = await models.User.update(
+    {id},
+    {lockId: null, lockExpiration: null},
+    {
+      condition: 'lockId = :lockId',
+      conditionValues: {lockId}
+    },
+  );
+  return user;
+}
+
+/**
+ * Find the TC Challenge ID for a given TCX project ID
+ * @param {String} projectId Project ID
+ * @returns {Promise<String | null>} Challenge ID
+ */
+async function queryChallengeIdByProjectId(projectId) {
+  const filter = {
+    FilterExpression: '#projectId = :projectId',
+    ExpressionAttributeNames: {
+      '#projectId': 'projectId'
+    },
+    ExpressionAttributeValues: {
+      ':projectId': projectId
+    }
+  };
+  return new Promise((resolve, reject) => {
+    models.ProjectChallengeMapping.scan(filter, (err, result) => {
+      if (err) {
+        return reject(err);
+      }
+      return resolve(result.count === 0 ? null : result[0].challengeId);
+    });
+  });
+}
+
+/**
+ * Find the TCX Project ID for a given TC Challenge ID
+ * @param {String} challengeId Challenge ID
+ * @returns {Promise<String | null>} Project ID
+ */
+async function queryProjectIdByChallengeId(challengeId) {
+  const filter = {
+    FilterExpression: '#challengeId = :challengeId',
+    ExpressionAttributeNames: {
+      '#challengeId': 'challengeId'
+    },
+    ExpressionAttributeValues: {
+      ':challengeId': challengeId
+    }
+  };
+  return new Promise((resolve, reject) => {
+    models.ProjectChallengeMapping.scan(filter, (err, result) => {
+      if (err) {
+        return reject(err);
+      }
+      return resolve(result.count === 0 ? null : result[0].projectId);
+    });
+  });
+}
+
 module.exports = {
   getById,
   scan,
@@ -377,8 +573,15 @@ module.exports = {
   queryOneUserMappingByGitlabUserId,
   queryOneUserMappingByGithubUsername,
   queryOneUserMappingByGitlabUsername,
+  queryOneUserByTypeAndRole,
+  queryOneProjectByRepositoryLink,
   queryOneUserMappingByTCUsername,
   queryChallengeUUIDsByRepoUrl,
+  queryAllRepositoriesByProjectId,
   removeCopilotPayment,
-  removeIssue
+  removeIssue,
+  acquireLockOnUser,
+  releaseLockOnUser,
+  queryChallengeIdByProjectId,
+  queryProjectIdByChallengeId
 };
